@@ -1,5 +1,5 @@
-/// Handles user profile data (name, email, avatar, settings, etc).
-/// Currently MOCKED — no real backend call happens yet.
+// Handles user profile data (name, email, avatar, settings, etc).
+// Currently MOCKED - no real backend call happens yet.
 
 class UserService {
   Future<UserProfile> getProfile(String userId) async {

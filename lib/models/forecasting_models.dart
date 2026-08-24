@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class ForecastingChartPoint {
   final double hour; // negative = past, 0 = current time, positive = predicted
   final double value;

@@ -18,7 +18,6 @@ class AppDrawer extends StatelessWidget {
 
 
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
 
     Navigator.pop(context);

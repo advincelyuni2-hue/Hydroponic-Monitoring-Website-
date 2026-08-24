@@ -89,7 +89,7 @@ class AppHeader extends StatelessWidget {
               decoration: AppDecorations.card(radius: 24),
               child: Row(
                 children: [
-                  Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -117,10 +117,10 @@ class AppHeader extends StatelessWidget {
         _iconCircle(Icons.notifications_none, onBellTap ?? () {}, size: iconSize),
         if (!isMobile) ...[
           const SizedBox(width: 12),
-          CircleAvatar(
+          const CircleAvatar(
             radius: 20,
             backgroundColor: AppColors.iconCircle,
-            child: const Icon(Icons.person, color: Colors.white),
+            child: Icon(Icons.person, color: Colors.white),
           ),
           const SizedBox(width: 8),
           Column(
@@ -134,10 +134,10 @@ class AppHeader extends StatelessWidget {
           SizedBox(width: iconGap),
           GestureDetector(
             onTap: onProfileTap ?? () {},
-            child: CircleAvatar(
+            child: const CircleAvatar(
               radius: 16,
               backgroundColor: AppColors.iconCircle,
-              child: const Icon(Icons.person, color: Colors.white, size: 16),
+              child: Icon(Icons.person, color: Colors.white, size: 16),
             ),
           ),
         ],
@@ -173,7 +173,7 @@ class AppHeader extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     hintStyle: AppTextStyles.cardMeta,
-                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                    prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
                     filled: true,
                     fillColor: AppColors.background,
                     border: OutlineInputBorder(
