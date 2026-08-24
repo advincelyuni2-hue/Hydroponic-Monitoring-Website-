@@ -70,7 +70,7 @@ class ReportPredictionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.cardBorder),
+          Divider(height: 1, color: AppColors.cardBorder),
           const SizedBox(height: 20),
           SizedBox(
             height: isMobile ? 220 : 320,

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'theme_mode_controller.dart';
 
 
 class AppColors {
   AppColors._(); 
 
   // Background
-  static const Color background = Color(0xFFFDFDF0);
+  static Color get background => _isDark ? const Color(0xFF121712) : const Color(0xFFFDFDF0);
 
   // Left-side image placeholder
   static const Color imagePlaceholder = Color(0xFFD9D9D9);
 
   // Text
-  static const Color textPrimary = Color(0xFF1A1A1A);
-  static const Color textSecondary = Color(0xFF8A8A8A);
+  static Color get textPrimary => _isDark ? Colors.white : const Color(0xFF1A1A1A);
+  static Color get textSecondary =>
+      _isDark ? const Color(0xFFB8C2B8) : const Color(0xFF8A8A8A);
 
   // Buttons
   static const Color primaryButton = Color(0xFF2D6A0D); // dark green "Log In"
@@ -28,15 +30,19 @@ class AppColors {
   static const Color checkboxBorder = Color(0xFFBDBDBD);
 
   // Dashboard cards
-  static const Color cardBackground = Color(0xFFFFFFFF);
-  static const Color cardBorder = Color(0xFFECECEC);
-  static const Color statusCardGreen = Color(0xFFE3F2D3);
-  static const Color statusCardYellow = Color(0xFFF7F2CE);
+    static Color get cardBackground => _isDark ? const Color(0xFF1B211B) : Colors.white;
+    static Color get cardBorder =>
+      _isDark ? const Color(0xFF4C584C) : const Color(0xFFECECEC);
+    static Color get statusCardGreen =>
+      _isDark ? const Color(0xFF2B4728) : const Color(0xFFE3F2D3);
+    static Color get statusCardYellow =>
+      _isDark ? const Color(0xFF4A4525) : const Color(0xFFF7F2CE);
 
   // Alerts
   static const Color alertBorder = Color(0xFFD9483C);
   static const Color alertText = Color(0xFFD9483C);
-  static const Color alertBackground = Color(0xFFFCECEA);
+  static Color get alertBackground =>
+      _isDark ? const Color(0xFF4A2422) : const Color(0xFFFCECEA);
 
   // Icon circles (header)
   static const Color iconCircle = Color(0xFF2D6A0D);
@@ -51,8 +57,12 @@ class AppColors {
   static const Color chartGrid = Color(0xFFE0E0E0);
 
   // Prediction Insights callout box
-  static const Color calloutBackground = Color(0xFFEDEDED);
+  static Color get calloutBackground =>
+      _isDark ? const Color(0xFF293129) : const Color(0xFFEDEDED);
 
   //HIstory table
-  static const Color tableStripe = Color.fromARGB(255, 247, 249, 241);
+  static Color get tableStripe =>
+      _isDark ? const Color(0xFF252D25) : const Color.fromARGB(255, 247, 249, 241);
+
+  static bool get _isDark => appThemeMode.value == ThemeMode.dark;
 }

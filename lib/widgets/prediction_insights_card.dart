@@ -38,7 +38,7 @@ class PredictionInsightsCard extends StatelessWidget {
         children: [
           Text('Prediction Insights', style: AppTextStyles.sectionTitle),
           const SizedBox(height: 12),
-          const Divider(color: AppColors.cardBorder, height: 1),
+          Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
 
           // Status Row + Badge
@@ -63,12 +63,10 @@ class PredictionInsightsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-
+           Divider(color: AppColors.cardBorder, height: 1),
           Text(detail.warningText, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary)),
-          const SizedBox(height: 12),
-          const Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
-
+           Divider(color: AppColors.cardBorder, height: 1),
           // Contributing factors section
           Text('Contributing factors', style: AppTextStyles.bodyBold.copyWith(fontSize: 15)),
           const SizedBox(height: 10),
@@ -78,7 +76,7 @@ class PredictionInsightsCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.air, size: 18, color: AppColors.textPrimary),
+                  Icon(Icons.air, size: 18, color: AppColors.textPrimary),
                   const SizedBox(width: 6),
                   Text('Air humidity:', style: AppTextStyles.body),
                 ],
@@ -93,7 +91,7 @@ class PredictionInsightsCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.bolt, size: 18, color: AppColors.textPrimary),
+                  Icon(Icons.bolt, size: 18, color: AppColors.textPrimary),
                   const SizedBox(width: 6),
                   Text('EC Level:', style: AppTextStyles.body),
                 ],
@@ -119,7 +117,7 @@ class PredictionInsightsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Divider(color: AppColors.cardBorder, height: 1),
+          Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
 
           // Current vs Target

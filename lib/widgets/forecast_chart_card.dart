@@ -144,7 +144,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                           return LineTooltipItem(
                             spot.y.toStringAsFixed(2),
                             AppTextStyles.cardMeta.copyWith(
-                              color: AppColors.textPrimary,
+                              color: const Color(0xFF1A1A1A),
                               fontWeight: FontWeight.w600,
                             ),
                           );

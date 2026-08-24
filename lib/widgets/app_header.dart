@@ -46,10 +46,14 @@ class AppHeader extends StatelessWidget {
         SizedBox(width: isMobile ? 8 : 16),
 
         // Title
-        Flexible(
+        SizedBox(
+          width: isMobile ? 150 : 230,
           child: Text(
             title,
-            style: AppTextStyles.pageHeading.copyWith(fontSize: isMobile ? 18 : 24),
+            style: AppTextStyles.pageHeading.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: isMobile ? 18 : 24,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -89,7 +93,7 @@ class AppHeader extends StatelessWidget {
               decoration: AppDecorations.card(radius: 24),
               child: Row(
                 children: [
-                  const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                  Icon(Icons.search, color: AppColors.textSecondary, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -126,8 +130,18 @@ class AppHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(profile?.name ?? '', style: AppTextStyles.bodyBold),
-              Text(profile?.role ?? '', style: AppTextStyles.cardMeta),
+              Text(
+                profile?.name ?? '',
+                style: AppTextStyles.bodyBold.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                profile?.role ?? '',
+                style: AppTextStyles.cardMeta.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ] else ...[
@@ -173,7 +187,7 @@ class AppHeader extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     hintStyle: AppTextStyles.cardMeta,
-                    prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
                     filled: true,
                     fillColor: AppColors.background,
                     border: OutlineInputBorder(

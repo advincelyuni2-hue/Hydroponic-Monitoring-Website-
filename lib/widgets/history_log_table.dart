@@ -27,7 +27,7 @@ class HistoryLogTable extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const Divider(height: 1, color: AppColors.cardBorder),
+          Divider(height: 1, color: AppColors.cardBorder),
 
         if (rows.isEmpty)
           Padding(
