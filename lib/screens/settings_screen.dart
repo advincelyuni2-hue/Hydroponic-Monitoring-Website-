@@ -3,6 +3,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/theme_mode_controller.dart';
+import '../services/app_state.dart';
+import '../services/user_service.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
@@ -15,10 +17,18 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _nameController = TextEditingController(text: 'Alveus');
-  final _emailController = TextEditingController(text: 'placeholder@example.com');
-  bool _notificationsEnabled = true;
-  String _unitSystem = 'Metric';
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = appProfile.value;
+    _nameController = TextEditingController(text: profile?.name ?? 'Alveus');
+    _emailController = TextEditingController(
+      text: profile?.email ?? 'placeholder@example.com',
+    );
+  }
 
   @override
   void dispose() {
@@ -87,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: isMobile ? double.infinity : 180,
                       height: 48,
                       child: ElevatedButton.icon(
-                        onPressed: () => _showMessage('Profile changes saved locally.'),
+                        onPressed: _saveProfile,
                         icon: const Icon(Icons.save_outlined),
                         label: const Text('Save profile'),
                         style: ElevatedButton.styleFrom(
@@ -114,9 +124,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Receive alerts when sensor readings need attention.',
                         style: AppTextStyles.cardMeta.copyWith(color: mutedColor),
                       ),
-                      value: _notificationsEnabled,
+                      value: appNotificationsEnabled.value,
                       activeThumbColor: AppColors.primaryButton,
-                      onChanged: (value) => setState(() => _notificationsEnabled = value),
+                      onChanged: (value) {
+                        appNotificationsEnabled.value = value;
+                        setState(() {});
+                      },
                     ),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -129,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: AppTextStyles.cardMeta.copyWith(color: mutedColor),
                       ),
                       trailing: DropdownButton<String>(
-                        value: _unitSystem,
+                        value: appMeasurementUnits.value,
                         isDense: true,
                         dropdownColor: Theme.of(context).colorScheme.surface,
                         style: TextStyle(
@@ -143,7 +156,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           DropdownMenuItem(value: 'Imperial', child: Text('Imperial')),
                         ],
                         onChanged: (value) {
-                          if (value != null) setState(() => _unitSystem = value);
+                          if (value != null) {
+                            appMeasurementUnits.value = value;
+                            setState(() {});
+                          }
                         },
                       ),
                     ),
@@ -212,5 +228,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _saveProfile() async {
+    final existing = appProfile.value ?? UserProfile(
+      id: 'local-user',
+      name: 'Alveus',
+      email: _emailController.text,
+      role: 'Employee',
+    );
+    await UserService().updateProfile(UserProfile(
+      id: existing.id,
+      name: _nameController.text.trim(),
+      email: existing.email,
+      role: existing.role,
+    ));
+    if (mounted) _showMessage('Profile changes saved.');
   }
 }

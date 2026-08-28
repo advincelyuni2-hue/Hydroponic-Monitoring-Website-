@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_text_styles.dart';
 import '../models/monitoring_models.dart';
+import '../services/app_state.dart';
 import 'live_pulse_dot.dart';
 
 class ParameterStatusCard extends StatelessWidget {
@@ -15,7 +16,11 @@ class ParameterStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ValueListenableBuilder<String>(
+      valueListenable: appMeasurementUnits,
+      builder: (context, units, _) {
+        final display = _displayValue(data, units);
+        return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -44,7 +49,7 @@ class ParameterStatusCard extends StatelessWidget {
               children: [
                 Text(data.label, style: AppTextStyles.cardLabel),
                 Text(
-                  'Current value: ${data.currentValue}${data.unit.isNotEmpty ? ' ${data.unit}' : ''} →',
+                  'Current value: $display →',
                   style: AppTextStyles.cardValue,
                 ),
               ],
@@ -72,6 +77,18 @@ class ParameterStatusCard extends StatelessWidget {
           ),
         ],
       ),
+        );
+      },
     );
+  }
+
+  String _displayValue(ParameterStatus value, String units) {
+    if (value.label == 'Temperature') {
+      final celsius = double.tryParse(value.currentValue);
+      if (celsius != null) {
+        return formatTemperature(celsius);
+      }
+    }
+    return '${value.currentValue}${value.unit.isNotEmpty ? ' ${value.unit}' : ''}';
   }
 }

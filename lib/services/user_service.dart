@@ -1,22 +1,35 @@
 // Handles user profile data (name, email, avatar, settings, etc).
-// Currently MOCKED - no real backend call happens yet.
+// Currently uses local state until profile tables are added to Supabase.
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'app_state.dart';
+import 'supabase_client.dart';
 
 class UserService {
   Future<UserProfile> getProfile(String userId) async {
+    if (appProfile.value != null) return appProfile.value!;
     await Future.delayed(const Duration(milliseconds: 500));
 
     // TODO: replace with a real Supabase query
-    return UserProfile(
+    final profile = UserProfile(
       id: userId,
       name: 'Alveus',
       email: 'placeholder@example.com',
       role: 'Employee',
     );
+    setAppProfile(profile);
+    return profile;
   }
 
   Future<bool> updateProfile(UserProfile profile) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    // TODO: replace with a real Supabase update
+    final client = supabaseClient;
+    if (client != null) {
+      await client.auth.updateUser(
+        UserAttributes(data: {'full_name': profile.name}),
+      );
+    } else {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    setAppProfile(profile);
     return true;
   }
 }

@@ -1,6 +1,8 @@
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
+import 'app_state.dart';
+import 'user_service.dart';
 
 class AuthService {
   Future<AuthResult> login({
@@ -16,11 +18,18 @@ class AuthService {
     final client = supabaseClient;
     if (client == null) {
       await Future.delayed(const Duration(seconds: 1));
+      setAppProfile(UserProfile(
+        id: 'prototype-user',
+        name: 'User',
+        email: email,
+        role: 'Employee',
+      ));
       return AuthResult(success: true, message: 'Login successful');
     }
 
     try {
       await client.auth.signInWithPassword(email: email, password: password);
+      _setAuthenticatedProfile(email);
       return AuthResult(success: true, message: 'Login successful');
     } on AuthException catch (error) {
       return AuthResult(success: false, message: error.message);
@@ -84,6 +93,7 @@ class AuthService {
         email: email,
         token: token,
       );
+      _setAuthenticatedProfile(email);
       return AuthResult(success: true, message: 'Account verified');
     } on AuthException catch (error) {
       return AuthResult(success: false, message: error.message);
@@ -115,10 +125,25 @@ class AuthService {
     }
   }
 
+  void _setAuthenticatedProfile(String email) {
+    final user = supabaseClient?.auth.currentUser;
+    setAppProfile(UserProfile(
+      id: user?.id ?? 'authenticated-user',
+      name: user?.userMetadata?['full_name'] as String? ?? 'User',
+      email: user?.email ?? email,
+      role: 'Employee',
+    ));
+  }
+
   Future<AuthResult> loginWithGoogle() async {
     await Future.delayed(const Duration(seconds: 1));
     // TODO: replace with Supabase Google OAuth sign-in
     return AuthResult(success: true, message: 'Google login successful');
+  }
+
+  Future<void> logout() async {
+    if (supabaseClient != null) await supabaseClient!.auth.signOut();
+    appProfile.value = null;
   }
   // Append this method inside your AuthService class in auth_service.dart
 

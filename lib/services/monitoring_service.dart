@@ -1,4 +1,5 @@
 import '../models/monitoring_models.dart';
+import 'app_state.dart';
 
 class MonitoringService {
   /// Column headers for the "Sensor logs" tab on the History Logs screen.
@@ -152,10 +153,10 @@ class MonitoringService {
     return [
       const HistoryLogEntry(['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
       const HistoryLogEntry(['7:45 AM', 'EC', '5.8 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry(['7:30 AM', 'Temperature', '24.6 °C', 'Stable', 'None']),
+      HistoryLogEntry(['7:30 AM', 'Temperature', formatTemperature(24.6), 'Stable', 'None']),
       const HistoryLogEntry(['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
       const HistoryLogEntry(['7:00 AM', 'EC', '5.9 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry(['6:45 AM', 'Temperature', '26.8 °C', 'Critical', 'Alert sent to admin']),
+      HistoryLogEntry(['6:45 AM', 'Temperature', formatTemperature(26.8), 'Critical', 'Alert sent to admin']),
       const HistoryLogEntry(['6:30 AM', 'pH', '6.6', 'Stable', 'None']),
       const HistoryLogEntry(['6:15 AM', 'EC', '5.7 mS/cm', 'Stable', 'None']),
     ];
@@ -172,8 +173,8 @@ class MonitoringService {
           ['8:00 AM', 'pH', '2-Point Calibration', '+0.2', 'Auto-system', 'Success']),
       const HistoryLogEntry(
           ['Yesterday, 6:00 PM', 'EC', '1-Point Calibration', '-0.1 mS/cm', 'Alveus', 'Success']),
-      const HistoryLogEntry(
-          ['2 days ago, 8:00 AM', 'Temperature', 'Sensor Reset', '0.0 °C', 'Auto-system', 'Success']),
+        HistoryLogEntry(
+          ['2 days ago, 8:00 AM', 'Temperature', 'Sensor Reset', formatTemperature(0.0), 'Auto-system', 'Success']),
       const HistoryLogEntry(
           ['3 days ago, 8:00 AM', 'pH', '2-Point Calibration', '+0.1', 'Auto-system', 'Failed']),
     ];

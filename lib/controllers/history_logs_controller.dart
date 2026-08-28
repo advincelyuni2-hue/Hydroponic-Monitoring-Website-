@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../services/user_service.dart';
+import '../services/app_state.dart';
 
 class HistoryLogsController extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -101,12 +102,12 @@ void _initWeekRange() {
           ? ['Time', 'Parameter', 'Recorded Value', 'Status']
           : ['Time', 'Sensor', 'Action', 'Status'];
 
-      rows = isSensor
-          ? const [
-              HistoryLogEntry(['8:00 AM', 'pH Level', '6.5', 'Normal']),
-              HistoryLogEntry(['10:30 AM', 'EC Level', '1.8 mS/cm', 'Normal']),
-              HistoryLogEntry(['1:15 PM', 'Water Temp', '24.2 °C', 'Warning']),
-              HistoryLogEntry(['4:00 PM', 'pH Level', '6.2', 'Normal']),
+        rows = isSensor
+          ? [
+              const HistoryLogEntry(['8:00 AM', 'pH Level', '6.5', 'Normal']),
+              const HistoryLogEntry(['10:30 AM', 'EC Level', '1.8 mS/cm', 'Normal']),
+            HistoryLogEntry(['1:15 PM', 'Water Temp', formatTemperature(24.2), 'Warning']),
+              const HistoryLogEntry(['4:00 PM', 'pH Level', '6.2', 'Normal']),
             ]
           : const [
               HistoryLogEntry(['9:00 AM', 'pH Sensor', '2-Point Cal', 'Completed']),
@@ -117,12 +118,12 @@ void _initWeekRange() {
           ? ['Week', 'Avg pH', 'Avg EC', 'Status']
           : ['Week', 'Sensor', 'Calibrations', 'Status'];
 
-      rows = isSensor
-          ? const [
-              HistoryLogEntry(['Week 1', '6.4', '1.7 mS/cm', 'Normal']),
-              HistoryLogEntry(['Week 2', '6.5', '1.8 mS/cm', 'Normal']),
-              HistoryLogEntry(['Week 3', '6.2', '2.0 mS/cm', 'Warning']),
-              HistoryLogEntry(['Week 4', '6.6', '1.8 mS/cm', 'Normal']),
+        rows = isSensor
+          ? [
+              const HistoryLogEntry(['Week 1', '6.4', '1.7 mS/cm', 'Normal']),
+              const HistoryLogEntry(['Week 2', '6.5', '1.8 mS/cm', 'Normal']),
+              const HistoryLogEntry(['Week 3', '6.2', '2.0 mS/cm', 'Warning']),
+              const HistoryLogEntry(['Week 4', '6.6', '1.8 mS/cm', 'Normal']),
             ]
           : const [
               HistoryLogEntry(['Week 1', 'pH Sensor', '2 Runs', 'Verified']),

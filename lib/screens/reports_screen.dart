@@ -162,6 +162,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final card2 = ReportPredictionCard(
       points: _controller.predictionPoints,
       selectedParameter: _controller.selectedParameter,
+      onApplyRecommendation: () {
+        _controller.applyRecommendation();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_controller.selectedParameter} recommendation applied.')),
+        );
+      },
+      onDismissRecommendation: () {
+        _controller.dismissRecommendation();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_controller.selectedParameter} recommendation dismissed.')),
+        );
+      },
     );
 
     if (isMobile) {
@@ -207,10 +219,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
       onToggleCalibrationLogs: _controller.toggleCalibrationLogs,
       onTogglePhOptimization: _controller.togglePhOptimization,
       onToggleEcOptimization: _controller.toggleEcOptimization,
-      onGenerate: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Generating Report...')),
-        );
+      onGenerate: () async {
+        try {
+          await _controller.generatePdfReport();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('PDF report ready.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not generate report: $error')),
+            );
+          }
+        }
       },
     );
 
