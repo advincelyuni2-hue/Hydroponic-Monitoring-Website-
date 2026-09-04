@@ -7,8 +7,10 @@ class SignupController extends ChangeNotifier {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController otpController = TextEditingController();
 
   bool isLoading = false;
+  bool isOtpStep = false;
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   String? errorMessage;
@@ -46,17 +48,58 @@ class SignupController extends ChangeNotifier {
     notifyListeners();
 
    
-    final result = await _authService.login(
+    final result = await _authService.signUp(
+      name: nameController.text.trim(),
       email: emailController.text.trim(),
       password: passwordController.text,
     );
 
     isLoading = false;
-    if (!result.success) {
+    if (result.success && result.requiresOtp) {
+      isOtpStep = true;
+    } else if (!result.success) {
       errorMessage = result.message;
     }
     notifyListeners();
 
+    return result.success;
+  }
+
+  Future<bool> verifyOtp() async {
+    errorMessage = null;
+    final token = otpController.text.trim();
+    if (token.length != 6) {
+      errorMessage = 'Enter the 6-digit verification code';
+      notifyListeners();
+      return false;
+    }
+
+    isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.verifySignupOtp(
+      email: emailController.text.trim(),
+      token: token,
+    );
+
+    isLoading = false;
+    if (!result.success) errorMessage = result.message;
+    notifyListeners();
+    return result.success;
+  }
+
+  Future<bool> resendOtp() async {
+    errorMessage = null;
+    isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.resendSignupOtp(
+      email: emailController.text.trim(),
+    );
+
+    isLoading = false;
+    if (!result.success) errorMessage = result.message;
+    notifyListeners();
     return result.success;
   }
 
@@ -66,6 +109,7 @@ class SignupController extends ChangeNotifier {
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    otpController.dispose();
     super.dispose();
   }
 }

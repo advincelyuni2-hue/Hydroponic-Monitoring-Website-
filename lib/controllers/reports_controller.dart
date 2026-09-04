@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
 import '../services/reports_service.dart';
 import '../services/user_service.dart';
+import '../services/pdf_report_service.dart';
 
 class ReportsController extends ChangeNotifier {
   final ReportsService _reportsService = ReportsService();
   final UserService _userService = UserService();
+  final PdfReportService _pdfReportService = PdfReportService();
 
   bool isLoading = false;
   String? errorMessage;
@@ -91,6 +93,8 @@ class ReportsController extends ChangeNotifier {
   bool includeCalibrationLogs = false;
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
+  bool recommendationApplied = false;
+  bool recommendationDismissed = false;
 
   ReportsController() {
     loadData();
@@ -146,6 +150,33 @@ class ReportsController extends ChangeNotifier {
   void revertRanges() {
     phRange = const RangeValues(5.5, 6.5);
     ecRange = const RangeValues(5.0, 6.0);
+    notifyListeners();
+  }
+
+  Future<void> generatePdfReport() async {
+    await _pdfReportService.generateAndShare(
+      summary: summary,
+      trendPoints: trendPoints,
+      predictionPoints: predictionPoints,
+      phRange: phRange,
+      ecRange: ecRange,
+      selectedParameter: selectedParameter,
+      includeSensorLogs: includeSensorLogs,
+      includeCalibrationLogs: includeCalibrationLogs,
+      includePhOptimization: includePhOptimization,
+      includeEcOptimization: includeEcOptimization,
+    );
+  }
+
+  void applyRecommendation() {
+    recommendationApplied = true;
+    recommendationDismissed = false;
+    notifyListeners();
+  }
+
+  void dismissRecommendation() {
+    recommendationDismissed = true;
+    recommendationApplied = false;
     notifyListeners();
   }
 

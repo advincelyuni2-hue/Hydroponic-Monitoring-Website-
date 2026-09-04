@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../controllers/forecasting_controller.dart';
 import '../widgets/forecasting_chart_card.dart';
@@ -31,7 +30,7 @@ class _ForecastingDashboardScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 1),
       body: SafeArea(
         child: ListenableBuilder(

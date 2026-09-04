@@ -64,6 +64,8 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -71,11 +73,11 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
         width: 340,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 24,
               offset: const Offset(0, 8),
             ),
@@ -105,6 +107,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
   }
 
   Widget _buildMonthYearHeader() {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     final months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
@@ -130,7 +133,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
               const SizedBox(width: 4),
               Icon(
                 _showYearPicker ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                color: AppColors.textPrimary,
+                color: textColor,
               ),
             ],
           ),
@@ -138,7 +141,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.chevron_left, size: 20),
+              icon: Icon(Icons.chevron_left, size: 20, color: textColor),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               onPressed: () {
@@ -153,7 +156,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
             ),
             const SizedBox(width: 12),
             IconButton(
-              icon: const Icon(Icons.chevron_right, size: 20),
+              icon: Icon(Icons.chevron_right, size: 20, color: textColor),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               onPressed: () {
@@ -175,6 +178,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
   Widget _buildYearGrid() {
     final currentYear = _focusedDate.year;
     final years = List.generate(12, (index) => currentYear - 5 + index);
+    final textColor = Theme.of(context).colorScheme.onSurface;
 
     return SizedBox(
       height: 200,
@@ -206,7 +210,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
               child: Text(
                 '$year',
                 style: AppTextStyles.bodyBold.copyWith(
-                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                  color: isSelected ? Colors.white : textColor,
                 ),
               ),
             ),
@@ -221,6 +225,8 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final monthBackground = Theme.of(context).colorScheme.surfaceContainerHighest;
 
     return SizedBox(
       height: 200,
@@ -245,14 +251,14 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : const Color(0xFFF2F4F0),
+                color: isSelected ? AppColors.primaryButton : monthBackground,
                 borderRadius: BorderRadius.circular(12),
               ),
               alignment: Alignment.center,
               child: Text(
                 months[index],
                 style: AppTextStyles.bodyBold.copyWith(
-                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                  color: isSelected ? Colors.white : textColor,
                 ),
               ),
             ),
@@ -269,6 +275,10 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
 
     final weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     final weekRange = _getWeekRange(_selectedDate);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final rangeBackground = Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF365230)
+      : const Color(0xFFE2F0D9);
 
     return Column(
       children: [
@@ -318,7 +328,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
             BoxDecoration outerDecoration = const BoxDecoration();
             if (widget.mode == CalendarMode.weekly && isInSelectedWeek) {
               outerDecoration = BoxDecoration(
-                color: const Color(0xFFE2F0D9),
+                color: rangeBackground,
                 borderRadius: BorderRadius.horizontal(
                   left: isRowStart ? const Radius.circular(16) : Radius.zero,
                   right: isRowEnd ? const Radius.circular(16) : Radius.zero,
@@ -328,14 +338,14 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
 
             // Inner decoration (selected date badge)
             BoxDecoration? innerDecoration;
-            Color textColor = AppColors.textPrimary;
+            var dayTextColor = textColor;
 
             if (isSelectedDay) {
               innerDecoration = const BoxDecoration(
                 color: AppColors.primaryButton,
                 shape: BoxShape.circle,
               );
-              textColor = Colors.white;
+              dayTextColor = Colors.white;
             }
 
             return GestureDetector(
@@ -363,7 +373,7 @@ class _CustomCalendarPopupState extends State<CustomCalendarPopup> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: isSelectedDay ? FontWeight.w700 : FontWeight.w400,
-                      color: textColor,
+                      color: dayTextColor,
                     ),
                   ),
                 ),

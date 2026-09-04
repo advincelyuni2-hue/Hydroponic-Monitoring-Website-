@@ -50,7 +50,7 @@ class SideNav extends StatelessWidget {
             _NavTile(
               item: item,
               selected: false,
-              onTap: () => onSelect(-1), // -1 = "not a real screen yet"
+              onTap: () => onSelect(kNavItems.length + kNavFooterItems.indexOf(item)),
             ),
         ],
       ),
@@ -88,7 +88,7 @@ class _NavTile extends StatelessWidget {
                 Text(
                   item.label,
                   style: AppTextStyles.body.copyWith(
-                    color: selected ? AppColors.textPrimary : AppColors.sidebarText,
+                    color: selected ? const Color(0xFF1A1A1A) : AppColors.sidebarText,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),

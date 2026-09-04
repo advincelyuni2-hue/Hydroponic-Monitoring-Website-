@@ -1,33 +1,24 @@
-# Hydroponic Monitoring App
+# Monitoring App - Login Frontend
 
-## Supabase setup
+A Flutter login and signup frontend for the hydroponic monitoring application.
+Authentication is wired for Supabase, including email OTP verification during
+new account registration.
 
-The dashboard reads the newest `is_average = false` row from
-`ph_readings`, `ec_readings`, and `temp_readings`. It subscribes to inserts
-on those tables, so a new ESP32 upload updates the cards without refreshing
-the page. History Logs merges the `is_average = true` rows from those same
-three tables. Daily views retain each ten-minute record, weekly views summarize
-each eight-hour window, and monthly views summarize each calendar day.
+## Realtime monitoring and history
 
-1. Copy `supabase.example.json` to `supabase.json` and add the project URL and
-   publishable key from Supabase's Connect panel.
-2. Run `supabase/realtime_setup.sql` once in the Supabase SQL Editor.
-3. Start the app with:
+The dashboard reads the latest `is_average = false` rows from `ph_readings`,
+`ec_readings`, and `temp_readings`, and refreshes when the ESP32 inserts its
+five-minute readings. History Logs uses `is_average = true`: daily views keep
+each ten-minute summary, weekly views aggregate into eight-hour windows, and
+monthly views aggregate by calendar day.
 
-   ```powershell
-   flutter run -d chrome --dart-define-from-file=supabase.json
-   ```
+Copy `supabase.example.json` to the ignored `supabase.json`, fill in the project
+URL and publishable key, run `supabase/realtime_setup.sql` once in Supabase,
+then launch with:
 
-The expected reading-table columns are `value`, `is_average`, and
-`recorded_at`. The expected `sensor_history` columns match the ESP32 payload:
-`avg_ph`, `avg_ec`, `avg_temp`, `sample_count`, and `recorded_at` (along with
-the additional median/min/max/latest/std columns saved by the device).
-
----
-
-A fully functioning (mocked) login screen, built to match your Figma design,
-structured so the backend (Supabase) can be dropped in later without
-touching the UI.
+```powershell
+flutter run -d chrome --dart-define-from-file=supabase.json
+```
 
 ## Folder structure
 
@@ -39,14 +30,17 @@ lib/
     app_text_styles.dart        -> Manrope (titles) + Work Sans (everything else)
     app_theme.dart               -> combines colors/fonts into a Flutter theme
   screens/
-    login_screen.dart           -> pure UI, no logic
+    login_screen.dart           -> login UI
+    signup_screen.dart          -> signup and email OTP UI
   widgets/
     custom_text_field.dart      -> reusable input box
     custom_button.dart          -> reusable pill button
   controllers/
-    login_controller.dart       -> "frontend logic": form state, validation, loading
+    login_controller.dart       -> login form state and loading
+    signup_controller.dart      -> signup and OTP state
   services/
-    auth_service.dart           -> "backend logic": currently MOCKED, will call Supabase later
+    auth_service.dart           -> Supabase auth and OTP operations
+    supabase_client.dart        -> one shared Supabase client
 ```
 
 **Why split it like this?**
@@ -78,15 +72,22 @@ Nothing in `login_screen.dart` or `login_controller.dart` needs to change.
 
 ## What's mocked right now
 
-`auth_service.dart` doesn't call any real backend yet — it just waits 1 second
-and returns a fake success/failure so you can see the loading spinner and
-error messages working. Look for the `TODO` comments in that file; that's
-exactly where the Supabase calls will go later.
+Without Supabase environment values, the app remains runnable as a frontend
+prototype. In that mode, login is simulated and any six-digit OTP verifies the
+account. With Supabase values supplied, all auth calls use the real backend.
 
 ## Next steps (when you're ready)
 
-1. Add `supabase_flutter` to `pubspec.yaml` (already commented out, just uncomment it).
-2. Initialize Supabase in `main.dart`.
-3. Replace the mock logic inside `auth_service.dart` with real
-   `Supabase.instance.client.auth.signInWithPassword(...)` calls.
-4. Everything else in the app stays the same.
+1. Create or open the Supabase project.
+2. In Authentication > Providers > Email, enable email authentication and keep
+  email confirmation enabled so signup sends a verification code.
+3. Run the app with the project URL and publishable key. Do not commit these
+  values to source control:
+
+  ```
+  flutter run -d windows --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+  ```
+
+  `SUPABASE_ANON_KEY` is also accepted for compatibility with older projects.
+4. The signup form creates the account, shows the OTP form, verifies the code,
+  and then opens the dashboard.

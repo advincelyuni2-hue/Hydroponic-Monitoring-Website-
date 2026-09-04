@@ -71,7 +71,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
                   ],
                 ),
           const SizedBox(height: 12),
-          const Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
+           Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
           const SizedBox(height: 24),
 
           // 2. CHART CANVAS
@@ -273,7 +273,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
                 return LineTooltipItem(
                   spot.y.toStringAsFixed(2),
                   AppTextStyles.cardMeta.copyWith(
-                    color: AppColors.textPrimary,
+                    color: const Color(0xFF1A1A1A),
                     fontWeight: FontWeight.w600,
                   ),
                 );
