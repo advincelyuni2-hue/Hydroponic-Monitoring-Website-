@@ -1,4 +1,6 @@
 
+import 'app_state.dart';
+
 class NotificationService {
   Future<List<AppNotification>> getNotifications() async {
     await Future.delayed(const Duration(milliseconds: 500));
@@ -8,14 +10,14 @@ class NotificationService {
       AppNotification(
         id: '1',
         title: 'Critical Overheating',
-        detail: 'Water Temp 26.8°C',
+        detail: 'Water Temp ${formatTemperature(26.8)}',
         timeAgo: 'Just now',
         isCritical: true,
       ),
       AppNotification(
         id: '2',
         title: 'Critical Overheating',
-        detail: 'Water Temp 26.8°C',
+        detail: 'Water Temp ${formatTemperature(26.8)}',
         timeAgo: 'Just now',
         isCritical: true,
       ),

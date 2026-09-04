@@ -28,15 +28,15 @@ class CustomTextField extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.inputBorder),
+          borderSide: const BorderSide(color: AppColors.inputBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.inputBorder),
+          borderSide: const BorderSide(color: AppColors.inputBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.primaryButton, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.primaryButton, width: 1.5),
         ),
       ),
     );

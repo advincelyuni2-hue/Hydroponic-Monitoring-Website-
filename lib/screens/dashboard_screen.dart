@@ -37,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 0),
       body: SafeArea(
         child: ListenableBuilder(
@@ -178,7 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
+                      const Icon(Icons.warning_amber_rounded,
                           color: AppColors.alertText, size: 20),
                       const SizedBox(width: 6),
                       Flexible(
@@ -242,16 +242,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           for (final n in _controller.notifications)
             NotificationTile(
               notification: n,
-              onTap: () {},
+              onTap: () => _showNotifications(),
             ),
           if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: _showNotifications,
               child: Text('View all notifications', style: AppTextStyles.cardMeta),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showNotifications() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('All notifications'),
+        content: Text('${_controller.notifications.length} recent notifications available.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         ],
       ),
     );

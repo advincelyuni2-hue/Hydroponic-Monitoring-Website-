@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../models/reports_models.dart';
 import '../controllers/reports_controller.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
@@ -34,7 +33,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 3),
       body: SafeArea(
         child: ListenableBuilder(
@@ -163,6 +162,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final card2 = ReportPredictionCard(
       points: _controller.predictionPoints,
       selectedParameter: _controller.selectedParameter,
+      onApplyRecommendation: () {
+        _controller.applyRecommendation();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_controller.selectedParameter} recommendation applied.')),
+        );
+      },
+      onDismissRecommendation: () {
+        _controller.dismissRecommendation();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_controller.selectedParameter} recommendation dismissed.')),
+        );
+      },
     );
 
     if (isMobile) {
@@ -208,10 +219,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
       onToggleCalibrationLogs: _controller.toggleCalibrationLogs,
       onTogglePhOptimization: _controller.togglePhOptimization,
       onToggleEcOptimization: _controller.toggleEcOptimization,
-      onGenerate: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Generating Report...')),
-        );
+      onGenerate: () async {
+        try {
+          await _controller.generatePdfReport();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('PDF report ready.')),
+            );
+          }
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not generate report: $error')),
+            );
+          }
+        }
       },
     );
 

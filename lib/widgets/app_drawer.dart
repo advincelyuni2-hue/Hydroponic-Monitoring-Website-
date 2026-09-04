@@ -4,6 +4,8 @@ import '../screens/dashboard_screen.dart';
 import '../screens/forecasting_dashboard_screen.dart';
 import '../screens/history_logs_screen.dart';
 import '../screens/reports_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/help_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final int selectedIndex;
@@ -14,11 +16,10 @@ class AppDrawer extends StatelessWidget {
   });
 
   void _navigateTo(BuildContext context, int index) {
-    if (index == selectedIndex) return; 
+    if (index == selectedIndex) return;
 
 
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
 
     Navigator.pop(context);
@@ -41,9 +42,18 @@ class AppDrawer extends StatelessWidget {
         );
         break;
       case 3: // Reports
-      default:
         navigator.pushReplacement(
           MaterialPageRoute(builder: (_) => const ReportsScreen()),
+        );
+        break;
+      case 4: // Settings
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        );
+        break;
+      case 5: // Help
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (_) => const HelpScreen()),
         );
         break;
     }

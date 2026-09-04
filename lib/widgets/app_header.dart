@@ -5,6 +5,9 @@ import '../theme/app_decorations.dart';
 import '../services/user_service.dart';
 import '../utils/responsive.dart';
 import '../widgets/live_pulse_dot.dart';
+import '../services/app_state.dart';
+import '../services/auth_service.dart';
+import '../screens/login_screen.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
@@ -46,10 +49,14 @@ class AppHeader extends StatelessWidget {
         SizedBox(width: isMobile ? 8 : 16),
 
         // Title
-        Flexible(
+        SizedBox(
+          width: isMobile ? 150 : 230,
           child: Text(
             title,
-            style: AppTextStyles.pageHeading.copyWith(fontSize: isMobile ? 18 : 24),
+            style: AppTextStyles.pageHeading.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: isMobile ? 18 : 24,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -114,30 +121,47 @@ class AppHeader extends StatelessWidget {
         // Actions & Profile
         _iconCircle(Icons.add, onAddTap ?? () {}, size: iconSize),
         SizedBox(width: iconGap),
-        _iconCircle(Icons.notifications_none, onBellTap ?? () {}, size: iconSize),
+        _iconCircle(
+          Icons.notifications_none,
+          onBellTap ?? () => _showNotifications(context),
+          size: iconSize,
+        ),
         if (!isMobile) ...[
           const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.iconCircle,
-            child: const Icon(Icons.person, color: Colors.white),
+          GestureDetector(
+            onTap: onProfileTap ?? () => _showProfileMenu(context),
+            child: const CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.iconCircle,
+              child: Icon(Icons.person, color: Colors.white),
+            ),
           ),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(profile?.name ?? '', style: AppTextStyles.bodyBold),
-              Text(profile?.role ?? '', style: AppTextStyles.cardMeta),
+              Text(
+                profile?.name ?? '',
+                style: AppTextStyles.bodyBold.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                profile?.role ?? '',
+                style: AppTextStyles.cardMeta.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ] else ...[
           SizedBox(width: iconGap),
           GestureDetector(
-            onTap: onProfileTap ?? () {},
-            child: CircleAvatar(
+            onTap: onProfileTap ?? () => _showProfileMenu(context),
+            child: const CircleAvatar(
               radius: 16,
               backgroundColor: AppColors.iconCircle,
-              child: const Icon(Icons.person, color: Colors.white, size: 16),
+              child: Icon(Icons.person, color: Colors.white, size: 16),
             ),
           ),
         ],
@@ -187,6 +211,50 @@ class AppHeader extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showNotifications(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications'),
+        content: const Text('You have 2 recent notifications to review.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _showProfileMenu(BuildContext context) {
+    final profile = appProfile.value;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.person)),
+              title: Text(profile?.name ?? 'User'),
+              subtitle: Text(profile?.email ?? ''),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Log out'),
+              onTap: () async {
+                await AuthService().logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

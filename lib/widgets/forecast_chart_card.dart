@@ -144,7 +144,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                           return LineTooltipItem(
                             spot.y.toStringAsFixed(2),
                             AppTextStyles.cardMeta.copyWith(
-                              color: AppColors.textPrimary,
+                              color: const Color(0xFF1A1A1A),
                               fontWeight: FontWeight.w600,
                             ),
                           );
@@ -168,8 +168,8 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppColors.chartLine.withOpacity(0.22),
-                          AppColors.chartLine.withOpacity(0.0),
+                          AppColors.chartLine.withValues(alpha: 0.22),
+                          AppColors.chartLine.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -188,8 +188,8 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppColors.chartLine.withOpacity(0.10),
-                          AppColors.chartLine.withOpacity(0.0),
+                          AppColors.chartLine.withValues(alpha: 0.10),
+                          AppColors.chartLine.withValues(alpha: 0.0),
                         ],
                       ),
                     ),

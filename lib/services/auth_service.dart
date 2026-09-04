@@ -1,23 +1,138 @@
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_client.dart';
+import 'app_state.dart';
+import 'user_service.dart';
+
 class AuthService {
   Future<AuthResult> login({
     required String email,
     required String password,
   }) async {
-    // Simulate a network request
-    await Future.delayed(const Duration(seconds: 1));
-
-    // --- MOCK validation, remove once Supabase is connected ---
     if (email.isEmpty || password.isEmpty) {
       return AuthResult(success: false, message: 'Please fill in all fields');
     }
     if (!email.contains('@')) {
       return AuthResult(success: false, message: 'Enter a valid email');
     }
-    // --- end mock validation ---
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(seconds: 1));
+      setAppProfile(UserProfile(
+        id: 'prototype-user',
+        name: 'User',
+        email: email,
+        role: 'Employee',
+      ));
+      return AuthResult(success: true, message: 'Login successful');
+    }
 
-    // Pretend the login always succeeds for now
-    return AuthResult(success: true, message: 'Login successful');
+    try {
+      await client.auth.signInWithPassword(email: email, password: password);
+      _setAuthenticatedProfile(email);
+      return AuthResult(success: true, message: 'Login successful');
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to log in right now. Please try again.',
+      );
+    }
+  }
+
+  Future<AuthResult> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(seconds: 1));
+      return AuthResult(
+        success: true,
+        message: 'Verification code sent to your email.',
+        requiresOtp: true,
+      );
+    }
+
+    try {
+      final response = await client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': name},
+      );
+      return AuthResult(
+        success: response.user != null,
+        message: 'Verification code sent to your email.',
+        requiresOtp: response.user != null,
+      );
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to create your account right now.',
+      );
+    }
+  }
+
+  Future<AuthResult> verifySignupOtp({
+    required String email,
+    required String token,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return AuthResult(success: token.length == 6, message: 'Account verified');
+    }
+
+    try {
+      await client.auth.verifyOTP(
+        type: OtpType.signup,
+        email: email,
+        token: token,
+      );
+      _setAuthenticatedProfile(email);
+      return AuthResult(success: true, message: 'Account verified');
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to verify the code right now.',
+      );
+    }
+  }
+
+  Future<AuthResult> resendSignupOtp({required String email}) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return AuthResult(success: true, message: 'A new code was sent.');
+    }
+
+    try {
+      await client.auth.resend(type: OtpType.signup, email: email);
+      return AuthResult(success: true, message: 'A new code was sent.');
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to resend the code right now.',
+      );
+    }
+  }
+
+  void _setAuthenticatedProfile(String email) {
+    final user = supabaseClient?.auth.currentUser;
+    setAppProfile(UserProfile(
+      id: user?.id ?? 'authenticated-user',
+      name: user?.userMetadata?['full_name'] as String? ?? 'User',
+      email: user?.email ?? email,
+      role: 'Employee',
+    ));
   }
 
   Future<AuthResult> loginWithGoogle() async {
@@ -25,11 +140,14 @@ class AuthService {
     // TODO: replace with Supabase Google OAuth sign-in
     return AuthResult(success: true, message: 'Google login successful');
   }
+
+  Future<void> logout() async {
+    if (supabaseClient != null) await supabaseClient!.auth.signOut();
+    appProfile.value = null;
+  }
   // Append this method inside your AuthService class in auth_service.dart
 
 Future<AuthResult> resetPassword({required String email}) async {
-  await Future.delayed(const Duration(seconds: 1));
-
   if (email.trim().isEmpty) {
     return AuthResult(success: false, message: 'Please enter your email address');
   }
@@ -37,8 +155,16 @@ Future<AuthResult> resetPassword({required String email}) async {
     return AuthResult(success: false, message: 'Please enter a valid email address');
   }
 
-  // TODO: Replace with Supabase password reset call:
-  // await Supabase.instance.client.auth.resetPasswordForEmail(email);
+    final client = supabaseClient;
+    if (client != null) {
+      try {
+        await client.auth.resetPasswordForEmail(email);
+      } on AuthException catch (error) {
+        return AuthResult(success: false, message: error.message);
+      }
+    } else {
+      await Future.delayed(const Duration(seconds: 1));
+    }
 
   return AuthResult(
     success: true,
@@ -52,8 +178,13 @@ Future<AuthResult> resetPassword({required String email}) async {
 class AuthResult {
   final bool success;
   final String message;
+  final bool requiresOtp;
 
-  AuthResult({required this.success, required this.message});
+  AuthResult({
+    required this.success,
+    required this.message,
+    this.requiresOtp = false,
+  });
 }
 
 

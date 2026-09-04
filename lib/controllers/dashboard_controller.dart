@@ -3,6 +3,7 @@ import '../models/monitoring_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardController extends ChangeNotifier {
   final MonitoringService _monitoringService = MonitoringService();
@@ -18,9 +19,27 @@ class DashboardController extends ChangeNotifier {
   List<AppNotification> notifications = [];
   List<ForecastPoint> phForecast = [];
   List<ForecastPoint> ecForecast = [];
+  RealtimeChannel? _parameterChannel;
+  bool _refreshingParameters = false;
 
   DashboardController() {
     loadDashboard();
+    _parameterChannel = _monitoringService.subscribeToParameterChanges(
+      _refreshParameterStatuses,
+    );
+  }
+
+  Future<void> _refreshParameterStatuses() async {
+    if (_refreshingParameters) return;
+    _refreshingParameters = true;
+    try {
+      parameterStatuses = await _monitoringService.getParameterStatuses();
+      notifyListeners();
+    } catch (_) {
+      // Keep the last known dashboard values during a transient refresh error.
+    } finally {
+      _refreshingParameters = false;
+    }
   }
 
   Future<void> loadDashboard() async {
@@ -50,5 +69,14 @@ class DashboardController extends ChangeNotifier {
 
     isLoading = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    final channel = _parameterChannel;
+    if (channel != null) {
+      _monitoringService.unsubscribe(channel);
+    }
+    super.dispose();
   }
 }

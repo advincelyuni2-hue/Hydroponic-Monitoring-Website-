@@ -48,7 +48,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 2),
       body: SafeArea(
         child: ListenableBuilder(
@@ -138,7 +138,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
           const SizedBox(height: 12),
           filters,
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.cardBorder),
+          Divider(height: 1, color: AppColors.cardBorder),
         ],
       );
     }
@@ -160,7 +160,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        const Divider(height: 1, color: AppColors.cardBorder),
+        Divider(height: 1, color: AppColors.cardBorder),
       ],
     );
   }

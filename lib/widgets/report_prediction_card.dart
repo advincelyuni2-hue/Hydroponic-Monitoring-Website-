@@ -9,11 +9,15 @@ import '../utils/responsive.dart';
 class ReportPredictionCard extends StatelessWidget {
   final List<PredictedAnalyticsPoint> points;
   final String selectedParameter;
+  final VoidCallback? onApplyRecommendation;
+  final VoidCallback? onDismissRecommendation;
 
   const ReportPredictionCard({
     super.key,
     required this.points,
     required this.selectedParameter,
+    this.onApplyRecommendation,
+    this.onDismissRecommendation,
   });
 
   @override
@@ -70,7 +74,7 @@ class ReportPredictionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.cardBorder),
+          Divider(height: 1, color: AppColors.cardBorder),
           const SizedBox(height: 20),
           SizedBox(
             height: isMobile ? 220 : 320,
@@ -78,6 +82,35 @@ class ReportPredictionCard extends StatelessWidget {
                 ? LineChart(_buildChartData())
                 : Center(child: Text('No prediction data yet', style: AppTextStyles.cardMeta)),
           ),
+          if (onApplyRecommendation != null || onDismissRecommendation != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (onApplyRecommendation != null)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onApplyRecommendation,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Apply recommendation'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryButton,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                if (onApplyRecommendation != null && onDismissRecommendation != null)
+                  const SizedBox(width: 12),
+                if (onDismissRecommendation != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDismissRecommendation,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Dismiss'),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -116,7 +149,7 @@ class ReportPredictionCard extends StatelessWidget {
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (val) => FlLine(
+        getDrawingHorizontalLine: (val) => const FlLine(
           color: AppColors.chartGrid,
           strokeWidth: 1,
           dashArray: [4, 4],
