@@ -135,7 +135,7 @@ class ParameterConfigCard extends StatelessWidget {
           SliderTheme(
             data: SliderThemeData(
               activeTrackColor: activeColor, // Thin dark green line
-              inactiveTrackColor: activeColor.withOpacity(0.3), // Muted track
+              inactiveTrackColor: activeColor.withValues(alpha: 0.3), // Muted track
               thumbColor: activeColor, // Dark green circular thumb
               trackHeight: 2, // Thin line height
               rangeThumbShape: const RoundRangeSliderThumbShape(

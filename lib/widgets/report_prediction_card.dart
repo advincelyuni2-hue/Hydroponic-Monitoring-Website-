@@ -116,7 +116,7 @@ class ReportPredictionCard extends StatelessWidget {
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (val) => FlLine(
+        getDrawingHorizontalLine: (val) => const FlLine(
           color: AppColors.chartGrid,
           strokeWidth: 1,
           dashArray: [4, 4],

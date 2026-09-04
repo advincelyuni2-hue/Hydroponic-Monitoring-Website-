@@ -178,7 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
+                      const Icon(Icons.warning_amber_rounded,
                           color: AppColors.alertText, size: 20),
                       const SizedBox(width: 6),
                       Flexible(

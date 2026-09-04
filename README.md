@@ -1,4 +1,29 @@
-# Monitoring App — Login Frontend
+# Hydroponic Monitoring App
+
+## Supabase setup
+
+The dashboard reads the newest `is_average = false` row from
+`ph_readings`, `ec_readings`, and `temp_readings`. It subscribes to inserts
+on those tables, so a new ESP32 upload updates the cards without refreshing
+the page. History Logs merges the `is_average = true` rows from those same
+three tables. Daily views retain each ten-minute record, weekly views summarize
+each eight-hour window, and monthly views summarize each calendar day.
+
+1. Copy `supabase.example.json` to `supabase.json` and add the project URL and
+   publishable key from Supabase's Connect panel.
+2. Run `supabase/realtime_setup.sql` once in the Supabase SQL Editor.
+3. Start the app with:
+
+   ```powershell
+   flutter run -d chrome --dart-define-from-file=supabase.json
+   ```
+
+The expected reading-table columns are `value`, `is_average`, and
+`recorded_at`. The expected `sensor_history` columns match the ESP32 payload:
+`avg_ph`, `avg_ec`, `avg_temp`, `sample_count`, and `recorded_at` (along with
+the additional median/min/max/latest/std columns saved by the device).
+
+---
 
 A fully functioning (mocked) login screen, built to match your Figma design,
 structured so the backend (Supabase) can be dropped in later without

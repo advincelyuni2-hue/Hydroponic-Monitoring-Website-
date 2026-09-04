@@ -198,7 +198,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => FlLine(
+        getDrawingHorizontalLine: (value) => const FlLine(
           color: AppColors.chartGrid,
           strokeWidth: 1,
           dashArray: [4, 4],
@@ -296,8 +296,8 @@ class ReportsAnalyticsCard extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                AppColors.chartLine.withOpacity(0.22),
-                AppColors.chartLine.withOpacity(0.0),
+                AppColors.chartLine.withValues(alpha: 0.22),
+                AppColors.chartLine.withValues(alpha: 0.0),
               ],
             ),
           ),

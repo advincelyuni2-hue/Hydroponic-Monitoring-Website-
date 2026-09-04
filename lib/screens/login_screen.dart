@@ -138,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Checkbox(
                           value: _controller.rememberMe,
                           onChanged: _controller.toggleRememberMe,
-                          side: BorderSide(color: AppColors.checkboxBorder),
+                          side: const BorderSide(color: AppColors.checkboxBorder),
                         ),
                         Text('Remember me', style: AppTextStyles.bodySmall),
                       ],
