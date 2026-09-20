@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
 import '../models/reports_models.dart';
+import '../utils/responsive.dart';
 
 class TargetDistributionCard extends StatelessWidget {
   final TargetDistributionData data;
@@ -19,84 +20,123 @@ class TargetDistributionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     final total = data.optimalPercentage + data.warningPercentage + data.criticalPercentage;
     final hasData = total > 0;
+    final isMobile = Responsive.isMobile(context);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
                 child: Text(
-                  'Target Distribution',
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+                  'Target distribution',
+                  style: AppTextStyles.sectionTitle,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               _buildParamPill(),
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 150,
-            child: hasData
-                ? PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 40,
-                      sections: [
-                        PieChartSectionData(
-                          value: data.optimalPercentage,
-                          color: AppColors.primaryButton,
-                          title: '${data.optimalPercentage.toInt()}%',
-                          radius: 30,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        PieChartSectionData(
-                          value: data.warningPercentage,
-                          color: const Color(0xFFF39C12),
-                          title: '${data.warningPercentage.toInt()}%',
-                          radius: 30,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        PieChartSectionData(
-                          value: data.criticalPercentage,
-                          color: AppColors.alertBorder,
-                          title: '${data.criticalPercentage.toInt()}%',
-                          radius: 30,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Center(child: Text('No data yet', style: AppTextStyles.cardMeta)),
-          ),
-          const SizedBox(height: 16),
-          _legendRow('Optimal (In Target)', AppColors.primaryButton,
-              '${data.optimalPercentage.toInt()}%'),
-          const SizedBox(height: 6),
-          _legendRow('Warning Zone', const Color(0xFFF39C12),
-              '${data.warningPercentage.toInt()}%'),
-          const SizedBox(height: 6),
-          _legendRow('Critical Bounds', AppColors.alertBorder,
-              '${data.criticalPercentage.toInt()}%'),
+          const SizedBox(height: 12),
+          const Divider(color: AppColors.cardBorder, height: 1),
+          const SizedBox(height: 20),
+
+          if (!hasData)
+            SizedBox(
+              height: 150,
+              child: Center(
+                child: Text('No data yet', style: AppTextStyles.cardMeta),
+              ),
+            )
+          else if (isMobile)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(height: 160, child: _buildChart()),
+                const SizedBox(height: 16),
+                _buildLegendList(),
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: SizedBox(height: 170, child: _buildChart()),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 5,
+                  child: _buildLegendList(),
+                ),
+              ],
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildChart() {
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 3,
+        centerSpaceRadius: 40,
+        sections: [
+          PieChartSectionData(
+            value: data.optimalPercentage,
+            color: AppColors.primaryButton,
+            title: '${data.optimalPercentage.toInt()}%',
+            radius: 30,
+            titleStyle: AppTextStyles.cardMeta.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          PieChartSectionData(
+            value: data.warningPercentage,
+            color: const Color(0xFFF39C12),
+            title: '${data.warningPercentage.toInt()}%',
+            radius: 30,
+            titleStyle: AppTextStyles.cardMeta.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          PieChartSectionData(
+            value: data.criticalPercentage,
+            color: AppColors.alertBorder,
+            title: '${data.criticalPercentage.toInt()}%',
+            radius: 30,
+            titleStyle: AppTextStyles.cardMeta.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendList() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _legendRow('Optimal (in target)', AppColors.primaryButton, '${data.optimalPercentage.toInt()}%'),
+        const SizedBox(height: 12),
+        _legendRow('Warning zone', const Color(0xFFF39C12), '${data.warningPercentage.toInt()}%'),
+        const SizedBox(height: 12),
+        _legendRow('Critical bounds', AppColors.alertBorder, '${data.criticalPercentage.toInt()}%'),
+      ],
     );
   }
 
@@ -136,22 +176,40 @@ class TargetDistributionCard extends StatelessWidget {
   }
 
   Widget _legendRow(String label, Color color, String percent) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Using Flexible instead of Expanded inside nested Row prevents unbounded crashes
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(label, style: AppTextStyles.cardMeta.copyWith(fontSize: 12)),
-          ],
-        ),
-        Text(percent, style: AppTextStyles.bodyBold.copyWith(fontSize: 12)),
-      ],
+          ),
+          const SizedBox(width: 8),
+          Text(percent, style: AppTextStyles.bodyBold.copyWith(fontSize: 13)),
+        ],
+      ),
     );
   }
 }

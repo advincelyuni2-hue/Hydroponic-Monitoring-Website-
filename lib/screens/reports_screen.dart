@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../models/reports_models.dart';
 import '../controllers/reports_controller.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/report_summary_card.dart';
 import '../widgets/report_analytics_card.dart';
 import '../widgets/report_prediction_card.dart';
-import '../widgets/parameter_config_card.dart';
-import '../widgets/report_generation_card.dart';
+import '../widgets/ph_range_card.dart';
+import '../widgets/ec_range_card.dart';
 import '../widgets/target_distribution_card.dart';
 import '../widgets/alerts_frequency_card.dart';
 import '../widgets/sensor_health_card.dart';
@@ -19,16 +18,34 @@ class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  State<ReportsScreen> createState() => ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
-  final ReportsController _controller = ReportsController();
+class ReportsScreenState extends State<ReportsScreen> {
+  late final ReportsController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = ReportsController();
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    controller.dispose();
     super.dispose();
+  }
+
+  void _handleGenerate() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Generating Report...')),
+    );
+  }
+
+  void _handleSave() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Configuration saved!')),
+    );
   }
 
   @override
@@ -36,23 +53,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: const AppDrawer(selectedIndex: 3),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _handleGenerate,
+        backgroundColor: AppColors.primaryButton,
+        icon: const Icon(Icons.description, color: Colors.white, size: 20),
+        label: Text(
+          'Generate report',
+          style: AppTextStyles.button.copyWith(fontSize: 14),
+        ),
+      ),
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: _controller,
+          listenable: controller,
           builder: (context, _) {
-            if (_controller.isLoading) {
+            if (controller.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (_controller.errorMessage != null) {
+            if (controller.errorMessage != null) {
               return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!, style: AppTextStyles.body),
+                    Text(
+                      controller.errorMessage!,
+                      style: AppTextStyles.body,
+                    ),
                     const SizedBox(height: 12),
                     ElevatedButton(
-                      onPressed: _controller.loadData,
+                      onPressed: controller.loadData,
                       child: const Text('Retry'),
                     ),
                   ],
@@ -61,32 +91,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
             }
 
             final isMobile = Responsive.isMobile(context);
+            final isDesktop = Responsive.isDesktop(context);
 
             return SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 16 : 24,
+                isMobile ? 16 : 24,
+                isMobile ? 16 : 24,
+                isMobile ? 96 : 100,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppHeader(
-                    title: 'Reports',
-                    profile: _controller.profile,
-                  ),
+                  AppHeader(title: 'Reports', profile: controller.profile),
                   const SizedBox(height: 24),
-
-  
-                  _buildSummarySection(isMobile),
+                  _buildTopSummaryRow(isDesktop),
                   const SizedBox(height: 24),
-
-                 
+                  _buildDistributionAndAlertsSection(isMobile),
+                  const SizedBox(height: 24),
                   _buildVisualAnalyticsSection(isMobile),
                   const SizedBox(height: 24),
-
-                  
-                  _buildConfigAndGenerationSection(isMobile),
-                  const SizedBox(height: 24),
-
-               
-                  _buildDeepInsightsSection(isMobile),
+                  _buildRangeConfigSection(isMobile),
                 ],
               ),
             );
@@ -96,82 +121,119 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildSummarySection(bool isMobile) {
-    final summary = _controller.summary;
+  Widget _buildTopSummaryRow(bool isDesktop) {
+    final summary = controller.summary;
 
-    final cards = [
-      ReportSummaryCard(
-        label: 'Avg pH (30d)',
-        value: summary.avgPh.toStringAsFixed(1),
-        badgeText: summary.phStatus,
-        badgeColor: AppColors.statusCardGreen,
-      ),
-      ReportSummaryCard(
-        label: 'Avg EC (30d)',
-        value: summary.avgEc.toStringAsFixed(1),
-        unit: 'mS/cm',
-        badgeText: summary.ecStatus,
-        badgeColor: AppColors.statusCardGreen,
-      ),
-      ReportSummaryCard(
-        label: 'Critical alerts',
-        value: summary.criticalAlertsCount.toString(),
-        badgeText: summary.alertsPeriod,
-        badgeColor: AppColors.alertBackground,
-        badgeTextColor: AppColors.alertText,
-      ),
-    ];
+    final phCard = ReportSummaryCard(
+      label: 'Avg pH (30d)',
+      value: summary.avgPh.toStringAsFixed(1),
+      badgeText: summary.phStatus,
+      badgeColor: AppColors.statusCardGreen,
+    );
 
-    if (isMobile) {
+    final ecCard = ReportSummaryCard(
+      label: 'Avg EC (30d)',
+      value: summary.avgEc.toStringAsFixed(1),
+      unit: 'mS/cm',
+      badgeText: summary.ecStatus,
+      badgeColor: AppColors.statusCardGreen,
+    );
+
+    final alertsCard = ReportSummaryCard(
+      label: 'Critical alerts',
+      value: summary.criticalAlertsCount.toString(),
+      badgeText: summary.alertsPeriod,
+      badgeColor: AppColors.alertBackground,
+      badgeTextColor: AppColors.alertText,
+    );
+
+    final sensorCard = SensorHealthCard(sensors: controller.sensorHealthList);
+
+    if (!isDesktop) {
       return Column(
-        children: cards
-            .map((c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: c,
-                ))
-            .toList(),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: phCard),
+              const SizedBox(width: 12),
+              Expanded(child: ecCard),
+            ],
+          ),
+          const SizedBox(height: 12),
+          alertsCard,
+          const SizedBox(height: 12),
+          sensorCard,
+        ],
       );
     }
 
     return Row(
-      children: cards
-          .map((c) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: c,
-                ),
-              ))
-          .toList(),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 1, child: phCard),
+        const SizedBox(width: 12),
+        Expanded(flex: 1, child: ecCard),
+        const SizedBox(width: 12),
+        Expanded(flex: 1, child: alertsCard),
+        const SizedBox(width: 12),
+        Expanded(flex: 3, child: sensorCard),
+      ],
     );
   }
 
+  Widget _buildDistributionAndAlertsSection(bool isMobile) {
+  final card1 = TargetDistributionCard(
+    data: controller.targetDistribution,
+    selectedParam: controller.selectedDistributionParam,
+    onParamChanged: controller.setDistributionParam,
+  );
+
+  final card2 = AlertFrequencyCard(
+    alerts: controller.alertFrequency,
+    fixedCount: controller.fixedAlertsCount,
+    activeCount: controller.activeAlertsCount,
+  );
+
+  if (isMobile) {
+    return Column(
+      children: [card1, const SizedBox(height: 16), card2],
+    );
+  }
+
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: card1),
+      const SizedBox(width: 20),
+      Expanded(child: card2),
+    ],
+  );
+}
+
   Widget _buildVisualAnalyticsSection(bool isMobile) {
-    final card1 = ReportsAnalyticsCard(
-      selectedParameter: _controller.selectedParameter,
-      selectedTimeframe: _controller.selectedTimeframe,
-      points: _controller.trendPoints,
-      minThreshold: _controller.selectedParameter == 'pH'
-          ? _controller.phRange.start
-          : _controller.ecRange.start,
-      maxThreshold: _controller.selectedParameter == 'pH'
-          ? _controller.phRange.end
-          : _controller.ecRange.end,
-      onParameterChanged: _controller.setParameter,
-      onTimeframeChanged: _controller.setTimeframe,
+    final card1 = ReportAnalyticsCard(
+      selectedParameter: controller.selectedParameter,
+      selectedTimeframe: controller.selectedTimeframe,
+      points: controller.trendPoints,
+      minThreshold: controller.selectedParameter == 'pH'
+          ? controller.phRange.start
+          : controller.ecRange.start,
+      maxThreshold: controller.selectedParameter == 'pH'
+          ? controller.phRange.end
+          : controller.ecRange.end,
+      onParameterChanged: controller.setParameter,
+      onTimeframeChanged: controller.setTimeframe,
     );
 
     final card2 = ReportPredictionCard(
-      points: _controller.predictionPoints,
-      selectedParameter: _controller.selectedParameter,
+      points: controller.predictionPoints,
+      selectedParameter: controller.selectedParameter,
     );
 
     if (isMobile) {
       return Column(
-        children: [
-          card1,
-          const SizedBox(height: 16),
-          card2,
-        ],
+        children: [card1, const SizedBox(height: 16), card2],
       );
     }
 
@@ -185,93 +247,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildConfigAndGenerationSection(bool isMobile) {
-    final configCard = ParameterConfigCard(
-      phRange: _controller.phRange,
-      ecRange: _controller.ecRange,
-      onPhChanged: _controller.updatePhRange,
-      onEcChanged: _controller.updateEcRange,
-      onSave: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Configuration saved!')),
-        );
-      },
-      onRevert: _controller.revertRanges,
+  Widget _buildRangeConfigSection(bool isMobile) {
+    final phCard = PhRangeCard(
+      phRange: controller.phRange,
+      onChanged: controller.updatePhRange,
+      onSave: _handleSave,
+      onRevert: controller.revertRanges,
     );
 
-    final generationCard = ReportGenerationCard(
-      includeSensorLogs: _controller.includeSensorLogs,
-      includeCalibrationLogs: _controller.includeCalibrationLogs,
-      includePhOptimization: _controller.includePhOptimization,
-      includeEcOptimization: _controller.includeEcOptimization,
-      onToggleSensorLogs: _controller.toggleSensorLogs,
-      onToggleCalibrationLogs: _controller.toggleCalibrationLogs,
-      onTogglePhOptimization: _controller.togglePhOptimization,
-      onToggleEcOptimization: _controller.toggleEcOptimization,
-      onGenerate: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Generating Report...')),
-        );
-      },
+    final ecCard = EcRangeCard(
+      ecRange: controller.ecRange,
+      onChanged: controller.updateEcRange,
+      onSave: _handleSave,
+      onRevert: controller.revertRanges,
     );
 
     if (isMobile) {
       return Column(
-        children: [
-          configCard,
-          const SizedBox(height: 16),
-          generationCard,
-        ],
+        children: [phCard, const SizedBox(height: 16), ecCard],
       );
     }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: configCard),
+        Expanded(child: phCard),
         const SizedBox(width: 20),
-        Expanded(child: generationCard),
-      ],
-    );
-  }
-
-  Widget _buildDeepInsightsSection(bool isMobile) {
-    final card1 = TargetDistributionCard(
-      data: _controller.targetDistribution,
-      selectedParam: _controller.selectedDistributionParam,
-      onParamChanged: _controller.setDistributionParam,
-    );
-
-    final card2 = AlertFrequencyCard(
-      alerts: _controller.alertFrequency,
-      fixedCount: _controller.fixedAlertsCount,
-      activeCount: _controller.activeAlertsCount,
-    );
-
-    final card3 = SensorHealthCard(
-      sensors: _controller.sensorHealthList,
-    );
-
-    if (isMobile) {
-      return Column(
-        children: [
-          card1,
-          const SizedBox(height: 16),
-          card2,
-          const SizedBox(height: 16),
-          card3,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: card1),
-        const SizedBox(width: 16),
-        Expanded(child: card2),
-        const SizedBox(width: 16),
-        Expanded(child: card3),
+        Expanded(child: ecCard),
       ],
     );
   }

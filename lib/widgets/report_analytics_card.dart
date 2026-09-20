@@ -7,7 +7,7 @@ import '../models/reports_models.dart';
 import '../utils/responsive.dart';
 import 'date_picker_button.dart';
 
-class ReportsAnalyticsCard extends StatelessWidget {
+class ReportAnalyticsCard extends StatelessWidget {
   final String selectedParameter; // 'pH' or 'EC'
   final String selectedTimeframe; // '7d', '30d', or '90d'
   final List<AnalyticsPoint> points;
@@ -15,9 +15,9 @@ class ReportsAnalyticsCard extends StatelessWidget {
   final double maxThreshold;
   final ValueChanged<String> onParameterChanged;
   final ValueChanged<String> onTimeframeChanged;
-  final VoidCallback? onDatePickerTap; // DatePicker callback
+  final VoidCallback? onDatePickerTap;
 
-  const ReportsAnalyticsCard({
+  const ReportAnalyticsCard({
     super.key,
     required this.selectedParameter,
     required this.selectedTimeframe,
@@ -40,7 +40,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. TOP HEADER: Title & Parameter Toggle + Timeframe Pills & Calendar
+          // 1. TOP HEADER: Title & Parameter Toggle + Timeframe Pills
           isMobile
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,10 +138,8 @@ class ReportsAnalyticsCard extends StatelessWidget {
     );
   }
 
-  /// Timeframe Pills + DatePickerButton
   Widget _buildTimeframeFilterPills(BuildContext context) {
     final options = ['7d', '30d', '90d'];
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -170,13 +168,11 @@ class ReportsAnalyticsCard extends StatelessWidget {
           ),
         ],
         const SizedBox(width: 8),
-
-        // Reusable Calendar Icon Button
         DatePickerButton(
           onTap: onDatePickerTap ??
               () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Date picker coming soon')),
+                  const SnackBar(content: Text('Date picker coming soon!')),
                 );
               },
         ),
@@ -192,13 +188,13 @@ class ReportsAnalyticsCard extends StatelessWidget {
 
     return LineChartData(
       minX: 0,
-      maxX: (points.length - 1).toDouble(),
-      minY: 5.0,
-      maxY: 7.5,
+      maxX: points.isEmpty ? 1 : (points.length - 1).toDouble(),
+      minY: selectedParameter == 'pH' ? 4.0 : 0.0,
+      maxY: selectedParameter == 'pH' ? 9.0 : 1200.0,
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => FlLine(
+        getDrawingHorizontalLine: (value) => const FlLine(
           color: AppColors.chartGrid,
           strokeWidth: 1,
           dashArray: [4, 4],
@@ -215,7 +211,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 36,
-            interval: 0.5,
+            interval: selectedParameter == 'pH' ? 1.0 : 300.0,
             getTitlesWidget: (val, meta) {
               return Text(
                 val.toStringAsFixed(1),
@@ -266,19 +262,14 @@ class ReportsAnalyticsCard extends StatelessWidget {
           getTooltipColor: (touchedSpot) => const Color(0xFFE5FFDE),
           tooltipRoundedRadius: 8,
           getTooltipItems: (touchedSpots) {
-            if (touchedSpots.isEmpty) return [];
-            final primarySpot = touchedSpots.first;
             return touchedSpots.map((spot) {
-              if (spot == primarySpot) {
-                return LineTooltipItem(
-                  spot.y.toStringAsFixed(2),
-                  AppTextStyles.cardMeta.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                );
-              }
-              return null;
+              return LineTooltipItem(
+                spot.y.toStringAsFixed(2),
+                AppTextStyles.cardMeta.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              );
             }).toList();
           },
         ),
