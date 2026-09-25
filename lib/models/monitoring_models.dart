@@ -4,6 +4,7 @@ class ParameterStatus {
   final String unit;
   final String idealRange;
   final String lastUpdated;
+  final String status;
 
   ParameterStatus({
     required this.label,
@@ -11,6 +12,7 @@ class ParameterStatus {
     required this.unit,
     required this.idealRange,
     required this.lastUpdated,
+    this.status = 'Normal',
   });
 }
 

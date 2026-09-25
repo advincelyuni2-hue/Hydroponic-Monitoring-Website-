@@ -35,32 +35,83 @@ class MonitoringService {
 
   /// Powers the "Parameter Status" cards (pH / EC / Temperature).
   Future<List<ParameterStatus>> getParameterStatuses() async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    final config = await _client
+        .from('parameter_configurations')
+        .select('ph_min, ph_max, ec_min, ec_max')
+        .eq('id', 1)
+        .maybeSingle();
+    final phMin = (config?['ph_min'] as num?)?.toDouble() ?? 5.5;
+    final phMax = (config?['ph_max'] as num?)?.toDouble() ?? 6.5;
+    final ecMin = (config?['ec_min'] as num?)?.toDouble() ?? 1.2;
+    final ecMax = (config?['ec_max'] as num?)?.toDouble() ?? 1.8;
 
-    // TODO: replace with a real Supabase query against your readings table
+    final readings = await Future.wait([
+      _latestReading('ph_readings'),
+      _latestReading('ec_readings'),
+      _latestReading('temp_readings'),
+    ]);
     return [
-      ParameterStatus(
+      _statusFromReading(
         label: 'pH Level',
-        currentValue: '5.8',
+        row: readings[0],
         unit: '',
-        idealRange: '5.5 - 6.5',
-        lastUpdated: '8:00AM',
+        min: phMin,
+        max: phMax,
+        decimals: 2,
       ),
-      ParameterStatus(
+      _statusFromReading(
         label: 'EC Level',
-        currentValue: '5.8',
+        row: readings[1],
         unit: 'mS/cm',
-        idealRange: '5.5 - 6.5',
-        lastUpdated: '8:00AM',
+        min: ecMin,
+        max: ecMax,
+        decimals: 2,
       ),
-      ParameterStatus(
+      _statusFromReading(
         label: 'Temperature',
-        currentValue: '5.8',
+        row: readings[2],
         unit: '°C',
-        idealRange: '5.5 - 6.5',
-        lastUpdated: '8:00AM',
+        min: 18,
+        max: 28,
+        decimals: 1,
       ),
     ];
+  }
+
+  Future<Map<String, dynamic>?> _latestReading(String table) async {
+    final rows = await _client
+        .from(table)
+        .select('value, recorded_at, status')
+        .order('recorded_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  ParameterStatus _statusFromReading({
+    required String label,
+    required Map<String, dynamic>? row,
+    required String unit,
+    required double min,
+    required double max,
+    required int decimals,
+  }) {
+    final value = (row?['value'] as num?)?.toDouble();
+    final recordedAt = row?['recorded_at'] as String?;
+    final status = value == null
+        ? 'No data'
+        : value < min || value > max
+            ? 'Critical'
+            : row?['status'] as String? ?? 'Normal';
+    return ParameterStatus(
+      label: label,
+      currentValue: value?.toStringAsFixed(decimals) ?? '—',
+      unit: unit,
+      idealRange: '${min.toStringAsFixed(decimals)} - ${max.toStringAsFixed(decimals)}',
+      lastUpdated: recordedAt == null
+          ? 'No data'
+          : _formatTime(DateTime.parse(recordedAt).toLocal()),
+      status: status,
+    );
   }
 
   String _formatTime(DateTime value) {

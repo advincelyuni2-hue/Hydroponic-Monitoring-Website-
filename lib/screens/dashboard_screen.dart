@@ -89,12 +89,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildParameterStatusSection(bool isMobile) {
     final statuses = _controller.parameterStatuses;
-    final cardColors = [
-      AppColors.statusCardGreen,
-      AppColors.statusCardYellow,
-      AppColors.statusCardGreen,
-    ];
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -110,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     for (int i = 0; i < statuses.length; i++) ...[
                       ParameterStatusCard(
                         data: statuses[i],
-                        backgroundColor: cardColors[i % cardColors.length],
+                        backgroundColor: _statusColor(statuses[i].status),
                       ),
                       if (i != statuses.length - 1) const SizedBox(height: 12),
                     ],
@@ -123,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         child: ParameterStatusCard(
                           data: statuses[i],
-                          backgroundColor: cardColors[i % cardColors.length],
+                          backgroundColor: _statusColor(statuses[i].status),
                         ),
                       ),
                       if (i != statuses.length - 1) const SizedBox(width: 16),
@@ -133,6 +127,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'critical':
+        return AppColors.alertBackground;
+      case 'warning':
+        return AppColors.statusCardYellow;
+      default:
+        return AppColors.statusCardGreen;
+    }
   }
 
   Widget _buildInsightAndNotificationsSection(bool isMobile) {
@@ -345,8 +350,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('All notifications'),
-        content: Text(
-            '${_controller.notifications.length} recent notifications available.'),
+        content: SizedBox(
+          width: 420,
+          child: _controller.notifications.isEmpty
+              ? const Text('No recent notifications available.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: _controller.notifications
+                      .map((notification) => ListTile(
+                            title: Text(notification.title),
+                            subtitle: Text(notification.detail),
+                            trailing: Text(notification.timeAgo),
+                          ))
+                      .toList(),
+                ),
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),

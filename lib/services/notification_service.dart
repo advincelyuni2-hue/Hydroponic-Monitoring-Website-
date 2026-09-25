@@ -44,12 +44,16 @@ class NotificationService {
     final client = supabaseClient;
     final user = client?.auth.currentUser;
     if (client != null && user != null) {
-      final rows = await client
+      final isAdmin = appProfile.value?.isAdmin == true;
+      final query = client
           .from('notifications')
-          .select('id, message, status, timestamp, created_at')
-          .eq('employee_id', user.id)
-          .order('created_at', ascending: false)
-          .limit(10);
+          .select('id, message, status, timestamp, created_at');
+      final rows = isAdmin
+          ? await query.order('created_at', ascending: false).limit(10)
+          : await query
+              .eq('employee_id', user.id)
+              .order('created_at', ascending: false)
+              .limit(10);
       return (rows as List).cast<Map<String, dynamic>>().map((row) {
         final critical = (row['message'] as String? ?? '')
             .toLowerCase()
@@ -59,27 +63,22 @@ class NotificationService {
           databaseId: row['id'].toString(),
           title: critical ? 'Critical alert' : 'Notification',
           detail: row['message'] as String? ?? '',
-          timeAgo: 'Recent',
+          timeAgo: _timeAgo(
+              DateTime.tryParse((row['timestamp'] ?? row['created_at']) as String? ?? '')),
           isCritical: critical,
         );
       }).toList();
     }
-    return [
-      AppNotification(
-        id: '1',
-        title: 'Critical Overheating',
-        detail: 'Water Temp ${formatTemperature(26.8)}',
-        timeAgo: 'Just now',
-        isCritical: true,
-      ),
-      AppNotification(
-        id: '2',
-        title: 'Critical Overheating',
-        detail: 'Water Temp ${formatTemperature(26.8)}',
-        timeAgo: 'Just now',
-        isCritical: true,
-      ),
-    ];
+    return const [];
+  }
+
+  String _timeAgo(DateTime? timestamp) {
+    if (timestamp == null) return 'Recent';
+    final difference = DateTime.now().difference(timestamp.toLocal());
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inHours < 1) return '${difference.inMinutes}m ago';
+    if (difference.inDays < 1) return '${difference.inHours}h ago';
+    return '${difference.inDays}d ago';
   }
 
   Future<bool> markAsRead(String notificationId) async {

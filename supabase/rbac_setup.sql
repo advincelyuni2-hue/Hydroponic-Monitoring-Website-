@@ -153,6 +153,70 @@ create policy "Admins can delete alerts"
 on public.notifications for delete to authenticated
 using (public.is_admin());
 
+create or replace function public.create_parameter_alert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  config record;
+  minimum_value numeric;
+  maximum_value numeric;
+  parameter_name text;
+begin
+  if coalesce(new.is_average, false) then
+    return new;
+  end if;
+
+  select ph_min, ph_max, ec_min, ec_max
+  into config
+  from public.parameter_configurations
+  where id = 1;
+
+  if tg_table_name = 'ph_readings' then
+    parameter_name := 'pH Level';
+    minimum_value := coalesce(config.ph_min, 5.5);
+    maximum_value := coalesce(config.ph_max, 6.5);
+  elsif tg_table_name = 'ec_readings' then
+    parameter_name := 'EC Level';
+    minimum_value := coalesce(config.ec_min, 1.2);
+    maximum_value := coalesce(config.ec_max, 1.8);
+  else
+    parameter_name := 'Temperature';
+    minimum_value := 18;
+    maximum_value := 28;
+  end if;
+
+  if new.value < minimum_value or new.value > maximum_value then
+    insert into public.notifications (employee_id, message, status)
+    select id,
+      format('%s reading %s is outside the configured range (%s - %s).',
+        parameter_name, new.value, minimum_value, maximum_value),
+      'unread'
+    from public.profiles
+    where role = 'admin' and is_active;
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array['ph_readings', 'ec_readings', 'temp_readings']
+  loop
+    if to_regclass(format('public.%s', table_name)) is not null then
+      execute format('drop trigger if exists create_parameter_alert on public.%I', table_name);
+      execute format(
+        'create trigger create_parameter_alert after insert on public.%I for each row execute function public.create_parameter_alert()',
+        table_name
+      );
+    end if;
+  end loop;
+end $$;
+
 create table if not exists public.parameter_configurations (
   id integer primary key default 1 check (id = 1),
   ph_min numeric not null default 5.5,
