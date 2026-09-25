@@ -13,7 +13,6 @@ import 'forecasting_dashboard_screen.dart';
 import '../services/app_state.dart';
 import '../services/notification_service.dart';
 
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -138,7 +137,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildInsightAndNotificationsSection(bool isMobile) {
     final insightCard = _buildLatestInsightCard();
-    final notificationsCard = _buildNotificationsCard(pushFooterToBottom: !isMobile);
+    final notificationsCard =
+        _buildNotificationsCard(pushFooterToBottom: !isMobile);
 
     if (isMobile) {
       return Column(
@@ -184,7 +184,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: AppColors.alertText, size: 20),
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(insight.warningTitle, style: AppTextStyles.alert),
+                        child: Text(insight.warningTitle,
+                            style: AppTextStyles.alert),
                       ),
                     ],
                   ),
@@ -206,8 +207,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 alignment: WrapAlignment.spaceBetween,
                 runSpacing: 8,
                 children: [
-                  Text('Humidity: ${insight.humidity}', style: AppTextStyles.bodyBold),
-                  Text('EC Level: ${insight.ecStatus}', style: AppTextStyles.bodyBold),
+                  Text('Humidity: ${insight.humidity}',
+                      style: AppTextStyles.bodyBold),
+                  Text('EC Level: ${insight.ecStatus}',
+                      style: AppTextStyles.bodyBold),
                 ],
               ),
             ),
@@ -301,13 +304,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             NotificationTile(
               notification: n,
               onTap: () => _showNotifications(),
+              onDelete: !(_controller.profile?.isAdmin ?? false) ||
+                      n.databaseId == null
+                  ? null
+                  : () async {
+                      try {
+                        await NotificationService()
+                            .deleteNotification(n.databaseId!);
+                        await _controller.loadDashboard();
+                      } catch (_) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Unable to delete notification.')),
+                          );
+                        }
+                      }
+                    },
             ),
-          if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
+          if (pushFooterToBottom)
+            const Spacer()
+          else
+            const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _showNotifications,
-              child: Text('View all notifications', style: AppTextStyles.cardMeta),
+              child:
+                  Text('View all notifications', style: AppTextStyles.cardMeta),
             ),
           ),
         ],
@@ -320,9 +345,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('All notifications'),
-        content: Text('${_controller.notifications.length} recent notifications available.'),
+        content: Text(
+            '${_controller.notifications.length} recent notifications available.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
         ],
       ),
     );

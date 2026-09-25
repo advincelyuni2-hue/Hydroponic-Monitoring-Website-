@@ -8,10 +8,13 @@ class ReportGenerationCard extends StatelessWidget {
   final bool includeCalibrationLogs;
   final bool includePhOptimization;
   final bool includeEcOptimization;
+  final bool includeAllAnalytics;
   final ValueChanged<bool?> onToggleSensorLogs;
   final ValueChanged<bool?> onToggleCalibrationLogs;
   final ValueChanged<bool?> onTogglePhOptimization;
   final ValueChanged<bool?> onToggleEcOptimization;
+  final ValueChanged<bool?> onToggleAllAnalytics;
+  final VoidCallback onDismiss;
   final VoidCallback onGenerate;
 
   const ReportGenerationCard({
@@ -20,10 +23,13 @@ class ReportGenerationCard extends StatelessWidget {
     required this.includeCalibrationLogs,
     required this.includePhOptimization,
     required this.includeEcOptimization,
+    required this.includeAllAnalytics,
     required this.onToggleSensorLogs,
     required this.onToggleCalibrationLogs,
     required this.onTogglePhOptimization,
     required this.onToggleEcOptimization,
+    required this.onToggleAllAnalytics,
+    required this.onDismiss,
     required this.onGenerate,
   });
 
@@ -42,27 +48,27 @@ class ReportGenerationCard extends StatelessWidget {
           _checkboxTile('Calibration history logs', includeCalibrationLogs, onToggleCalibrationLogs),
           _checkboxTile('pH optimization results', includePhOptimization, onTogglePhOptimization),
           _checkboxTile('EC optimization results', includeEcOptimization, onToggleEcOptimization),
+          _checkboxTile('All analytics and graphs', includeAllAnalytics, onToggleAllAnalytics),
           const SizedBox(height: 20),
 
           // Green Pill "Generate report" Button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: onGenerate,
-              icon: const Icon(Icons.description, color: Colors.white, size: 20),
-              label: Text(
-                'Generate report',
-                style: AppTextStyles.button.copyWith(fontSize: 15),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryButton,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30), // Pill shape matching Figma
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onGenerate,
+                  icon: const Icon(Icons.description, color: Colors.white, size: 20),
+                  label: Text('Generate report', style: AppTextStyles.button.copyWith(fontSize: 15)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryButton,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+              OutlinedButton(onPressed: onDismiss, child: const Text('Dismiss')),
+            ],
           ),
         ],
       ),

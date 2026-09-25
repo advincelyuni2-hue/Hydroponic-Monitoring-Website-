@@ -41,9 +41,29 @@ class NotificationService {
   }
 
   Future<List<AppNotification>> getNotifications() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // TODO: replace with a real query / realtime subscription
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (client != null && user != null) {
+      final rows = await client
+          .from('notifications')
+          .select('id, message, status, timestamp, created_at')
+          .eq('employee_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(10);
+      return (rows as List).cast<Map<String, dynamic>>().map((row) {
+        final critical = (row['message'] as String? ?? '')
+            .toLowerCase()
+            .contains('critical');
+        return AppNotification(
+          id: row['id'].toString(),
+          databaseId: row['id'].toString(),
+          title: critical ? 'Critical alert' : 'Notification',
+          detail: row['message'] as String? ?? '',
+          timeAgo: 'Recent',
+          isCritical: critical,
+        );
+      }).toList();
+    }
     return [
       AppNotification(
         id: '1',
@@ -63,8 +83,18 @@ class NotificationService {
   }
 
   Future<bool> markAsRead(String notificationId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    // TODO: replace with a real Supabase update
+    final client = supabaseClient;
+    if (client == null) return false;
+    await client
+        .from('notifications')
+        .update({'status': 'read'}).eq('id', notificationId);
+    return true;
+  }
+
+  Future<bool> deleteNotification(String notificationId) async {
+    final client = supabaseClient;
+    if (client == null) return false;
+    await client.from('notifications').delete().eq('id', notificationId);
     return true;
   }
 }
@@ -76,6 +106,7 @@ class AppNotification {
   final String detail;
   final String timeAgo;
   final bool isCritical;
+  final String? databaseId;
 
   AppNotification({
     required this.id,
@@ -83,5 +114,6 @@ class AppNotification {
     required this.detail,
     required this.timeAgo,
     required this.isCritical,
+    this.databaseId,
   });
 }

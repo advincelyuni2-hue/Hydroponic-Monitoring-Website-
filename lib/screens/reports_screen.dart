@@ -13,6 +13,7 @@ import '../widgets/target_distribution_card.dart';
 import '../widgets/alerts_frequency_card.dart';
 import '../widgets/sensor_health_card.dart';
 import '../utils/responsive.dart';
+import 'generate_report_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -35,6 +36,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 3),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const GenerateReportScreen()),
+        ),
+        icon: const Icon(Icons.picture_as_pdf),
+        label: const Text('Generate report'),
+      ),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
@@ -71,20 +79,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-
-  
                   _buildSummarySection(isMobile),
                   const SizedBox(height: 24),
-
-                 
                   _buildVisualAnalyticsSection(isMobile),
                   const SizedBox(height: 24),
-
-                  
                   _buildConfigAndGenerationSection(isMobile),
                   const SizedBox(height: 24),
-
-               
                   _buildDeepInsightsSection(isMobile),
                 ],
               ),
@@ -165,13 +165,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
       onApplyRecommendation: () {
         _controller.applyRecommendation();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${_controller.selectedParameter} recommendation applied.')),
+          SnackBar(
+              content: Text(
+                  '${_controller.selectedParameter} recommendation applied.')),
         );
       },
       onDismissRecommendation: () {
         _controller.dismissRecommendation();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${_controller.selectedParameter} recommendation dismissed.')),
+          SnackBar(
+              content: Text(
+                  '${_controller.selectedParameter} recommendation dismissed.')),
         );
       },
     );
@@ -215,10 +219,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       includeCalibrationLogs: _controller.includeCalibrationLogs,
       includePhOptimization: _controller.includePhOptimization,
       includeEcOptimization: _controller.includeEcOptimization,
+      includeAllAnalytics: _controller.includeAllAnalytics,
       onToggleSensorLogs: _controller.toggleSensorLogs,
       onToggleCalibrationLogs: _controller.toggleCalibrationLogs,
       onTogglePhOptimization: _controller.togglePhOptimization,
       onToggleEcOptimization: _controller.toggleEcOptimization,
+      onToggleAllAnalytics: _controller.toggleAllAnalytics,
+      onDismiss: _controller.dismissReportGeneration,
       onGenerate: () async {
         try {
           await _controller.generatePdfReport();

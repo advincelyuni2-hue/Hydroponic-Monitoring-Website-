@@ -1,4 +1,3 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'supabase_client.dart';
@@ -31,9 +30,21 @@ class AuthService {
     try {
       await client.auth.signInWithPassword(email: email, password: password);
       await _setAuthenticatedProfile(email);
+      if (appProfile.value?.isActive == false) {
+        await client.auth.signOut();
+        appProfile.value = null;
+        return AuthResult(
+          success: false,
+          message: 'Unable to log in with those credentials. Please try again.',
+        );
+      }
       return AuthResult(success: true, message: 'Login successful');
     } on AuthException catch (error) {
-      return AuthResult(success: false, message: error.message);
+      debugPrint('Login failed: ${error.message}');
+      return AuthResult(
+        success: false,
+        message: 'Unable to log in with those credentials. Please try again.',
+      );
     } catch (_) {
       return AuthResult(
         success: false,
@@ -85,7 +96,8 @@ class AuthService {
     final client = supabaseClient;
     if (client == null) {
       await Future.delayed(const Duration(milliseconds: 500));
-      return AuthResult(success: token.length == 6, message: 'Account verified');
+      return AuthResult(
+          success: token.length == 6, message: 'Account verified');
     }
 
     try {
@@ -177,13 +189,15 @@ class AuthService {
   }
   // Append this method inside your AuthService class in auth_service.dart
 
-Future<AuthResult> resetPassword({required String email}) async {
-  if (email.trim().isEmpty) {
-    return AuthResult(success: false, message: 'Please enter your email address');
-  }
-  if (!email.contains('@')) {
-    return AuthResult(success: false, message: 'Please enter a valid email address');
-  }
+  Future<AuthResult> resetPassword({required String email}) async {
+    if (email.trim().isEmpty) {
+      return AuthResult(
+          success: false, message: 'Please enter your email address');
+    }
+    if (!email.contains('@')) {
+      return AuthResult(
+          success: false, message: 'Please enter a valid email address');
+    }
 
     final client = supabaseClient;
     if (client != null) {
@@ -196,12 +210,11 @@ Future<AuthResult> resetPassword({required String email}) async {
       await Future.delayed(const Duration(seconds: 1));
     }
 
-  return AuthResult(
-    success: true,
-    message: 'Password reset link sent! Check your inbox.',
-  );
-}
-  
+    return AuthResult(
+      success: true,
+      message: 'Password reset link sent! Check your inbox.',
+    );
+  }
 }
 
 /// A simple wrapper so the UI always knows: did it work, and if not, why.

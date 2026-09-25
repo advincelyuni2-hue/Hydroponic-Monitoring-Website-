@@ -140,6 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
               CustomTextField(
                 controller: _controller.passwordController,
                 obscureText: _controller.obscurePassword,
+                onToggleObscureText: _controller.togglePasswordVisibility,
               ),
               const SizedBox(height: 16),
               SizedBox(

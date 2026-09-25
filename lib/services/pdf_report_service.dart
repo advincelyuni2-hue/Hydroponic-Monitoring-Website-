@@ -16,6 +16,7 @@ class PdfReportService {
     required bool includeCalibrationLogs,
     required bool includePhOptimization,
     required bool includeEcOptimization,
+    required bool includeAllAnalytics,
   }) async {
     final document = pw.Document();
     final generatedAt = DateTime.now();
@@ -57,6 +58,7 @@ class PdfReportService {
           pw.Bullet(text: 'Calibration history logs: ${includeCalibrationLogs ? 'Yes' : 'No'}'),
           pw.Bullet(text: 'pH optimization results: ${includePhOptimization ? 'Yes' : 'No'}'),
           pw.Bullet(text: 'EC optimization results: ${includeEcOptimization ? 'Yes' : 'No'}'),
+          pw.Bullet(text: 'All analytics and graphs: ${includeAllAnalytics ? 'Yes' : 'No'}'),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Analytics snapshot')),
           pw.TableHelper.fromTextArray(

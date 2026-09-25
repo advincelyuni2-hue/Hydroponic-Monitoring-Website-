@@ -153,6 +153,42 @@ class MonitoringService {
           .gte('recorded_at', start.toUtc().toIso8601String())
           .lt('recorded_at', end.toUtc().toIso8601String());
     }
+
+  }
+
+  Future<List<HistoryLogEntry>> getCalibrationHistory({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final rows = await _client
+        .from('calibration_logs')
+        .select(
+            'recorded_at, parameter, calibration_type, adjustment, performed_by, status')
+        .gte('recorded_at', start.toUtc().toIso8601String())
+        .lt('recorded_at', end.toUtc().toIso8601String())
+        .order('recorded_at', ascending: false);
+    return rows
+        .map<HistoryLogEntry>((row) => HistoryLogEntry([
+              _formatTime(
+                  DateTime.parse(row['recorded_at'] as String).toLocal()),
+              row['parameter'] as String? ?? 'Unknown',
+              row['calibration_type'] as String? ?? 'Calibration',
+              row['adjustment'] as String? ?? '',
+              row['performed_by'] as String? ?? 'Unknown',
+              row['status'] as String? ?? 'Completed',
+            ]))
+        .toList();
+  }
+
+  Future<void> deleteCalibrationLogs({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    await _client
+        .from('calibration_logs')
+        .delete()
+        .gte('recorded_at', start.toUtc().toIso8601String())
+        .lt('recorded_at', end.toUtc().toIso8601String());
   }
 
   Future<List<Map<String, dynamic>>> _getAverageReadings(

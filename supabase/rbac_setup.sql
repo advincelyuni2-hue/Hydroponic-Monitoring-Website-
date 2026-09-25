@@ -83,8 +83,53 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.calibration_logs (
+  id uuid primary key default gen_random_uuid(),
+  recorded_at timestamptz not null default now(),
+  parameter text not null,
+  calibration_type text not null,
+  adjustment text not null default '',
+  performed_by text not null default 'Unknown',
+  status text not null default 'Completed',
+  created_by uuid references auth.users(id) on delete set null
+);
+
+alter table public.calibration_logs enable row level security;
+grant select on public.calibration_logs to authenticated;
+grant delete on public.calibration_logs to authenticated;
+
+drop policy if exists "Authenticated users can read calibration logs" on public.calibration_logs;
+create policy "Authenticated users can read calibration logs"
+on public.calibration_logs for select to authenticated using (true);
+
+drop policy if exists "Admins can delete calibration logs" on public.calibration_logs;
+create policy "Admins can delete calibration logs"
+on public.calibration_logs for delete to authenticated using (public.is_admin());
+
+create table if not exists public.help_articles (
+  id uuid primary key default gen_random_uuid(),
+  type text not null default 'faq' check (type in ('tutorial', 'faq')),
+  title text not null,
+  body text not null,
+  media_url text,
+  created_by uuid references auth.users(id) on delete set null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.help_articles enable row level security;
+grant select on public.help_articles to authenticated;
+grant insert, update, delete on public.help_articles to authenticated;
+drop policy if exists "Authenticated users can read help articles" on public.help_articles;
+create policy "Authenticated users can read help articles"
+on public.help_articles for select to authenticated using (true);
+drop policy if exists "Admins can manage help articles" on public.help_articles;
+create policy "Admins can manage help articles"
+on public.help_articles for all to authenticated
+using (public.is_admin()) with check (public.is_admin());
+
 alter table public.notifications enable row level security;
-grant select, insert, update on public.notifications to authenticated;
+grant select, insert, update, delete on public.notifications to authenticated;
 
 drop policy if exists "Employees can create alerts" on public.notifications;
 create policy "Employees can create alerts"
@@ -101,6 +146,12 @@ create policy "Admins can update alerts"
 on public.notifications for update to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "Admins can delete alerts" on public.notifications;
+drop policy if exists "Users can delete relevant alerts" on public.notifications;
+create policy "Admins can delete alerts"
+on public.notifications for delete to authenticated
+using (public.is_admin());
 
 create table if not exists public.parameter_configurations (
   id integer primary key default 1 check (id = 1),

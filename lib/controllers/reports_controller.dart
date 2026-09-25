@@ -93,6 +93,7 @@ class ReportsController extends ChangeNotifier {
   bool includeCalibrationLogs = false;
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
+  bool includeAllAnalytics = false;
   bool recommendationApplied = false;
   bool recommendationDismissed = false;
 
@@ -147,6 +148,20 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleAllAnalytics(bool? val) {
+    includeAllAnalytics = val ?? false;
+    notifyListeners();
+  }
+
+  void dismissReportGeneration() {
+    includeSensorLogs = false;
+    includeCalibrationLogs = false;
+    includePhOptimization = false;
+    includeEcOptimization = false;
+    includeAllAnalytics = false;
+    notifyListeners();
+  }
+
   void revertRanges() {
     phRange = const RangeValues(5.5, 6.5);
     ecRange = const RangeValues(5.0, 6.0);
@@ -165,6 +180,7 @@ class ReportsController extends ChangeNotifier {
       includeCalibrationLogs: includeCalibrationLogs,
       includePhOptimization: includePhOptimization,
       includeEcOptimization: includeEcOptimization,
+      includeAllAnalytics: includeAllAnalytics,
     );
   }
 

@@ -307,8 +307,16 @@ class _AdminAlertBellState extends State<AdminAlertBell> {
     super.initState();
     _refresh();
     if (appProfile.value?.isAdmin == true) {
-      _channel = _service.subscribeToAdminAlerts(onAlert: _refresh);
+      _channel = _service.subscribeToAdminAlerts(onAlert: _handleAlert);
     }
+  }
+
+  Future<void> _handleAlert() async {
+    await _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('A new employee alert was received.')),
+    );
   }
 
   Future<void> _refresh() async {

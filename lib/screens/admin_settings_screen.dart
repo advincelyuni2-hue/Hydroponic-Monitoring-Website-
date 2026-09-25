@@ -118,6 +118,42 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
+  Future<void> _deactivateUser(Map<String, dynamic> user) async {
+    final email = user['email'] as String? ?? 'this user';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Deactivate user?'),
+        content: Text(
+          'This will prevent $email from accessing the application. '
+          'Their account and history will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final client = supabaseClient;
+    if (client == null) return;
+    try {
+      await client
+          .from('profiles')
+          .update({'is_active': false}).eq('id', user['id']);
+      setState(() => user['is_active'] = false);
+      _message('User deactivated.');
+    } catch (_) {
+      _message('Unable to deactivate this user.');
+    }
+  }
+
   void _message(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -209,15 +245,28 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               title: Text(user['email'] as String? ?? 'Unknown user'),
               subtitle: Text(
                   (user['is_active'] as bool? ?? false) ? 'Active' : 'Revoked'),
-              trailing: DropdownButton<String>(
-                value: user['role'] as String? ?? 'employee',
-                items: const [
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                  DropdownMenuItem(value: 'employee', child: Text('Employee')),
+              trailing: Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  DropdownButton<String>(
+                    value: user['role'] as String? ?? 'employee',
+                    items: const [
+                      DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                      DropdownMenuItem(
+                          value: 'employee', child: Text('Employee')),
+                    ],
+                    onChanged: (role) {
+                      if (role != null) _changeRole(user, role);
+                    },
+                  ),
+                  if (user['is_active'] as bool? ?? false)
+                    IconButton(
+                      tooltip: 'Deactivate user',
+                      icon: const Icon(Icons.person_off_outlined),
+                      onPressed: () => _deactivateUser(user),
+                    ),
                 ],
-                onChanged: (role) {
-                  if (role != null) _changeRole(user, role);
-                },
               ),
             ),
         ],
