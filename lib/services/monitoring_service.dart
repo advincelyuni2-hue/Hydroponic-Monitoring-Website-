@@ -1,7 +1,17 @@
+import 'package:supabase_flutter/supabase_flutter.dart'; // NEW — needed for RealtimeChannel, PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType
 import '../models/monitoring_models.dart';
 import 'app_state.dart';
+import 'supabase_client.dart'; // NEW — TODO: confirm this file exports `supabase` (used below). history_logs_controller.dart instead imports/uses a nullable `supabaseClient` — check whether that's the same client under a different name, or two different things, and make this consistent.
 
 class MonitoringService {
+  SupabaseClient get _client {
+    final client = supabaseClient;
+    if (client == null) {
+      throw StateError('Supabase is not configured');
+    }
+    return client;
+  }
+
   /// Column headers for the "Sensor logs" tab on the History Logs screen.
   static const List<String> sensorLogColumns = [
     'Time',
@@ -22,6 +32,7 @@ class MonitoringService {
     'Performed By',
     'Status',
   ];
+
   /// Powers the "Parameter Status" cards (pH / EC / Temperature).
   Future<List<ParameterStatus>> getParameterStatuses() async {
     await Future.delayed(const Duration(milliseconds: 600));
@@ -52,39 +63,6 @@ class MonitoringService {
     ];
   }
 
-<<<<<<< Updated upstream
-=======
-  Future<Map<String, dynamic>> _getLatestReading(String table) async {
-    final rows = await supabase
-        .from(table)
-        .select('value, recorded_at')
-        .eq('is_average', false)
-        .order('recorded_at', ascending: false)
-        .limit(1);
-
-    if (rows.isEmpty) {
-      throw StateError('No non-average readings found in $table');
-    }
-    return rows.first;
-  }
-
-  ParameterStatus _toParameterStatus(
-    String label,
-    Map<String, dynamic> row,
-    String unit,
-    String idealRange,
-  ) {
-    final value = (row['value'] as num).toDouble();
-    final timestamp = DateTime.parse(row['recorded_at'] as String).toLocal();
-    return ParameterStatus(
-      label: label,
-      currentValue: value.toStringAsFixed(label == 'pH Level' ? 2 : 1),
-      unit: unit,
-      idealRange: idealRange,
-      lastUpdated: _formatTime(timestamp),
-    );
-  }
-
   String _formatTime(DateTime value) {
     final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
     final minute = value.minute.toString().padLeft(2, '0');
@@ -92,7 +70,7 @@ class MonitoringService {
   }
 
   RealtimeChannel subscribeToParameterChanges(void Function() onChange) {
-    return supabase
+    return _client
         .channel('dashboard-parameter-readings')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
@@ -131,7 +109,7 @@ class MonitoringService {
   }
 
   Future<void> unsubscribe(RealtimeChannel channel) =>
-      supabase.removeChannel(channel);
+      _client.removeChannel(channel);
 
   Future<List<HistoryLogEntry>> getSensorHistory({
     required DateTime start,
@@ -168,7 +146,7 @@ class MonitoringService {
     required DateTime end,
   }) async {
     for (final table in ['ph_readings', 'ec_readings', 'temp_readings']) {
-      await supabase
+      await _client
           .from(table)
           .delete()
           .eq('is_average', true)
@@ -187,7 +165,7 @@ class MonitoringService {
     var from = 0;
 
     while (true) {
-      final page = await supabase
+      final page = await _client
           .from(table)
           .select('value, recorded_at, status')
           .eq('is_average', true)
@@ -282,7 +260,6 @@ class MonitoringService {
     }
   }
 
->>>>>>> Stashed changes
   /// Powers the "Latest Insight" card.
   Future<LatestInsight> getLatestInsight() async {
     await Future.delayed(const Duration(milliseconds: 500));
@@ -363,7 +340,8 @@ class MonitoringService {
       warningText: 'EC levels are stable and within the ideal range.',
       airHumidity: '75%',
       ecLevel: '5.8 mS/cm',
-      calloutText: 'Nutrient concentration has remained steady over the last 12 hours.',
+      calloutText:
+          'Nutrient concentration has remained steady over the last 12 hours.',
       currentPh: 5.8,
       targetPh: 6.0,
       suggestedFixes: ['No action needed right now.'],
@@ -371,6 +349,11 @@ class MonitoringService {
   }
 
   /// Powers the "Sensor logs" tab on the History Logs screen.
+  // NOTE: this and getCalibrationLogs() below appear to no longer be called
+  // by history_logs_controller.dart — _loadSelectedLogs() there calls
+  // getSensorHistory() directly instead. Confirm whether these two mock
+  // methods are still used anywhere (e.g. dashboard cards) or are dead code
+  // now that real data exists for the Sensor logs tab.
   Future<List<HistoryLogEntry>> getSensorLogs() async {
     await Future.delayed(const Duration(milliseconds: 600));
 
@@ -382,32 +365,111 @@ class MonitoringService {
     //       .order('created_at', ascending: false)
     //       .limit(50);
     return [
-      const HistoryLogEntry(['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
+      const HistoryLogEntry(
+          ['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
       const HistoryLogEntry(['7:45 AM', 'EC', '5.8 mS/cm', 'Stable', 'None']),
-      HistoryLogEntry(['7:30 AM', 'Temperature', formatTemperature(24.6), 'Stable', 'None']),
-      const HistoryLogEntry(['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
+      HistoryLogEntry([
+        '7:30 AM',
+        'Temperature',
+        formatTemperature(24.6),
+        'Stable',
+        'None'
+      ]),
+      const HistoryLogEntry(
+          ['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
       const HistoryLogEntry(['7:00 AM', 'EC', '5.9 mS/cm', 'Stable', 'None']),
-      HistoryLogEntry(['6:45 AM', 'Temperature', formatTemperature(26.8), 'Critical', 'Alert sent to admin']),
+      HistoryLogEntry([
+        '6:45 AM',
+        'Temperature',
+        formatTemperature(26.8),
+        'Critical',
+        'Alert sent to admin'
+      ]),
       const HistoryLogEntry(['6:30 AM', 'pH', '6.6', 'Stable', 'None']),
       const HistoryLogEntry(['6:15 AM', 'EC', '5.7 mS/cm', 'Stable', 'None']),
     ];
   }
 
   /// Powers the "Calibration logs" tab on the History Logs screen.
+  // NOTE: unlike Sensor logs, there is no real-data equivalent for
+  // calibration logs yet (no getCalibrationHistory() wired to Supabase).
+  // If the Calibration logs tab should also show/delete real data, that
+  // still needs to be built — this is still mock data.
   Future<List<HistoryLogEntry>> getCalibrationLogs() async {
     await Future.delayed(const Duration(milliseconds: 600));
 
     // TODO: replace with a real Supabase query against your calibration
     // events table.
     return [
-      const HistoryLogEntry(
-          ['8:00 AM', 'pH', '2-Point Calibration', '+0.2', 'Auto-system', 'Success']),
-      const HistoryLogEntry(
-          ['Yesterday, 6:00 PM', 'EC', '1-Point Calibration', '-0.1 mS/cm', 'Alveus', 'Success']),
-        HistoryLogEntry(
-          ['2 days ago, 8:00 AM', 'Temperature', 'Sensor Reset', formatTemperature(0.0), 'Auto-system', 'Success']),
-      const HistoryLogEntry(
-          ['3 days ago, 8:00 AM', 'pH', '2-Point Calibration', '+0.1', 'Auto-system', 'Failed']),
+      const HistoryLogEntry([
+        '8:00 AM',
+        'pH',
+        '2-Point Calibration',
+        '+0.2',
+        'Auto-system',
+        'Success'
+      ]),
+      const HistoryLogEntry([
+        'Yesterday, 6:00 PM',
+        'EC',
+        '1-Point Calibration',
+        '-0.1 mS/cm',
+        'Alveus',
+        'Success'
+      ]),
+      HistoryLogEntry([
+        '2 days ago, 8:00 AM',
+        'Temperature',
+        'Sensor Reset',
+        formatTemperature(0.0),
+        'Auto-system',
+        'Success'
+      ]),
+      const HistoryLogEntry([
+        '3 days ago, 8:00 AM',
+        'pH',
+        '2-Point Calibration',
+        '+0.1',
+        'Auto-system',
+        'Failed'
+      ]),
     ];
+  }
+}
+
+// NEW — was referenced throughout getSensorHistory()/​_mergeAverageRows() but
+// never defined anywhere in the conflict. Reconstructed from how it's used:
+// one instance per time bucket, accumulating whichever of ph/ec/temp arrive
+// for that bucket, plus a rolled-up status. The status logic (worst-of wins)
+// is a guess — confirm it matches what you actually want shown per row.
+class _HistorySummary {
+  _HistorySummary(this.recordedAt);
+
+  final DateTime recordedAt;
+  double? ph;
+  double? ec;
+  double? temp;
+  final List<String> _statuses = [];
+
+  void add({required String parameter, required double value, String? status}) {
+    switch (parameter) {
+      case 'ph':
+        ph = value;
+        break;
+      case 'ec':
+        ec = value;
+        break;
+      case 'temp':
+        temp = value;
+        break;
+    }
+    if (status != null) _statuses.add(status);
+  }
+
+  String get status {
+    if (_statuses.contains('Critical')) return 'Critical';
+    if (_statuses.contains('Warning')) return 'Warning';
+    if (_statuses.isNotEmpty) return _statuses.first;
+    return 'Normal';
   }
 }

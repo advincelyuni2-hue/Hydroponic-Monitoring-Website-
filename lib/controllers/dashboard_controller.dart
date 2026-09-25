@@ -3,12 +3,8 @@ import '../models/monitoring_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
-<<<<<<< Updated upstream
-=======
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_client.dart';
 import '../services/app_state.dart';
->>>>>>> Stashed changes
 
 class DashboardController extends ChangeNotifier {
   final MonitoringService _monitoringService = MonitoringService();

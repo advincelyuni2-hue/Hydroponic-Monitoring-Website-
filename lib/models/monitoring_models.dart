@@ -1,5 +1,3 @@
-
-
 class ParameterStatus {
   final String label;
   final String currentValue;
@@ -15,7 +13,6 @@ class ParameterStatus {
     required this.lastUpdated,
   });
 }
-
 
 class ForecastPoint {
   final double hour;
@@ -45,7 +42,6 @@ class LatestInsight {
   });
 }
 
-
 class PredictionInsightDetail {
   final String statusLabel; // e.g. "pH Level"
   final String statusBadge; // "Warning" | "Critical" | "Normal"
@@ -74,4 +70,10 @@ class HistoryLogEntry {
   final List<String> values;
 
   const HistoryLogEntry(this.values);
+}
+
+enum HistoryAggregation {
+  tenMinutes,
+  eightHours,
+  daily,
 }
