@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/monitoring_models.dart';
+import '../models/notification_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardController extends ChangeNotifier {
   final MonitoringService _monitoringService = MonitoringService();
@@ -12,19 +13,20 @@ class DashboardController extends ChangeNotifier {
 
   bool isLoading = true;
   String? errorMessage;
-
   UserProfile? profile;
+
   List<ParameterStatus> parameterStatuses = [];
   LatestInsight? latestInsight;
-  List<AppNotification> notifications = [];
+  List<AppNotificationItem> notifications = []; // Fixed type model
   List<ForecastPoint> phForecast = [];
   List<ForecastPoint> ecForecast = [];
-  RealtimeChannel? _parameterChannel;
+
+  RealtimeChannel? parameterChannel;
   bool _refreshingParameters = false;
 
   DashboardController() {
     loadDashboard();
-    _parameterChannel = _monitoringService.subscribeToParameterChanges(
+    parameterChannel = _monitoringService.subscribeToParameterChanges(
       _refreshParameterStatuses,
     );
   }
@@ -36,7 +38,7 @@ class DashboardController extends ChangeNotifier {
       parameterStatuses = await _monitoringService.getParameterStatuses();
       notifyListeners();
     } catch (_) {
-      // Keep the last known dashboard values during a transient refresh error.
+      // Keep existing values during transient network error
     } finally {
       _refreshingParameters = false;
     }
@@ -52,7 +54,7 @@ class DashboardController extends ChangeNotifier {
         _userService.getProfile('mock-user-id'),
         _monitoringService.getParameterStatuses(),
         _monitoringService.getLatestInsight(),
-        _notificationService.getNotifications(),
+        _notificationService.getNotifications(), // Now resolves correctly
         _monitoringService.getForecastData('ph'),
         _monitoringService.getForecastData('ec'),
       ]);
@@ -60,20 +62,22 @@ class DashboardController extends ChangeNotifier {
       profile = results[0] as UserProfile;
       parameterStatuses = results[1] as List<ParameterStatus>;
       latestInsight = results[2] as LatestInsight;
-      notifications = results[3] as List<AppNotification>;
+      notifications = results[3] as List<AppNotificationItem>;
       phForecast = results[4] as List<ForecastPoint>;
       ecForecast = results[5] as List<ForecastPoint>;
+
+      isLoading = false;
+      notifyListeners();
     } catch (e) {
       errorMessage = 'Could not load dashboard data';
+      isLoading = false;
+      notifyListeners();
     }
-
-    isLoading = false;
-    notifyListeners();
   }
 
   @override
   void dispose() {
-    final channel = _parameterChannel;
+    final channel = parameterChannel;
     if (channel != null) {
       _monitoringService.unsubscribe(channel);
     }

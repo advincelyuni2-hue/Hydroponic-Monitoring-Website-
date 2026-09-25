@@ -10,7 +10,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../utils/responsive.dart';
 import 'forecasting_dashboard_screen.dart';
-
+import 'notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -231,32 +231,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildNotificationsCard({required bool pushFooterToBottom}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recent Notifications', style: AppTextStyles.sectionTitle),
-          const SizedBox(height: 16),
-          for (final n in _controller.notifications)
+  // Take only the 2 most recent notifications
+  final recentNotifications = _controller.notifications.take(2).toList();
+
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: AppDecorations.card(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recent Notifications',
+          style: AppTextStyles.sectionTitle,
+        ),
+        const SizedBox(height: 16),
+
+        if (recentNotifications.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'No active notifications',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          )
+        else
+          for (final n in recentNotifications)
             NotificationTile(
               notification: n,
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => NotificationsScreen(
+                      initialSelectedId: n.id,
+                    ),
+                  ),
+                );
+              },
             ),
-          if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {},
-              child: Text('View all notifications', style: AppTextStyles.cardMeta),
+
+        if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
+
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const NotificationsScreen(),
+                ),
+              );
+            },
+            child: Text(
+              'View all notifications',
+              style: AppTextStyles.cardMeta.copyWith(
+                decoration: TextDecoration.underline,
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildForecastSection(bool isMobile) {
     final phCard = ForecastChartCard(
       title: 'pH Forecast Overview',

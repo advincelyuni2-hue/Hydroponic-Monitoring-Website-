@@ -1,17 +1,17 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import '../models/forecasting_models.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
-import '../models/monitoring_models.dart';
+import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 
 class ForecastingChartCard extends StatelessWidget {
   final String activeTab; // 'pH Forecast' or 'EC Forecast'
   final ValueChanged<String> onTabChanged;
-  final int selectedHours; // 6, 12, or 24
+  final int selectedHours; // 4, 8, or 12
   final ValueChanged<int> onHoursChanged;
-  final List<ForecastPoint> points;
+  final List<ForecastingChartPoint> points;
 
   const ForecastingChartCard({
     super.key,
@@ -24,6 +24,7 @@ class ForecastingChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = Responsive.isDesktop(context);
     final isMobile = Responsive.isMobile(context);
 
     final historical = points
@@ -33,172 +34,189 @@ class ForecastingChartCard extends StatelessWidget {
         .where((p) => p.isPredicted && p.hour <= selectedHours)
         .toList();
 
-    final historicalSpots = historical.map((p) => FlSpot(p.hour, p.value)).toList();
+    final historicalSpots =
+        historical.map((p) => FlSpot(p.hour, p.value)).toList();
     final predictedSpots = <FlSpot>[
-      if (historical.isNotEmpty) FlSpot(historical.last.hour, historical.last.value),
+      if (historical.isNotEmpty)
+        FlSpot(historical.last.hour, historical.last.value),
       ...predicted.map((p) => FlSpot(p.hour, p.value)),
     ];
 
+    bool isPh = activeTab.contains('pH');
+
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      height: isDesktop ? 689 : null,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: isDesktop ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          // 1. TABS & FILTER PILLS
-          // Cramming both into one spaceBetween Row overflows on narrow
-          // phones (tabs alone run ~240px, pills another ~135px, more
-          // than a phone's available width) — so mobile stacks them
-          // instead of squeezing them side by side.
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _buildTab('pH Forecast', isMobile),
-                        const SizedBox(width: 16),
-                        _buildTab('EC Forecast', isMobile),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTimeFilterPills(),
-                  ],
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        _buildTab('pH Forecast', isMobile),
-                        const SizedBox(width: 24),
-                        _buildTab('EC Forecast', isMobile),
-                      ],
-                    ),
-                    _buildTimeFilterPills(),
-                  ],
-                ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
-          const SizedBox(height: 24),
-
-          // 2. CHART — same visual language as the dashboard's mini chart:
-          // curved lines, gradient fill, gridlines, hover tooltip.
-          SizedBox(
-            height: isMobile ? 240 : 340,
-            child: LineChart(
-              LineChartData(
-                minX: -selectedHours.toDouble(),
-                maxX: selectedHours.toDouble(),
-                minY: 3.0,
-                maxY: 9.0,
-                gridData: const FlGridData(show: true, drawVerticalLine: false),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(color: AppColors.chartGrid),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: isMobile ? 48 : 56,
-                      interval: 0.5,
-                      // fl_chart's `interval` already guarantees clean tick
-                      // values, so there's no need to manually filter with
-                      // a modulo check (which is unreliable with floating
-                      // point numbers and can silently drop labels).
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          'pH ${value.toStringAsFixed(1)}',
-                          style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                extraLinesData: ExtraLinesData(
-                  verticalLines: [
-                    VerticalLine(
-                      x: 0,
-                      color: AppColors.textSecondary,
-                      strokeWidth: 1,
-                      dashArray: [4, 4],
-                    ),
-                  ],
-                ),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (touchedSpot) => const Color(0xFFE5FFDE),
-                    tooltipRoundedRadius: 8,
-                    getTooltipItems: (touchedSpots) {
-                      if (touchedSpots.isEmpty) return [];
-                      final primarySpot = touchedSpots.first;
-                      return touchedSpots.map((spot) {
-                        if (spot == primarySpot) {
-                          return LineTooltipItem(
-                            spot.y.toStringAsFixed(2),
-                            AppTextStyles.cardMeta.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        }
-                        return null;
-                      }).toList();
-                    },
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: historicalSpots,
-                    isCurved: true,
-                    color: AppColors.chartLine,
-                    barWidth: 2,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.chartLine.withOpacity(0.22),
-                          AppColors.chartLine.withOpacity(0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                  LineChartBarData(
-                    spots: predictedSpots,
-                    isCurved: true,
-                    color: AppColors.chartLine,
-                    barWidth: 2,
-                    dashArray: [6, 4],
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.chartLine.withOpacity(0.10),
-                          AppColors.chartLine.withOpacity(0.0),
-                        ],
-                      ),
-                    ),
-                  ),
+          // 1. Header Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTab('pH Forecast', isMobile),
+                  SizedBox(width: isMobile ? 12 : 20),
+                  _buildTab('EC Forecast', isMobile),
                 ],
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: _buildTimeFilterPills(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
+          const SizedBox(height: 12),
+
+          // 2. Scrollable Chart Viewport
+          WidgetChildWrapper(
+            isDesktop: isDesktop,
+            child: ClipRRect(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: SizedBox(
+                  height: 650,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 8),
+                    child: LineChart(
+                      LineChartData(
+                        minX: -selectedHours.toDouble(),
+                        maxX: selectedHours.toDouble(),
+                        minY: 0.0,
+                        maxY: 15.0,
+                        gridData: const FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border.all(color: AppColors.chartGrid),
+                        ),
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          bottomTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: isMobile ? 48 : 56,
+                              interval: 1.0,
+                              getTitlesWidget: (value, meta) {
+                                final label = isPh
+                                    ? 'pH ${value.toStringAsFixed(1)}'
+                                    : '${value.toStringAsFixed(1)} mS';
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: Text(
+                                    label,
+                                    style: AppTextStyles.cardMeta
+                                        .copyWith(fontSize: 11),
+                                    textAlign: TextAlign.right,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        extraLinesData: ExtraLinesData(
+                          verticalLines: [
+                            VerticalLine(
+                              x: 0,
+                              color: AppColors.textSecondary,
+                              strokeWidth: 1,
+                              dashArray: [4, 4],
+                            ),
+                          ],
+                        ),
+                        lineTouchData: LineTouchData(
+                          touchTooltipData: LineTouchTooltipData(
+                            getTooltipColor: (touchedSpot) =>
+                                const Color(0xFFE5FFDE),
+                            tooltipRoundedRadius: 8,
+                            getTooltipItems: (touchedSpots) {
+                              if (touchedSpots.isEmpty) return [];
+                              final primarySpot = touchedSpots.first;
+                              return touchedSpots.map((spot) {
+                                if (spot == primarySpot) {
+                                  return LineTooltipItem(
+                                    spot.y.toStringAsFixed(2),
+                                    AppTextStyles.cardMeta.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  );
+                                }
+                                return null;
+                              }).toList();
+                            },
+                          ),
+                        ),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: historicalSpots,
+                            isCurved: true,
+                            color: AppColors.chartLine,
+                            barWidth: 2,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  AppColors.chartLine.withOpacity(0.22),
+                                  AppColors.chartLine.withOpacity(0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                          LineChartBarData(
+                            spots: predictedSpots,
+                            isCurved: true,
+                            color: AppColors.chartLine,
+                            barWidth: 2,
+                            dashArray: [6, 4],
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  AppColors.chartLine.withOpacity(0.10),
+                                  AppColors.chartLine.withOpacity(0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 3. AXIS LABELS — three fixed slots (not a spaceBetween Row) so
-          // this can't overflow on narrow phones, same fix as the
-          // dashboard's mini chart needed earlier.
+          // 3. X-Axis Time Labels
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -234,50 +252,54 @@ class ForecastingChartCard extends StatelessWidget {
     final isActive = activeTab == title;
     return GestureDetector(
       onTap: () => onTabChanged(title),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppTextStyles.sectionTitle.copyWith(
-              fontSize: isMobile ? 16 : 20,
-              color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: AppTextStyles.sectionTitle.copyWith(
+                fontSize: isMobile ? 15 : 18,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 3,
-            width: isActive ? (isMobile ? 65 : 85) : 0,
-            decoration: BoxDecoration(
-              color: AppColors.primaryButton,
-              borderRadius: BorderRadius.circular(2),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              decoration: BoxDecoration(
+                color: isActive ? AppColors.primaryButton : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Same rounded-pill visual language as the dashboard's mini chart's
-  /// time filter, just with 6h/12h/24h instead of 4hr/8hr/12hr.
   Widget _buildTimeFilterPills() {
-    final options = [6, 12, 24];
-
+    final options = [4, 8, 12];
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: options.map((hours) {
-        final isSelected = selectedHours == hours;
+        final isSelected = selectedHours == hours; // Fixed equality operator
         return GestureDetector(
           onTap: () => onHoursChanged(hours),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(left: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            margin: const EdgeInsets.only(left: 4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 4,
+            ),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primaryButton : const Color(0xFFE2E2E2),
+              color: isSelected
+                  ? AppColors.primaryButton
+                  : const Color(0xFFE2E2E2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -292,5 +314,24 @@ class ForecastingChartCard extends StatelessWidget {
         );
       }).toList(),
     );
+  }
+}
+
+class WidgetChildWrapper extends StatelessWidget {
+  final bool isDesktop;
+  final Widget child;
+
+  const WidgetChildWrapper({
+    super.key,
+    required this.isDesktop,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isDesktop) {
+      return Expanded(child: child);
+    }
+    return SizedBox(height: 380, child: child);
   }
 }

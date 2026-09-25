@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
+import '../models/notification_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../services/notification_service.dart';
 
 class NotificationTile extends StatelessWidget {
-  final AppNotification notification;
+  final AppNotificationItem notification;
   final VoidCallback? onTap;
 
-  const NotificationTile({super.key, required this.notification, this.onTap});
+  const NotificationTile({
+    super.key,
+    required this.notification,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isCritical = notification.type == NotificationType.critical;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isCritical ? AppColors.alertBackground : AppColors.cardBackground,
+        color: isCritical
+            ? AppColors.alertBackground
+            : AppColors.cardBackground,
         border: Border.all(
-          color: notification.isCritical ? AppColors.alertBorder : AppColors.cardBorder,
+          color: isCritical
+              ? AppColors.alertBorder
+              : AppColors.cardBorder,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
@@ -40,17 +50,29 @@ class NotificationTile extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      notification.title,
-                      style: notification.isCritical
-                          ? AppTextStyles.alert
-                          : AppTextStyles.bodyBold,
+                    Expanded(
+                      child: Text(
+                        notification.title,
+                        style: isCritical
+                            ? AppTextStyles.alert
+                            : AppTextStyles.bodyBold,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    Text(notification.timeAgo, style: AppTextStyles.cardMeta),
+                    const SizedBox(width: 8),
+                    Text(
+                      notification.timestamp,
+                      style: AppTextStyles.cardMeta,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(notification.detail, style: AppTextStyles.body),
+                const SizedBox(height: 4),
+                Text(
+                  notification.subtitle,
+                  style: AppTextStyles.body,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

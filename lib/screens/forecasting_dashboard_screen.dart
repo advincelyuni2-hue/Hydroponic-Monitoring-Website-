@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import '../controllers/forecasting_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../controllers/forecasting_controller.dart';
+import '../utils/responsive.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/app_header.dart';
 import '../widgets/forecasting_chart_card.dart';
 import '../widgets/prediction_insights_card.dart';
 import '../widgets/report_issue_card.dart';
-import '../widgets/app_drawer.dart';
-import 'package:monitoring_app/widgets/app_header.dart';
-import '../utils/responsive.dart';
-
 
 class ForecastingDashboardScreen extends StatefulWidget {
   const ForecastingDashboardScreen({super.key});
@@ -57,6 +56,7 @@ class _ForecastingDashboardScreenState
               );
             }
 
+            final isDesktop = Responsive.isDesktop(context);
             final isMobile = Responsive.isMobile(context);
 
             return SingleChildScrollView(
@@ -69,7 +69,7 @@ class _ForecastingDashboardScreenState
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-                  if (isMobile) ...[
+                  if (!isDesktop) ...[
                     ForecastingChartCard(
                       activeTab: _controller.selectedTab,
                       onTabChanged: _controller.selectTab,
@@ -81,21 +81,31 @@ class _ForecastingDashboardScreenState
                     if (_controller.insightDetail != null)
                       PredictionInsightsCard(
                         detail: _controller.insightDetail!,
-                        onApplyFix: () {
-                         
-                        },
-                        onDismiss: () {
-                         
-                        },
+                        onApplyFix: _controller.applyFix,
+                        onDismiss: _controller.dismissFix,
                       ),
                     const SizedBox(height: 16),
-                    ReportIssueCard(onAlertAdmin: () {
-                    
-                    }),
+                    ReportIssueCard(onAlertAdmin: () {}),
                   ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            children: [
+                              if (_controller.insightDetail != null)
+                                PredictionInsightsCard(
+                                  detail: _controller.insightDetail!,
+                                  onApplyFix: _controller.applyFix,
+                                  onDismiss: _controller.dismissFix,
+                                ),
+                              const SizedBox(height: 16),
+                              ReportIssueCard(onAlertAdmin: () {}),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
                         Expanded(
                           flex: 6,
                           child: ForecastingChartCard(
@@ -104,22 +114,6 @@ class _ForecastingDashboardScreenState
                             selectedHours: _controller.selectedHours,
                             onHoursChanged: _controller.selectHours,
                             points: _controller.chartPoints,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          flex: 4,
-                          child: Column(
-                            children: [
-                              if (_controller.insightDetail != null)
-                                PredictionInsightsCard(
-                                  detail: _controller.insightDetail!,
-                                  onApplyFix: () {},
-                                  onDismiss: () {},
-                                ),
-                              const SizedBox(height: 20),
-                              ReportIssueCard(onAlertAdmin: () {}),
-                            ],
                           ),
                         ),
                       ],
