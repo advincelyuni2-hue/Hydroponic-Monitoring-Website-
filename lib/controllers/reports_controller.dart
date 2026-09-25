@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
-import '../models/monitoring_models.dart';
+import '../services/pdf_report_service.dart';
 import '../services/reports_service.dart';
 import '../services/user_service.dart';
 
 class ReportsController extends ChangeNotifier {
   final ReportsService _reportsService = ReportsService();
   final UserService _userService = UserService();
+  final PdfReportService _pdfReportService = PdfReportService();
 
   bool isLoading = false;
   String? errorMessage;
-
   UserProfile? profile;
 
-  ReportSummaryData summary = ReportSummaryData(
+  ReportSummaryData summary = const ReportSummaryData(
     avgPh: 6.2,
     phStatus: 'In range',
     avgEc: 5.7,
@@ -22,7 +22,7 @@ class ReportsController extends ChangeNotifier {
     alertsPeriod: 'This month',
   );
 
-  List<AnalyticsPoint> trendPoints = [
+  List<AnalyticsPoint> trendPoints = const [
     AnalyticsPoint(label: 'Jul 1', value: 6.4),
     AnalyticsPoint(label: 'Jul 5', value: 6.6),
     AnalyticsPoint(label: 'Jul 9', value: 6.9),
@@ -33,15 +33,23 @@ class ReportsController extends ChangeNotifier {
     AnalyticsPoint(label: 'Jul 29', value: 6.2),
   ];
 
-  List<PredictedAnalyticsPoint> predictionPoints = [
-    PredictedAnalyticsPoint(label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
-    PredictedAnalyticsPoint(label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
-    PredictedAnalyticsPoint(label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
-    PredictedAnalyticsPoint(label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
-    PredictedAnalyticsPoint(label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
-    PredictedAnalyticsPoint(label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
-    PredictedAnalyticsPoint(label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
-    PredictedAnalyticsPoint(label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
+  List<PredictedAnalyticsPoint> predictionPoints = const [
+    PredictedAnalyticsPoint(
+        label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
+    PredictedAnalyticsPoint(
+        label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
+    PredictedAnalyticsPoint(
+        label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
+    PredictedAnalyticsPoint(
+        label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
+    PredictedAnalyticsPoint(
+        label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
+    PredictedAnalyticsPoint(
+        label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
+    PredictedAnalyticsPoint(
+        label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
+    PredictedAnalyticsPoint(
+        label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
   ];
 
   TargetDistributionData targetDistribution = const TargetDistributionData(
@@ -82,7 +90,7 @@ class ReportsController extends ChangeNotifier {
   ];
 
   String selectedParameter = 'pH'; // 'pH' or 'EC'
-  String selectedTimeframe = '7d';  // '7d', '30d', '90d'
+  String selectedTimeframe = '7d'; // '7d', '30d', '90d'
   String selectedDistributionParam = 'pH';
 
   RangeValues phRange = const RangeValues(5.5, 6.5);
@@ -92,6 +100,10 @@ class ReportsController extends ChangeNotifier {
   bool includeCalibrationLogs = false;
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
+  bool includeAllAnalytics = false;
+
+  bool recommendationApplied = false;
+  bool recommendationDismissed = false;
 
   ReportsController() {
     loadData();
@@ -144,21 +156,62 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleAllAnalytics(bool? val) {
+    includeAllAnalytics = val ?? false;
+    notifyListeners();
+  }
+
+  void dismissReportGeneration() {
+    includeSensorLogs = false;
+    includeCalibrationLogs = false;
+    includePhOptimization = false;
+    includeEcOptimization = false;
+    includeAllAnalytics = false;
+    notifyListeners();
+  }
+
   void revertRanges() {
     phRange = const RangeValues(5.5, 6.5);
     ecRange = const RangeValues(5.0, 6.0);
     notifyListeners();
   }
 
+  Future<void> generatePdfReport() async {
+    await _pdfReportService.generateAndShare(
+      summary: summary,
+      trendPoints: trendPoints,
+      predictionPoints: predictionPoints,
+      phRange: phRange,
+      ecRange: ecRange,
+      selectedParameter: selectedParameter,
+      includeSensorLogs: includeSensorLogs,
+      includeCalibrationLogs: includeCalibrationLogs,
+      includePhOptimization: includePhOptimization,
+      includeEcOptimization: includeEcOptimization,
+      includeAllAnalytics: includeAllAnalytics,
+    );
+  }
+
+  void applyRecommendation() {
+    recommendationApplied = true;
+    recommendationDismissed = false;
+    notifyListeners();
+  }
+
+  void dismissRecommendation() {
+    recommendationDismissed = true;
+    recommendationApplied = false;
+    notifyListeners();
+  }
+
   Future<void> loadTrendData() async {
     try {
-      final points = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
+      final points = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
       if (points.isNotEmpty) {
         trendPoints = points;
       }
-    } catch (_) {
-
-    }
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -169,22 +222,17 @@ class ReportsController extends ChangeNotifier {
 
     try {
       profile = await _userService.getProfile('mock-user-id');
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     try {
       summary = await _reportsService.getSummaryData();
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     try {
-      final t = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
+      final t = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
       if (t.isNotEmpty) trendPoints = t;
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     isLoading = false;
     notifyListeners();

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
+import '../services/app_state.dart';
 import '../services/monitoring_service.dart';
+import '../services/supabase_client.dart';
 import '../services/user_service.dart';
 
 class HistoryLogsController extends ChangeNotifier {
@@ -9,24 +11,22 @@ class HistoryLogsController extends ChangeNotifier {
 
   bool isLoading = true;
   String? errorMessage;
-
   UserProfile? profile;
 
   String selectedTab = 'Sensor logs'; // 'Sensor logs' | 'Calibration logs'
   String selectedRange = 'Daily'; // 'Daily' | 'Weekly' | 'Monthly'
-
-  DateTime selectedDate = DateTime.now();
+  DateTime selectedDate = DateTime(2026, 7, 18);
   DateTimeRange? selectedWeekRange;
 
   List<String> columns = [];
   List<HistoryLogEntry> rows = [];
 
   HistoryLogsController() {
-    _initWeekRange();
+    initWeekRange();
     loadData();
   }
 
-  void _initWeekRange() {
+  void initWeekRange() {
     final start =
         DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
     final end = start.add(const Duration(days: 6));
@@ -51,7 +51,6 @@ class HistoryLogsController extends ChangeNotifier {
       'November',
       'December'
     ];
-
     if (selectedRange == 'Daily') {
       return '${months[selectedDate.month - 1]} ${selectedDate.day}, ${selectedDate.year}';
     } else if (selectedRange == 'Weekly') {
@@ -65,18 +64,38 @@ class HistoryLogsController extends ChangeNotifier {
     }
   }
 
+  DateTimeRange _selectedDateRange() {
+    if (selectedRange == 'Daily') {
+      final start =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final end = DateTime(selectedDate.year, selectedDate.month,
+          selectedDate.day, 23, 59, 59);
+      return DateTimeRange(start: start, end: end);
+    } else if (selectedRange == 'Weekly') {
+      return selectedWeekRange ??
+          DateTimeRange(start: selectedDate, end: selectedDate);
+    } else {
+      final start = DateTime(selectedDate.year, selectedDate.month, 1);
+      final end = DateTime(
+          selectedDate.year, selectedDate.month + 1, 0, 23, 59, 59);
+      return DateTimeRange(start: start, end: end);
+    }
+  }
+
   Future<void> loadData() async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
-
     try {
-      profile = await _userService.getProfile('mock-user-id');
+      profile = await _userService.getProfile(
+        supabaseClient?.auth.currentUser?.id ??
+            appProfile.value?.id ??
+            'mock-user-id',
+      );
       await _loadSelectedLogs();
     } catch (e) {
       errorMessage = 'Failed to load history logs';
     }
-
     isLoading = false;
     notifyListeners();
   }
@@ -97,34 +116,34 @@ class HistoryLogsController extends ChangeNotifier {
     if (weekRange != null) {
       selectedWeekRange = weekRange;
     } else {
-      _initWeekRange();
+      initWeekRange();
     }
     _loadSelectedLogs();
   }
 
   Future<void> _loadSelectedLogs() async {
-    if (selectedTab == 'Calibration logs') {
-      columns = const ['Time', 'Sensor', 'Action', 'Status'];
-      rows = const [];
-      notifyListeners();
-      return;
-    }
-
     isLoading = true;
-    errorMessage = null;
     notifyListeners();
     try {
       final range = _selectedDateRange();
-      columns = const ['Time', 'Avg pH', 'Avg EC', 'Avg Temp', 'Status'];
-      rows = await _monitoringService.getSensorHistory(
-        start: range.start,
-        end: range.end,
-        aggregation: switch (selectedRange) {
-          'Weekly' => HistoryAggregation.eightHours,
-          'Monthly' => HistoryAggregation.daily,
-          _ => HistoryAggregation.tenMinutes,
-        },
-      );
+      if (selectedTab == 'Calibration logs') {
+        columns = MonitoringService.calibrationLogColumns;
+        rows = await _monitoringService.getCalibrationHistory(
+          start: range.start,
+          end: range.end,
+        );
+      } else {
+        columns = const ['Time', 'Avg pH', 'Avg EC', 'Avg Temp', 'Status'];
+        rows = await _monitoringService.getSensorHistory(
+          start: range.start,
+          end: range.end,
+          aggregation: switch (selectedRange) {
+            'Weekly' => HistoryAggregation.eightHours,
+            'Monthly' => HistoryAggregation.daily,
+            _ => HistoryAggregation.tenMinutes,
+          },
+        );
+      }
     } catch (_) {
       errorMessage = 'Failed to load sensor history from Supabase';
     } finally {
@@ -133,24 +152,29 @@ class HistoryLogsController extends ChangeNotifier {
     }
   }
 
-  DateTimeRange _selectedDateRange() {
-    if (selectedRange == 'Weekly') {
-      final start = selectedWeekRange?.start ?? selectedDate;
-      return DateTimeRange(
-        start: DateTime(start.year, start.month, start.day),
-        end: DateTime(start.year, start.month, start.day)
-            .add(const Duration(days: 7)),
-      );
+  bool get canDelete => profile?.isAdmin == true;
+
+  Future<bool> deleteSelectedLogs() async {
+    if (!canDelete) return false;
+    try {
+      final range = _selectedDateRange();
+      if (selectedTab == 'Calibration logs') {
+        await _monitoringService.deleteCalibrationLogs(
+          start: range.start,
+          end: range.end,
+        );
+      } else {
+        await _monitoringService.deleteHistoryLogs(
+          start: range.start,
+          end: range.end,
+        );
+      }
+      await _loadSelectedLogs();
+      return true;
+    } catch (_) {
+      errorMessage = 'Unable to delete history logs. Please try again.';
+      notifyListeners();
+      return false;
     }
-    if (selectedRange == 'Monthly') {
-      final start = DateTime(selectedDate.year, selectedDate.month);
-      return DateTimeRange(
-        start: start,
-        end: DateTime(selectedDate.year, selectedDate.month + 1),
-      );
-    }
-    final start =
-        DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    return DateTimeRange(start: start, end: start.add(const Duration(days: 1)));
   }
 }

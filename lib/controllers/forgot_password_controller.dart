@@ -26,8 +26,8 @@ class ForgotPasswordController extends ChangeNotifier {
     } else {
       errorMessage = result.message;
     }
-    notifyListeners();
 
+    notifyListeners();
     return result.success;
   }
 
@@ -36,4 +36,4 @@ class ForgotPasswordController extends ChangeNotifier {
     emailController.dispose();
     super.dispose();
   }
-}
+}   

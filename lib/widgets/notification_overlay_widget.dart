@@ -56,7 +56,6 @@ class NotificationOverlayWidget extends StatelessWidget {
             const SizedBox(height: 12),
             const Divider(color: AppColors.cardBorder, height: 1),
             const SizedBox(height: 12),
-
             // Notification List
             if (activeNotifications.isEmpty)
               Padding(
@@ -105,7 +104,6 @@ class NotificationOverlayWidget extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-
                             // Notification Text Content
                             Expanded(
                               child: Column(
@@ -131,8 +129,6 @@ class NotificationOverlayWidget extends StatelessWidget {
                                 ],
                               ),
                             ),
-
-                            // Info Icon
                             Icon(
                               Icons.info_outline,
                               size: 18,

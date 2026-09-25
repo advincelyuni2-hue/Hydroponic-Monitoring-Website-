@@ -60,9 +60,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     child: Center(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 48,
-                          vertical: 32,
-                        ),
+                            horizontal: 48, vertical: 32),
                         child: formSection,
                       ),
                     ),
@@ -101,8 +99,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-        
-
               Text(
                 'Forgot Password',
                 style: AppTextStyles.title.copyWith(
@@ -110,7 +106,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
               Text(
                 "Enter your email address and we'll send you instructions to reset your password.",
                 style: AppTextStyles.bodySmall.copyWith(
@@ -119,7 +114,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
               SizedBox(height: isMobile ? 24 : 32),
-
               Text('Your email', style: AppTextStyles.label),
               const SizedBox(height: 8),
               CustomTextField(
@@ -127,7 +121,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: isMobile ? 24 : 32),
-
               CustomButton(
                 text: 'Send Reset Link',
                 backgroundColor: AppColors.primaryButton,
@@ -136,7 +129,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 onPressed: _handleResetPassword,
               ),
               const SizedBox(height: 24),
-
               Center(
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),

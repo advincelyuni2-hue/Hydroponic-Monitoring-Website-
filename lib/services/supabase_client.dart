@@ -11,7 +11,6 @@ bool get isSupabaseConfigured =>
 
 Future<void> initSupabase() async {
   if (!isSupabaseConfigured) return;
-
   await Supabase.initialize(
     url: supabaseUrl,
     publishableKey: supabasePublishableKey,

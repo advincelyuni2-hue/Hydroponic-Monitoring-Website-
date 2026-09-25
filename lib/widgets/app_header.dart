@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/notification_models.dart';
+import '../screens/login_screen.dart';
 import '../screens/notifications_screen.dart';
+import '../services/app_state.dart';
+import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
@@ -25,10 +28,10 @@ class AppHeader extends StatefulWidget {
   });
 
   @override
-  State<AppHeader> createState() => _AppHeaderState();
+  State<AppHeader> createState() => AppHeaderState();
 }
 
-class _AppHeaderState extends State<AppHeader> {
+class AppHeaderState extends State<AppHeader> {
   OverlayEntry? _overlayEntry;
   final NotificationService _notificationService = NotificationService();
 
@@ -36,7 +39,6 @@ class _AppHeaderState extends State<AppHeader> {
     if (_overlayEntry != null) {
       _removeOverlay();
     } else {
-      // Clear red dot on tap
       _notificationService.markAllAsRead();
       _showOverlay(context);
     }
@@ -61,7 +63,6 @@ class _AppHeaderState extends State<AppHeader> {
               stream: _notificationService.streamNotifications(),
               builder: (context, snapshot) {
                 final liveNotifications = snapshot.data ?? [];
-
                 return NotificationOverlayWidget(
                   notifications: liveNotifications,
                   onNotificationTap: (item) {
@@ -98,6 +99,52 @@ class _AppHeaderState extends State<AppHeader> {
     _overlayEntry = null;
   }
 
+  void showProfileMenu(BuildContext context) {
+    final currentProfile = appProfile.value ?? widget.profile;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.iconCircle,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              title: Text(
+                currentProfile?.name ?? 'User',
+                style: AppTextStyles.bodyBold,
+              ),
+              subtitle: Text(
+                currentProfile?.roleLabel ?? currentProfile?.role ?? 'Employee',
+                style: AppTextStyles.cardMeta,
+              ),
+            ),
+            const Divider(color: AppColors.cardBorder, height: 1),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.alertBorder),
+              title: const Text('Log out', style: TextStyle(color: AppColors.alertBorder)),
+              onTap: () async {
+                await AuthService().logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
@@ -108,7 +155,6 @@ class _AppHeaderState extends State<AppHeader> {
       stream: _notificationService.streamNotifications(),
       builder: (context, snapshot) {
         final liveNotifications = snapshot.data ?? [];
-        // Only show red dot if there are unread active notifications
         final hasUnread =
             liveNotifications.any((n) => !n.isRead && !n.isResolved);
 
@@ -194,8 +240,7 @@ class _AppHeaderState extends State<AppHeader> {
             ],
             _iconCircle(Icons.add, widget.onAddTap ?? () {}, iconSize),
             SizedBox(width: iconGap),
-
-            // Notification Bell with Red Dot Indicator
+            // Your custom Notification Bell triggering your overlay widget & stream
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -221,28 +266,35 @@ class _AppHeaderState extends State<AppHeader> {
                   ),
               ],
             ),
-
             if (!isMobile) ...[
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.iconCircle,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.profile?.name ?? 'Alveus',
-                      style: AppTextStyles.bodyBold),
-                  Text(widget.profile?.role ?? 'Employee',
-                      style: AppTextStyles.cardMeta),
-                ],
+              // Profile Tap triggering showProfileMenu()
+              GestureDetector(
+                onTap: widget.onProfileTap ?? () => showProfileMenu(context),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.iconCircle,
+                      child: Icon(Icons.person, color: Colors.white),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.profile?.name ?? 'Alveus',
+                            style: AppTextStyles.bodyBold),
+                        Text(widget.profile?.role ?? 'Employee',
+                            style: AppTextStyles.cardMeta),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ] else ...[
               SizedBox(width: iconGap),
               GestureDetector(
-                onTap: widget.onProfileTap ?? () {},
+                onTap: widget.onProfileTap ?? () => showProfileMenu(context),
                 child: const CircleAvatar(
                   radius: 16,
                   backgroundColor: AppColors.iconCircle,

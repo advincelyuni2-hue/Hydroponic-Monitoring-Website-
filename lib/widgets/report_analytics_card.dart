@@ -7,9 +7,9 @@ import '../models/reports_models.dart';
 import '../utils/responsive.dart';
 import 'date_picker_button.dart';
 
-class ReportAnalyticsCard extends StatelessWidget {
-  final String selectedParameter; // 'pH' or 'EC'
-  final String selectedTimeframe; // '7d', '30d', or '90d'
+class ReportsAnalyticsCard extends StatelessWidget {
+  final String selectedParameter;
+  final String selectedTimeframe;
   final List<AnalyticsPoint> points;
   final double minThreshold;
   final double maxThreshold;
@@ -17,7 +17,7 @@ class ReportAnalyticsCard extends StatelessWidget {
   final ValueChanged<String> onTimeframeChanged;
   final VoidCallback? onDatePickerTap;
 
-  const ReportAnalyticsCard({
+  const ReportsAnalyticsCard({
     super.key,
     required this.selectedParameter,
     required this.selectedTimeframe,
@@ -40,7 +40,6 @@ class ReportAnalyticsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. TOP HEADER: Title & Parameter Toggle + Timeframe Pills
           isMobile
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,8 +72,6 @@ class ReportAnalyticsCard extends StatelessWidget {
           const SizedBox(height: 12),
           const Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
           const SizedBox(height: 24),
-
-          // 2. CHART CANVAS
           SizedBox(
             height: isMobile ? 240 : 340,
             child: LineChart(_buildTrendChartData()),
@@ -159,8 +156,8 @@ class ReportAnalyticsCard extends StatelessWidget {
               child: Text(
                 tf,
                 style: TextStyle(
-                  fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  fontSize: 12,
                   color: selectedTimeframe == tf ? Colors.white : Colors.black87,
                 ),
               ),
@@ -170,11 +167,9 @@ class ReportAnalyticsCard extends StatelessWidget {
         const SizedBox(width: 8),
         DatePickerButton(
           onTap: onDatePickerTap ??
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Date picker coming soon!')),
-                );
-              },
+              () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Date picker coming soon')),
+                  ),
         ),
       ],
     );
@@ -188,9 +183,9 @@ class ReportAnalyticsCard extends StatelessWidget {
 
     return LineChartData(
       minX: 0,
-      maxX: points.isEmpty ? 1 : (points.length - 1).toDouble(),
-      minY: selectedParameter == 'pH' ? 4.0 : 0.0,
-      maxY: selectedParameter == 'pH' ? 9.0 : 1200.0,
+      maxX: (points.length - 1).toDouble(),
+      minY: 5.0,
+      maxY: 7.5,
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
@@ -211,7 +206,7 @@ class ReportAnalyticsCard extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 36,
-            interval: selectedParameter == 'pH' ? 1.0 : 300.0,
+            interval: 0.5,
             getTitlesWidget: (val, meta) {
               return Text(
                 val.toStringAsFixed(1),
@@ -259,17 +254,22 @@ class ReportAnalyticsCard extends StatelessWidget {
       ),
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
-          getTooltipColor: (touchedSpot) => const Color(0xFFE5FFDE),
+          getTooltipColor: (_) => const Color(0xFFE5FFDE),
           tooltipRoundedRadius: 8,
           getTooltipItems: (touchedSpots) {
+            if (touchedSpots.isEmpty) return [];
+            final primarySpot = touchedSpots.first;
             return touchedSpots.map((spot) {
-              return LineTooltipItem(
-                spot.y.toStringAsFixed(2),
-                AppTextStyles.cardMeta.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              );
+              if (spot == primarySpot) {
+                return LineTooltipItem(
+                  spot.y.toStringAsFixed(2),
+                  AppTextStyles.cardMeta.copyWith(
+                    color: const Color(0xFF1A1A1A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }
+              return null;
             }).toList();
           },
         ),
@@ -287,8 +287,8 @@ class ReportAnalyticsCard extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                AppColors.chartLine.withOpacity(0.22),
-                AppColors.chartLine.withOpacity(0.0),
+                AppColors.chartLine.withValues(alpha: 0.22),
+                AppColors.chartLine.withValues(alpha: 0.0),
               ],
             ),
           ),

@@ -3,9 +3,15 @@ import '../models/monitoring_models.dart';
 import 'notification_service.dart';
 import 'supabase_client.dart';
 
-enum HistoryAggregation { tenMinutes, eightHours, daily }
-
 class MonitoringService {
+  SupabaseClient get _client {
+    final client = supabaseClient;
+    if (client == null) {
+      throw StateError('Supabase is not configured');
+    }
+    return client;
+  }
+
   final NotificationService _notificationService = NotificationService();
 
   static const List<String> sensorLogColumns = [
@@ -25,20 +31,53 @@ class MonitoringService {
     'Status',
   ];
 
-  /// Powers the "Parameter Status" cards and evaluates active thresholds
   Future<List<ParameterStatus>> getParameterStatuses() async {
+    final config = await _client
+        .from('parameter_configurations')
+        .select('ph_min, ph_max, ec_min, ec_max')
+        .eq('id', 1)
+        .maybeSingle();
+
+    final phMin = (config?['ph_min'] as num?)?.toDouble() ?? 5.5;
+    final phMax = (config?['ph_max'] as num?)?.toDouble() ?? 6.5;
+    final ecMin = (config?['ec_min'] as num?)?.toDouble() ?? 1.2;
+    final ecMax = (config?['ec_max'] as num?)?.toDouble() ?? 1.8;
+
     final readings = await Future.wait([
-      _getLatestReading('ph_readings'),
-      _getLatestReading('ec_readings'),
-      _getLatestReading('temp_readings'),
+      _latestReading('ph_readings'),
+      _latestReading('ec_readings'),
+      _latestReading('temp_readings'),
     ]);
 
-    final phStatus = _toParameterStatus('pH Level', readings[0], '', '5.5 - 6.5');
-    final ecStatus = _toParameterStatus('EC Level', readings[1], 'mS/cm', '1.2 - 1.8');
-    final tempStatus = _toParameterStatus('Temperature', readings[2], '°C', '18.0 - 24.0');
+    final phStatus = _statusFromReading(
+      label: 'pH Level',
+      row: readings[0],
+      unit: '',
+      min: phMin,
+      max: phMax,
+      decimals: 2,
+    );
 
-    // Auto-evaluate thresholds and create database alert entries if breached
-    _checkAndTriggerThresholdAlerts(phStatus, ecStatus, tempStatus);
+    final ecStatus = _statusFromReading(
+      label: 'EC Level',
+      row: readings[1],
+      unit: 'mS/cm',
+      min: ecMin,
+      max: ecMax,
+      decimals: 2,
+    );
+
+    final tempStatus = _statusFromReading(
+      label: 'Temperature',
+      row: readings[2],
+      unit: '°C',
+      min: 18.0,
+      max: 28.0,
+      decimals: 1,
+    );
+
+    _checkAndTriggerThresholdAlerts(
+        phStatus, ecStatus, tempStatus, phMin, phMax, ecMin, ecMax);
 
     return [phStatus, ecStatus, tempStatus];
   }
@@ -47,16 +86,20 @@ class MonitoringService {
     ParameterStatus ph,
     ParameterStatus ec,
     ParameterStatus temp,
+    double phMin,
+    double phMax,
+    double ecMin,
+    double ecMax,
   ) {
     double? phVal = double.tryParse(ph.currentValue);
     if (phVal != null) {
       _notificationService.evaluateAndCreateAlert(
         parameter: 'pH',
         currentValue: phVal,
-        minIdeal: 5.5,
-        maxIdeal: 6.5,
+        minIdeal: phMin,
+        maxIdeal: phMax,
         unit: '',
-        recommendation: phVal > 6.5
+        recommendation: phVal > phMax
             ? '3.5 mL of pH down solution gradually, followed by verification.'
             : 'Add pH up solution gradually.',
       );
@@ -67,10 +110,10 @@ class MonitoringService {
       _notificationService.evaluateAndCreateAlert(
         parameter: 'EC',
         currentValue: ecVal,
-        minIdeal: 1.2,
-        maxIdeal: 1.8,
+        minIdeal: ecMin,
+        maxIdeal: ecMax,
         unit: 'mS/cm',
-        recommendation: ecVal < 1.2
+        recommendation: ecVal < ecMin
             ? '1.0 mL of A and B nutrient solution replenishment.'
             : 'Evaluate water dilution to normalize concentration.',
       );
@@ -82,7 +125,7 @@ class MonitoringService {
         parameter: 'Temperature',
         currentValue: tempVal,
         minIdeal: 18.0,
-        maxIdeal: 24.0,
+        maxIdeal: 28.0,
         unit: '°C',
         recommendation:
             'High water temperature may reduce oxygen absorption; check circulation fans.',
@@ -90,72 +133,53 @@ class MonitoringService {
     }
   }
 
-  /// Helper method for manual testing in browser / UI
-  Future<void> testTriggerAlert({
-    required String parameter,
-    required double testValue,
-    required String recommendation,
-  }) async {
-    double minIdeal = parameter == 'pH'
-        ? 5.5
-        : (parameter == 'EC' ? 1.2 : 18.0);
-    double maxIdeal = parameter == 'pH'
-        ? 6.5
-        : (parameter == 'EC' ? 1.8 : 24.0);
-    String unit = parameter == 'pH'
-        ? ''
-        : (parameter == 'EC' ? 'mS/cm' : '°C');
-
-    await _notificationService.evaluateAndCreateAlert(
-      parameter: parameter,
-      currentValue: testValue,
-      minIdeal: minIdeal,
-      maxIdeal: maxIdeal,
-      unit: unit,
-      recommendation: recommendation,
-    );
-  }
-
-  Future<Map<String, dynamic>> _getLatestReading(String table) async {
-    final rows = await supabase
+  Future<Map<String, dynamic>?> _latestReading(String table) async {
+    final rows = await _client
         .from(table)
-        .select('value, recorded_at')
-        .eq('is_average', false)
+        .select('value, recorded_at, status')
         .order('recorded_at', ascending: false)
         .limit(1);
 
-    if (rows.isEmpty) {
-      throw StateError('No non-average readings found in $table');
-    }
-    return rows.first;
+    return rows.isEmpty ? null : rows.first;
   }
 
-  ParameterStatus _toParameterStatus(
-    String label,
-    Map<String, dynamic> row,
-    String unit,
-    String idealRange,
-  ) {
-    final value = (row['value'] as num).toDouble();
-    final timestamp = DateTime.parse(row['recorded_at'] as String).toLocal();
+  ParameterStatus _statusFromReading({
+    required String label,
+    required Map<String, dynamic>? row,
+    required String unit,
+    required double min,
+    required double max,
+    required int decimals,
+  }) {
+    final value = (row?['value'] as num?)?.toDouble();
+    final recordedAt = row?['recorded_at'] as String?;
+    final status = value == null
+        ? 'No data'
+        : (value < min || value > max
+            ? 'Critical'
+            : (row?['status'] as String? ?? 'Normal'));
 
     return ParameterStatus(
       label: label,
-      currentValue: value.toStringAsFixed(label == 'pH Level' ? 2 : 1),
+      currentValue: value?.toStringAsFixed(decimals) ?? '-',
       unit: unit,
-      idealRange: idealRange,
-      lastUpdated: formatTime(timestamp),
+      idealRange:
+          '${min.toStringAsFixed(decimals)} - ${max.toStringAsFixed(decimals)}',
+      lastUpdated: recordedAt == null
+          ? 'No data'
+          : _formatTime(DateTime.parse(recordedAt).toLocal()),
+      status: status,
     );
   }
 
-  String formatTime(DateTime value) {
+  String _formatTime(DateTime value) {
     final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
     final minute = value.minute.toString().padLeft(2, '0');
     return '$hour:$minute ${value.hour < 12 ? 'AM' : 'PM'}';
   }
 
   RealtimeChannel subscribeToParameterChanges(void Function() onChange) {
-    return supabase
+    return _client
         .channel('dashboard-parameter-readings')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
@@ -194,7 +218,7 @@ class MonitoringService {
   }
 
   Future<void> unsubscribe(RealtimeChannel channel) =>
-      supabase.removeChannel(channel);
+      _client.removeChannel(channel);
 
   Future<List<HistoryLogEntry>> getSensorHistory({
     required DateTime start,
@@ -207,7 +231,7 @@ class MonitoringService {
       _getAverageReadings('temp_readings', start, end),
     ]);
 
-    final summaries = <int, HistorySummary>{};
+    final summaries = <int, _HistorySummary>{};
     _mergeAverageRows(summaries, results[0], 'ph', aggregation);
     _mergeAverageRows(summaries, results[1], 'ec', aggregation);
     _mergeAverageRows(summaries, results[2], 'temp', aggregation);
@@ -220,10 +244,62 @@ class MonitoringService {
         _historyLabel(summary.recordedAt, aggregation),
         summary.ph?.toStringAsFixed(2) ?? '-',
         summary.ec == null ? '-' : '${summary.ec!.toStringAsFixed(2)} mS/cm',
-        summary.temp == null ? '-' : '${summary.temp!.toStringAsFixed(1)} °C',
+        summary.temp == null
+            ? '-'
+            : '${summary.temp!.toStringAsFixed(1)} °C',
         summary.status,
       ]);
     }).toList();
+  }
+
+  Future<void> deleteHistoryLogs({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    for (final table in ['ph_readings', 'ec_readings', 'temp_readings']) {
+      await _client
+          .from(table)
+          .delete()
+          .eq('is_average', true)
+          .gte('recorded_at', start.toUtc().toIso8601String())
+          .lt('recorded_at', end.toUtc().toIso8601String());
+    }
+  }
+
+  Future<List<HistoryLogEntry>> getCalibrationHistory({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final rows = await _client
+        .from('calibration_logs')
+        .select(
+            'recorded_at, parameter, calibration_type, adjustment, performed_by, status')
+        .gte('recorded_at', start.toUtc().toIso8601String())
+        .lt('recorded_at', end.toUtc().toIso8601String())
+        .order('recorded_at', ascending: false);
+
+    return rows
+        .map<HistoryLogEntry>((row) => HistoryLogEntry([
+              _formatTime(
+                  DateTime.parse(row['recorded_at'] as String).toLocal()),
+              row['parameter'] as String? ?? 'Unknown',
+              row['calibration_type'] as String? ?? 'Calibration',
+              row['adjustment'] as String? ?? '',
+              row['performed_by'] as String? ?? 'Unknown',
+              row['status'] as String? ?? 'Completed',
+            ]))
+        .toList();
+  }
+
+  Future<void> deleteCalibrationLogs({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    await _client
+        .from('calibration_logs')
+        .delete()
+        .gte('recorded_at', start.toUtc().toIso8601String())
+        .lt('recorded_at', end.toUtc().toIso8601String());
   }
 
   Future<List<Map<String, dynamic>>> _getAverageReadings(
@@ -236,7 +312,7 @@ class MonitoringService {
     var from = 0;
 
     while (true) {
-      final page = await supabase
+      final page = await _client
           .from(table)
           .select('value, recorded_at, status')
           .eq('is_average', true)
@@ -249,12 +325,11 @@ class MonitoringService {
       if (page.length < pageSize) break;
       from += pageSize;
     }
-
     return allRows;
   }
 
   void _mergeAverageRows(
-    Map<int, HistorySummary> summaries,
+    Map<int, _HistorySummary> summaries,
     List<Map<String, dynamic>> rows,
     String parameter,
     HistoryAggregation aggregation,
@@ -264,10 +339,9 @@ class MonitoringService {
           DateTime.parse(row['recorded_at'] as String).toLocal();
       final bucket = _historyBucket(timestamp, aggregation);
       final bucketKey = bucket.millisecondsSinceEpoch;
-
       final summary = summaries.putIfAbsent(
         bucketKey,
-        () => HistorySummary(bucket),
+        () => _HistorySummary(bucket),
       );
 
       summary.add(
@@ -309,10 +383,10 @@ class MonitoringService {
   ) {
     switch (aggregation) {
       case HistoryAggregation.tenMinutes:
-        return '${bucket.month}/${bucket.day} ${formatTime(bucket)}';
+        return '${bucket.month}/${bucket.day} ${_formatTime(bucket)}';
       case HistoryAggregation.eightHours:
         final end = bucket.add(const Duration(hours: 8));
-        return '${bucket.month}/${bucket.day} ${formatTime(bucket)} - ${formatTime(end)}';
+        return '${bucket.month}/${bucket.day} ${_formatTime(bucket)} ${_formatTime(end)}';
       case HistoryAggregation.daily:
         const months = [
           'January',
@@ -326,7 +400,7 @@ class MonitoringService {
           'September',
           'October',
           'November',
-          'December'
+          'December',
         ];
         return '${months[bucket.month - 1]} ${bucket.day}, ${bucket.year}';
     }
@@ -366,113 +440,35 @@ class MonitoringService {
       ForecastPoint(hour: 12, value: 5.4, isPredicted: true),
     ];
   }
-
-  Future<PredictionInsightDetail> getPredictionInsight(String parameter) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (parameter == 'ph') {
-      return PredictionInsightDetail(
-        statusLabel: 'pH Level',
-        statusBadge: 'Warning',
-        warningText: 'pH is expected to rise above safe levels in 45 minutes.',
-        airHumidity: '75%',
-        ecLevel: '5.8 mS/cm',
-        calloutText:
-            'High humidity is slowing evaporation, letting dissolved solids build up and push pH higher.',
-        currentPh: 6.9,
-        targetPh: 6.5,
-        suggestedFixes: [
-          '4.5 ml of pH down solution',
-          '0.5 ml of A and B nutrient concentrate'
-        ],
-      );
-    }
-    return PredictionInsightDetail(
-      statusLabel: 'EC Level',
-      statusBadge: 'Normal',
-      warningText: 'EC levels are stable and within the ideal range.',
-      airHumidity: '75%',
-      ecLevel: '5.8 mS/cm',
-      calloutText:
-          'Nutrient concentration has remained steady over the last 12 hours.',
-      currentPh: 5.8,
-      targetPh: 6.0,
-      suggestedFixes: ['No action needed right now.'],
-    );
-  }
-
-  Future<List<HistoryLogEntry>> getSensorLogs() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    return [
-      const HistoryLogEntry(['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
-      const HistoryLogEntry(['7:45 AM', 'EC', '5.8 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry(['7:30 AM', 'Temperature', '24.6 °C', 'Stable', 'None']),
-      const HistoryLogEntry(['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
-      const HistoryLogEntry(['7:00 AM', 'EC', '5.9 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry(['6:45 AM', 'Temperature', '26.8 °C', 'Critical', 'Alert sent to admin']),
-      const HistoryLogEntry(['6:30 AM', 'pH', '6.6', 'Stable', 'None']),
-      const HistoryLogEntry(['6:15 AM', 'EC', '5.7 mS/cm', 'Stable', 'None']),
-    ];
-  }
-
-  Future<List<HistoryLogEntry>> getCalibrationLogs() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    return [
-      const HistoryLogEntry(['8:00 AM', 'pH', '2-Point Calibration', '+0.2', 'Auto-system', 'Success']),
-      const HistoryLogEntry(['Yesterday, 6:00 PM', 'EC', '1-Point Calibration', '-0.1 mS/cm', 'Alveus', 'Success']),
-      const HistoryLogEntry(['2 days ago, 8:00 AM', 'Temperature', 'Sensor Reset', '0.0 °C', 'Auto-system', 'Success']),
-      const HistoryLogEntry(['3 days ago, 8:00 AM', 'pH', '2-Point Calibration', '+0.1', 'Auto-system', 'Failed']),
-    ];
-  }
 }
 
-class HistorySummary {
+class _HistorySummary {
+  _HistorySummary(this.recordedAt);
   final DateTime recordedAt;
-  double _phTotal = 0;
-  int _phCount = 0;
-  double _ecTotal = 0;
-  int _ecCount = 0;
-  double _tempTotal = 0;
-  int _tempCount = 0;
-  String status = 'Stable';
+  double? ph;
+  double? ec;
+  double? temp;
+  final List<String> _statuses = [];
 
-  HistorySummary(this.recordedAt);
-
-  double? get ph => _phCount == 0 ? null : _phTotal / _phCount;
-  double? get ec => _ecCount == 0 ? null : _ecTotal / _ecCount;
-  double? get temp => _tempCount == 0 ? null : _tempTotal / _tempCount;
-
-  void add({
-    required String parameter,
-    required double value,
-    required String? status,
-  }) {
-    if (parameter == 'ph') {
-      _phTotal += value;
-      _phCount++;
-    } else if (parameter == 'ec') {
-      _ecTotal += value;
-      _ecCount++;
-    } else if (parameter == 'temp') {
-      _tempTotal += value;
-      _tempCount++;
+  void add({required String parameter, required double value, String? status}) {
+    switch (parameter) {
+      case 'ph':
+        ph = value;
+        break;
+      case 'ec':
+        ec = value;
+        break;
+      case 'temp':
+        temp = value;
+        break;
     }
-
-    if (_severity(status) > _severity(this.status)) {
-      this.status = status!;
-    }
+    if (status != null) _statuses.add(status);
   }
 
-  int _severity(String? value) {
-    switch (value?.toLowerCase()) {
-      case 'critical':
-        return 3;
-      case 'warning':
-        return 2;
-      case 'stable':
-      case 'normal':
-        return 1;
-      default:
-        return 0;
-    }
+  String get status {
+    if (_statuses.contains('Critical')) return 'Critical';
+    if (_statuses.contains('Warning')) return 'Warning';
+    if (_statuses.isNotEmpty) return _statuses.first;
+    return 'Normal';
   }
 }

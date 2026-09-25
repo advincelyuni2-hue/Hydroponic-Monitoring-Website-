@@ -9,11 +9,15 @@ import '../utils/responsive.dart';
 class ReportPredictionCard extends StatelessWidget {
   final List<PredictedAnalyticsPoint> points;
   final String selectedParameter;
+  final VoidCallback? onApplyRecommendation;
+  final VoidCallback? onDismissRecommendation;
 
   const ReportPredictionCard({
     super.key,
     required this.points,
     required this.selectedParameter,
+    this.onApplyRecommendation,
+    this.onDismissRecommendation,
   });
 
   @override
@@ -46,7 +50,8 @@ class ReportPredictionCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.statusCardGreen,
                   borderRadius: BorderRadius.circular(12),
@@ -76,8 +81,42 @@ class ReportPredictionCard extends StatelessWidget {
             height: isMobile ? 220 : 320,
             child: hasData
                 ? LineChart(_buildChartData())
-                : Center(child: Text('No prediction data yet', style: AppTextStyles.cardMeta)),
+                : Center(
+                    child: Text('No prediction data yet',
+                        style: AppTextStyles.cardMeta),
+                  ),
           ),
+          if (onApplyRecommendation != null ||
+              onDismissRecommendation != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (onApplyRecommendation != null)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onApplyRecommendation,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Apply recommendation'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryButton,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                if (onApplyRecommendation != null &&
+                    onDismissRecommendation != null)
+                  const SizedBox(width: 12),
+                if (onDismissRecommendation != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDismissRecommendation,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Dismiss'),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -89,10 +128,12 @@ class ReportPredictionCard extends StatelessWidget {
         Container(
           width: 16,
           height: 3,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2)),
         ),
         const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.cardMeta.copyWith(fontSize: 12)),
+        Text(label,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 12)),
       ],
     );
   }
@@ -100,7 +141,6 @@ class ReportPredictionCard extends StatelessWidget {
   LineChartData _buildChartData() {
     final actualSpots = <FlSpot>[];
     final predictedSpots = <FlSpot>[];
-
     for (int i = 0; i < points.length; i++) {
       actualSpots.add(FlSpot(i.toDouble(), points[i].actualValue));
       predictedSpots.add(FlSpot(i.toDouble(), points[i].predictedValue));
@@ -108,21 +148,20 @@ class ReportPredictionCard extends StatelessWidget {
 
     return LineChartData(
       minX: 0,
-      // Guard against a single-point list where minX == maxX, which some
-      // chart internals don't like.
       maxX: points.length > 1 ? (points.length - 1).toDouble() : 1,
       minY: 5.0,
       maxY: 7.5,
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        getDrawingHorizontalLine: (val) => FlLine(
+        getDrawingHorizontalLine: (val) => const FlLine(
           color: AppColors.chartGrid,
           strokeWidth: 1,
           dashArray: [4, 4],
         ),
       ),
-      borderData: FlBorderData(show: true, border: Border.all(color: AppColors.chartGrid)),
+      borderData: FlBorderData(
+          show: true, border: Border.all(color: AppColors.chartGrid)),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -167,7 +206,6 @@ class ReportPredictionCard extends StatelessWidget {
             final idx = touchedSpots.first.spotIndex;
             if (idx < 0 || idx >= points.length) return [];
             final pt = points[idx];
-
             return touchedSpots.map((spot) {
               if (spot.barIndex == 0) {
                 return LineTooltipItem(

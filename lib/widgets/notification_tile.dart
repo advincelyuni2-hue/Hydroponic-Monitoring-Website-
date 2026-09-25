@@ -6,11 +6,13 @@ import '../theme/app_text_styles.dart';
 class NotificationTile extends StatelessWidget {
   final AppNotificationItem notification;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   const NotificationTile({
     super.key,
     required this.notification,
     this.onTap,
+    this.onDelete,
   });
 
   @override
@@ -60,9 +62,22 @@ class NotificationTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      notification.timestamp,
-                      style: AppTextStyles.cardMeta,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          notification.timestamp,
+                          style: AppTextStyles.cardMeta,
+                        ),
+                        if (onDelete != null) ...[
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: onDelete,
+                            child: const Icon(Icons.delete_outline,
+                                size: 18, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

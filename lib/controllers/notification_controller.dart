@@ -6,7 +6,6 @@ import '../services/notification_service.dart';
 class NotificationController extends ChangeNotifier {
   final NotificationService _notificationService = NotificationService();
   StreamSubscription<List<AppNotificationItem>>? _subscription;
-
   List<AppNotificationItem> notifications = [];
   bool isLoading = true;
 
@@ -17,7 +16,6 @@ class NotificationController extends ChangeNotifier {
   void initRealtimeListener() {
     isLoading = true;
     notifyListeners();
-
     _subscription = _notificationService.streamNotifications().listen(
       (data) {
         notifications = data;
@@ -43,7 +41,6 @@ class NotificationController extends ChangeNotifier {
     bool resolved = value ?? false;
     item.isResolved = resolved;
     notifyListeners();
-
     await _notificationService.updateAlertStatus(item.id, resolved);
   }
 

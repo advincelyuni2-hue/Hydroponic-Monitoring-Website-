@@ -1,5 +1,5 @@
 class ForecastingChartPoint {
-  final double hour; // negative = past, 0 = current, positive = predicted
+  final double hour; // negative past, 0 = current, positive = predicted
   final double value;
   final bool isPredicted;
 
@@ -18,19 +18,19 @@ class ForecastingChartPoint {
   }
 
   Map<String, dynamic> toJson() => {
-    'hour': hour,
-    'value': value,
-    'is_predicted': isPredicted,
-  };
+        'hour': hour,
+        'value': value,
+        'is_predicted': isPredicted,
+      };
 }
 
 class PredictionInsightDetail {
   final String statusLabel; // e.g., "pH Level" or "EC Level"
   final String statusBadge; // e.g., "Warning", "Normal", "Critical"
-  final String warningText; // e.g., "pH is expected to rise above safe levels in 45 minutes."
-  final String temperature; // Updated from airHumidity -> e.g., "24.5 °C"
+  final String warningText;
+  final String temperature; // e.g., "24.5 °C"
   final String ecLevel; // e.g., "5.8 mS/cm"
-  final String calloutText; // Explanation of contributing factors
+  final String calloutText;
   final double currentPh;
   final double targetPh;
   final List<String> suggestedFixes;
@@ -62,14 +62,14 @@ class PredictionInsightDetail {
   }
 
   Map<String, dynamic> toJson() => {
-    'status_label': statusLabel,
-    'status_badge': statusBadge,
-    'warning_text': warningText,
-    'temperature': temperature,
-    'ec_level': ecLevel,
-    'callout_text': calloutText,
-    'current_ph': currentPh,
-    'target_ph': targetPh,
-    'suggested_fixes': suggestedFixes,
-  };
+        'status_label': statusLabel,
+        'status_badge': statusBadge,
+        'warning_text': warningText,
+        'temperature': temperature,
+        'ec_level': ecLevel,
+        'callout_text': calloutText,
+        'current_ph': currentPh,
+        'target_ph': targetPh,
+        'suggested_fixes': suggestedFixes,
+      };
 }

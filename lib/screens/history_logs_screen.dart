@@ -28,7 +28,6 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
 
   void _openCalendarPopup(String range) {
     _controller.selectRange(range);
-
     CalendarMode mode = CalendarMode.daily;
     if (range == 'Weekly') mode = CalendarMode.weekly;
     if (range == 'Monthly') mode = CalendarMode.monthly;
@@ -48,7 +47,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 2),
       body: SafeArea(
         child: ListenableBuilder(
@@ -81,7 +80,10 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppHeader(title: 'History logs', profile: _controller.profile),
+                  AppHeader(
+                    title: 'History logs',
+                    profile: _controller.profile,
+                  ),
                   const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
@@ -124,6 +126,14 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
       ),
     );
 
+    final deleteButton = _controller.canDelete
+        ? IconButton(
+            tooltip: 'Delete logs in selected range',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _confirmDelete,
+          )
+        : const SizedBox.shrink();
+
     if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,7 +141,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              tabs,
+              Row(children: [tabs, deleteButton]),
               activeText,
             ],
           ),
@@ -149,7 +159,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            tabs,
+            Row(children: [tabs, deleteButton]),
             Row(
               children: [
                 activeText,
@@ -162,6 +172,41 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
         const SizedBox(height: 12),
         const Divider(height: 1, color: AppColors.cardBorder),
       ],
+    );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete history logs?'),
+        content: Text('Delete logs for ${_controller.activeRangeLabel}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final deleted = await _controller.deleteSelectedLogs();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted
+              ? 'History logs deleted.'
+              : 'History logs could not be deleted.',
+        ),
+      ),
     );
   }
 
@@ -178,6 +223,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
 
   Widget _tab(String title, bool isMobile) {
     final isActive = _controller.selectedTab == title;
+
     return GestureDetector(
       onTap: () => _controller.selectTab(title),
       child: Column(
@@ -188,7 +234,9 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
             title,
             style: AppTextStyles.sectionTitle.copyWith(
               fontSize: isMobile ? 16 : 20,
-              color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+              color: isActive
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
               fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
@@ -214,6 +262,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
       mainAxisSize: MainAxisSize.min,
       children: options.map((range) {
         final isSelected = _controller.selectedRange == range;
+
         return GestureDetector(
           onTap: () => _openCalendarPopup(range),
           child: AnimatedContainer(
@@ -221,7 +270,9 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
             margin: const EdgeInsets.only(left: 6),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primaryButton : const Color(0xFFE2E2E2),
+              color: isSelected
+                  ? AppColors.primaryButton
+                  : const Color(0xFFE2E2E2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(

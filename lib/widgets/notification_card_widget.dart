@@ -96,7 +96,6 @@ class NotificationCardWidget extends StatelessWidget {
             const SizedBox(height: 10),
             const Divider(color: AppColors.cardBorder, height: 1),
             const SizedBox(height: 10),
-
             // Reading & Ideal Range Wrap
             Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -130,7 +129,6 @@ class NotificationCardWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-
             // DSS Recommendation Box
             Text(
               'Recommendation:',
@@ -159,7 +157,6 @@ class NotificationCardWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-
             // Timestamp Footer
             Align(
               alignment: Alignment.centerRight,

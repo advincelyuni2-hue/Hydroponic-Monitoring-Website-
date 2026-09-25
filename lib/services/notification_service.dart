@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification_models.dart';
+import 'app_state.dart';
 import 'supabase_client.dart';
 
 class NotificationService {
@@ -10,7 +11,6 @@ class NotificationService {
           .from('notification_alerts')
           .select()
           .order('created_at', ascending: false);
-
       return (response as List)
           .map((map) => _mapToNotification(map))
           .toList();
@@ -40,7 +40,6 @@ class NotificationService {
   }) async {
     bool isLow = currentValue < minIdeal;
     bool isHigh = currentValue > maxIdeal;
-
     if (!isLow && !isHigh) return;
 
     bool isCritical = false;
@@ -57,7 +56,6 @@ class NotificationService {
     String direction = isHigh ? 'High' : 'Low';
     String alertId =
         'notif_${parameter.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
-
     String title = '$parameter Level $direction $severityLabel';
     String subtitle = '$parameter: $currentValue $unit - $recommendation';
     String idealRange = '$minIdeal - $maxIdeal $unit'.trim();
@@ -102,6 +100,62 @@ class NotificationService {
       }).eq('id', id);
     } catch (e) {
       print('Error updating notification alert status: $e');
+    }
+  }
+
+  /// Deletes a notification entry from Supabase
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      await supabase
+          .from('notification_alerts')
+          .delete()
+          .eq('id', notificationId);
+      return true;
+    } catch (e) {
+      print('Error deleting notification: $e');
+      return false;
+    }
+  }
+
+  /// Sends a manual alert to the administrator
+  Future<void> sendAdminAlert(String message) async {
+    await evaluateAndCreateAlert(
+      parameter: 'System',
+      currentValue: 0.0,
+      minIdeal: 0.0,
+      maxIdeal: 0.0,
+      unit: '',
+      recommendation: message,
+    );
+  }
+
+  /// Real-time subscription helper for admin alerts
+  RealtimeChannel? subscribeToAdminAlerts({
+    required void Function() onAlert,
+  }) {
+    if (appProfile.value?.isAdmin != true) return null;
+    return supabase
+        .channel('admin-alerts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notification_alerts',
+          callback: (_) => onAlert(),
+        )
+        .subscribe();
+  }
+
+  /// Fetches unread admin alert counts
+  Future<int> unreadAdminAlertCount() async {
+    if (appProfile.value?.isAdmin != true) return 0;
+    try {
+      final rows = await supabase
+          .from('notification_alerts')
+          .select('id')
+          .eq('is_read', false);
+      return rows.length;
+    } catch (_) {
+      return 0;
     }
   }
 

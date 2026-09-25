@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/monitoring_models.dart';
 import '../models/notification_models.dart';
+import '../services/app_state.dart';
 import '../services/monitoring_service.dart';
 import '../services/notification_service.dart';
+import '../services/supabase_client.dart';
 import '../services/user_service.dart';
 
 class DashboardController extends ChangeNotifier {
@@ -17,31 +19,14 @@ class DashboardController extends ChangeNotifier {
 
   List<ParameterStatus> parameterStatuses = [];
   LatestInsight? latestInsight;
-  List<AppNotificationItem> notifications = []; // Fixed type model
+  List<AppNotificationItem> notifications = [];
   List<ForecastPoint> phForecast = [];
   List<ForecastPoint> ecForecast = [];
 
-  RealtimeChannel? parameterChannel;
-  bool _refreshingParameters = false;
+  RealtimeChannel? _readingChannel;
 
   DashboardController() {
     loadDashboard();
-    parameterChannel = _monitoringService.subscribeToParameterChanges(
-      _refreshParameterStatuses,
-    );
-  }
-
-  Future<void> _refreshParameterStatuses() async {
-    if (_refreshingParameters) return;
-    _refreshingParameters = true;
-    try {
-      parameterStatuses = await _monitoringService.getParameterStatuses();
-      notifyListeners();
-    } catch (_) {
-      // Keep existing values during transient network error
-    } finally {
-      _refreshingParameters = false;
-    }
   }
 
   Future<void> loadDashboard() async {
@@ -50,11 +35,15 @@ class DashboardController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final userId = supabaseClient?.auth.currentUser?.id ??
+          appProfile.value?.id ??
+          'mock-user-id';
+
       final results = await Future.wait([
-        _userService.getProfile('mock-user-id'),
+        _userService.getProfile(userId),
         _monitoringService.getParameterStatuses(),
         _monitoringService.getLatestInsight(),
-        _notificationService.getNotifications(), // Now resolves correctly
+        _notificationService.getNotifications(),
         _monitoringService.getForecastData('ph'),
         _monitoringService.getForecastData('ec'),
       ]);
@@ -66,6 +55,10 @@ class DashboardController extends ChangeNotifier {
       phForecast = results[4] as List<ForecastPoint>;
       ecForecast = results[5] as List<ForecastPoint>;
 
+      _readingChannel ??= _monitoringService.subscribeToParameterChanges(
+        _handleReadingChange,
+      );
+
       isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -75,9 +68,13 @@ class DashboardController extends ChangeNotifier {
     }
   }
 
+  Future<void> _handleReadingChange() async {
+    await loadDashboard();
+  }
+
   @override
   void dispose() {
-    final channel = parameterChannel;
+    final channel = _readingChannel;
     if (channel != null) {
       _monitoringService.unsubscribe(channel);
     }

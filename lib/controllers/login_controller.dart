@@ -35,21 +35,23 @@ class LoginController extends ChangeNotifier {
     isLoading = false;
     if (!result.success) {
       errorMessage = result.message;
+      notifyListeners();
     }
-    notifyListeners();
-
     return result.success;
   }
 
   Future<bool> loginWithGoogle() async {
     isLoading = true;
+    errorMessage = null;
     notifyListeners();
 
     final result = await _authService.loginWithGoogle();
 
     isLoading = false;
-    notifyListeners();
-
+    if (!result.success) {
+      errorMessage = result.message;
+      notifyListeners();
+    }
     return result.success;
   }
 

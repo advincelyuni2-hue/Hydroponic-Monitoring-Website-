@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/notification_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
@@ -11,6 +12,8 @@ import '../widgets/app_header.dart';
 import '../utils/responsive.dart';
 import 'forecasting_dashboard_screen.dart';
 import 'notifications_screen.dart';
+import '../services/app_state.dart';
+import '../services/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -30,7 +33,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _openForecastingScreen() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ForecastingDashboardScreen()),
+      MaterialPageRoute(
+        builder: (context) => const ForecastingDashboardScreen(),
+      ),
     );
   }
 
@@ -88,11 +93,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildParameterStatusSection(bool isMobile) {
     final statuses = _controller.parameterStatuses;
-    final cardColors = [
-      AppColors.statusCardGreen,
-      AppColors.statusCardYellow,
-      AppColors.statusCardGreen,
-    ];
 
     return Container(
       width: double.infinity,
@@ -109,10 +109,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     for (int i = 0; i < statuses.length; i++) ...[
                       ParameterStatusCard(
                         data: statuses[i],
-                        backgroundColor: cardColors[i % cardColors.length],
+                        backgroundColor: _statusColor(statuses[i].status),
                       ),
-                      if (i != statuses.length - 1) const SizedBox(height: 12),
-                    ],
+                      if (i != statuses.length - 1)
+                        const SizedBox(height: 12),
+                    ]
                   ],
                 )
               : Row(
@@ -122,11 +123,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         child: ParameterStatusCard(
                           data: statuses[i],
-                          backgroundColor: cardColors[i % cardColors.length],
+                          backgroundColor: _statusColor(statuses[i].status),
                         ),
                       ),
-                      if (i != statuses.length - 1) const SizedBox(width: 16),
-                    ],
+                      if (i != statuses.length - 1)
+                        const SizedBox(width: 16),
+                    ]
                   ],
                 ),
         ],
@@ -134,9 +136,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'critical':
+        return AppColors.alertBackground;
+      case 'warning':
+        return AppColors.statusCardYellow;
+      default:
+        return AppColors.statusCardGreen;
+    }
+  }
+
   Widget _buildInsightAndNotificationsSection(bool isMobile) {
     final insightCard = _buildLatestInsightCard();
-    final notificationsCard = _buildNotificationsCard(pushFooterToBottom: !isMobile);
+    final notificationsCard =
+        _buildNotificationsCard(pushFooterToBottom: !isMobile);
 
     if (isMobile) {
       return Column(
@@ -178,11 +192,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
+                      const Icon(Icons.warning_amber_rounded,
                           color: AppColors.alertText, size: 20),
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(insight.warningTitle, style: AppTextStyles.alert),
+                        child: Text(insight.warningTitle,
+                            style: AppTextStyles.alert),
                       ),
                     ],
                   ),
@@ -195,7 +210,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.cardBorder),
                 borderRadius: BorderRadius.circular(10),
@@ -204,25 +220,155 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 alignment: WrapAlignment.spaceBetween,
                 runSpacing: 8,
                 children: [
-                  Text('Humidity: ${insight.humidity}', style: AppTextStyles.bodyBold),
-                  Text('EC Level: ${insight.ecStatus}', style: AppTextStyles.bodyBold),
+                  Text('Humidity: ${insight.humidity}',
+                      style: AppTextStyles.bodyBold),
+                  Text('EC Level: ${insight.ecStatus}',
+                      style: AppTextStyles.bodyBold),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-          ],
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _openForecastingScreen,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryButton,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+            if (appProfile.value?.isAdmin != true) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: _showAlertAdminDialog,
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Alert Admin'),
                 ),
               ),
-              child: Text('View details', style: AppTextStyles.button),
+              const SizedBox(height: 10),
+            ],
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _openForecastingScreen,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryButton,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+                child: Text('View details', style: AppTextStyles.button),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAlertAdminDialog() async {
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alert Admin'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Describe the issue for the administrator',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(context, controller.text.trim()),
+            child: const Text('Send alert'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (message == null || message.isEmpty || !mounted) return;
+
+    try {
+      await NotificationService().sendAdminAlert(message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Alert sent to an administrator.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to send the alert right now.'),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildNotificationsCard({required bool pushFooterToBottom}) {
+    // Limits the list to the 2 most recent active notifications
+    final recentNotifications = _controller.notifications
+        .where((n) => !n.isResolved)
+        .take(2)
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recent Notifications', style: AppTextStyles.sectionTitle),
+          const SizedBox(height: 16),
+          if (recentNotifications.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'No active notifications',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            )
+          else
+            for (final n in recentNotifications)
+              NotificationTile(
+                notification: n,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => NotificationsScreen(
+                        initialSelectedId: n.id,
+                      ),
+                    ),
+                  );
+                },
+              ),
+          if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen(),
+                  ),
+                );
+              },
+              child: Text(
+                'View all notifications',
+                style: AppTextStyles.cardMeta.copyWith(
+                  decoration: TextDecoration.underline,
+                ),
+              ),
             ),
           ),
         ],
@@ -230,80 +376,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildNotificationsCard({required bool pushFooterToBottom}) {
-  // Take only the 2 most recent notifications
-  final recentNotifications = _controller.notifications.take(2).toList();
-
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: AppDecorations.card(),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Recent Notifications',
-          style: AppTextStyles.sectionTitle,
-        ),
-        const SizedBox(height: 16),
-
-        if (recentNotifications.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                'No active notifications',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          )
-        else
-          for (final n in recentNotifications)
-            NotificationTile(
-              notification: n,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => NotificationsScreen(
-                      initialSelectedId: n.id,
-                    ),
-                  ),
-                );
-              },
-            ),
-
-        if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
-
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const NotificationsScreen(),
-                ),
-              );
-            },
-            child: Text(
-              'View all notifications',
-              style: AppTextStyles.cardMeta.copyWith(
-                decoration: TextDecoration.underline,
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
   Widget _buildForecastSection(bool isMobile) {
     final phCard = ForecastChartCard(
       title: 'pH Forecast Overview',
       points: _controller.phForecast,
       onExpand: _openForecastingScreen,
     );
+
     final ecCard = ForecastChartCard(
       title: 'EC Forecast Overview',
       points: _controller.ecForecast,
