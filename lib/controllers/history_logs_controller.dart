@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/user_service.dart';
+import '../services/app_state.dart';
+import '../services/supabase_client.dart';
+import '../utils/manila_time.dart';
 
 class HistoryLogsController extends ChangeNotifier {
   final UserService _userService = UserService();
@@ -15,7 +18,7 @@ class HistoryLogsController extends ChangeNotifier {
   String selectedTab = 'Sensor logs'; // 'Sensor logs' | 'Calibration logs'
   String selectedRange = 'Daily'; // 'Daily' | 'Weekly' | 'Monthly'
 
-  DateTime selectedDate = DateTime.now();
+  DateTime selectedDate = manilaNow();
   DateTimeRange? selectedWeekRange;
 
   List<String> columns = [];
@@ -71,7 +74,11 @@ class HistoryLogsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      profile = await _userService.getProfile('mock-user-id');
+      profile = await _userService.getProfile(
+        supabaseClient?.auth.currentUser?.id ??
+            appProfile.value?.id ??
+            'mock-user-id',
+      );
       await _loadSelectedLogs();
     } catch (e) {
       errorMessage = 'Failed to load history logs';
@@ -115,7 +122,7 @@ class HistoryLogsController extends ChangeNotifier {
     notifyListeners();
     try {
       final range = _selectedDateRange();
-      columns = const ['Time', 'Avg pH', 'Avg EC', 'Avg Temp', 'Status'];
+      columns = const ['Time (PHT)', 'Avg pH', 'Avg EC', 'Avg Temp', 'Status'];
       rows = await _monitoringService.getSensorHistory(
         start: range.start,
         end: range.end,

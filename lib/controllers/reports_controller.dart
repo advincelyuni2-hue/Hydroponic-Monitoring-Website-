@@ -3,6 +3,8 @@ import '../models/reports_models.dart';
 import '../services/reports_service.dart';
 import '../services/user_service.dart';
 import '../services/pdf_report_service.dart';
+import '../services/app_state.dart';
+import '../services/supabase_client.dart';
 
 class ReportsController extends ChangeNotifier {
   final ReportsService _reportsService = ReportsService();
@@ -35,14 +37,22 @@ class ReportsController extends ChangeNotifier {
   ];
 
   List<PredictedAnalyticsPoint> predictionPoints = [
-    PredictedAnalyticsPoint(label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
-    PredictedAnalyticsPoint(label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
-    PredictedAnalyticsPoint(label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
-    PredictedAnalyticsPoint(label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
-    PredictedAnalyticsPoint(label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
-    PredictedAnalyticsPoint(label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
-    PredictedAnalyticsPoint(label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
-    PredictedAnalyticsPoint(label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
+    PredictedAnalyticsPoint(
+        label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
+    PredictedAnalyticsPoint(
+        label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
+    PredictedAnalyticsPoint(
+        label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
+    PredictedAnalyticsPoint(
+        label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
+    PredictedAnalyticsPoint(
+        label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
+    PredictedAnalyticsPoint(
+        label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
+    PredictedAnalyticsPoint(
+        label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
+    PredictedAnalyticsPoint(
+        label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
   ];
 
   TargetDistributionData targetDistribution = const TargetDistributionData(
@@ -83,7 +93,7 @@ class ReportsController extends ChangeNotifier {
   ];
 
   String selectedParameter = 'pH'; // 'pH' or 'EC'
-  String selectedTimeframe = '7d';  // '7d', '30d', '90d'
+  String selectedTimeframe = '7d'; // '7d', '30d', '90d'
   String selectedDistributionParam = 'pH';
 
   RangeValues phRange = const RangeValues(5.5, 6.5);
@@ -93,6 +103,7 @@ class ReportsController extends ChangeNotifier {
   bool includeCalibrationLogs = false;
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
+  bool includeAllAnalytics = false;
   bool recommendationApplied = false;
   bool recommendationDismissed = false;
 
@@ -147,6 +158,20 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleAllAnalytics(bool? val) {
+    includeAllAnalytics = val ?? false;
+    notifyListeners();
+  }
+
+  void dismissReportGeneration() {
+    includeSensorLogs = false;
+    includeCalibrationLogs = false;
+    includePhOptimization = false;
+    includeEcOptimization = false;
+    includeAllAnalytics = false;
+    notifyListeners();
+  }
+
   void revertRanges() {
     phRange = const RangeValues(5.5, 6.5);
     ecRange = const RangeValues(5.0, 6.0);
@@ -165,6 +190,7 @@ class ReportsController extends ChangeNotifier {
       includeCalibrationLogs: includeCalibrationLogs,
       includePhOptimization: includePhOptimization,
       includeEcOptimization: includeEcOptimization,
+      includeAllAnalytics: includeAllAnalytics,
     );
   }
 
@@ -182,13 +208,12 @@ class ReportsController extends ChangeNotifier {
 
   Future<void> loadTrendData() async {
     try {
-      final points = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
+      final points = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
       if (points.isNotEmpty) {
         trendPoints = points;
       }
-    } catch (_) {
-
-    }
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -198,23 +223,22 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      profile = await _userService.getProfile('mock-user-id');
-    } catch (_) {
-
-    }
+      profile = await _userService.getProfile(
+        supabaseClient?.auth.currentUser?.id ??
+            appProfile.value?.id ??
+            'mock-user-id',
+      );
+    } catch (_) {}
 
     try {
       summary = await _reportsService.getSummaryData();
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     try {
-      final t = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
+      final t = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
       if (t.isNotEmpty) trendPoints = t;
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     isLoading = false;
     notifyListeners();

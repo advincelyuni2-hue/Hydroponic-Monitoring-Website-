@@ -1,149 +1,196 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../services/app_state.dart';
+import '../services/help_article_service.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 
-class HelpScreen extends StatelessWidget {
+class HelpScreen extends StatefulWidget {
   const HelpScreen({super.key});
+  @override
+  State<HelpScreen> createState() => _HelpScreenState();
+}
+
+class _HelpScreenState extends State<HelpScreen> {
+  final _service = HelpArticleService();
+  List<HelpArticle> _articles = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final articles = await _service.list();
+      if (mounted) {
+        setState(() {
+          _articles = articles;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _edit([HelpArticle? article]) async {
+    final title = TextEditingController(text: article?.title);
+    final body = TextEditingController(text: article?.body);
+    var type = article?.type ?? 'faq';
+    final result = await showDialog<HelpArticle>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(article == null ? 'Add help article' : 'Edit help article'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+              controller: title,
+              decoration: const InputDecoration(labelText: 'Title')),
+          TextField(
+              controller: body,
+              maxLines: 5,
+              decoration: const InputDecoration(labelText: 'Content')),
+          DropdownButtonFormField<String>(
+            initialValue: type,
+            decoration: const InputDecoration(labelText: 'Section'),
+            items: const [
+              DropdownMenuItem(value: 'tutorial', child: Text('Tutorial')),
+              DropdownMenuItem(value: 'faq', child: Text('FAQ')),
+            ],
+            onChanged: (value) => type = value ?? 'faq',
+          ),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+                context,
+                HelpArticle(
+                  id: article?.id,
+                  type: type,
+                  title: title.text.trim(),
+                  body: body.text.trim(),
+                  sortOrder: article?.sortOrder ?? _articles.length,
+                )),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    title.dispose();
+    body.dispose();
+    if (result == null || result.title.isEmpty || result.body.isEmpty) return;
+    try {
+      if (result.id == null) {
+        await _service.create(result);
+      } else {
+        await _service.update(result);
+      }
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to save help article.')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
+    final admin = appProfile.value?.isAdmin == true;
+    final articles = _articles.isEmpty ? _fallback : _articles;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: -1),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(isMobile ? 16 : 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AppHeader(title: 'Help'),
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(isMobile ? 16 : 28),
-                decoration: AppDecorations.card(),
-                child: Column(
+          padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const AppHeader(title: 'Help'),
+            if (admin)
+              Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => _edit(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add article'),
+                  )),
+            const SizedBox(height: 16),
+            if (_loading) const Center(child: CircularProgressIndicator()),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: AppDecorations.card(),
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Tutorial', style: AppTextStyles.sectionTitle),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Getting Started',
-                      style: AppTextStyles.bodyBold,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Follow these steps to move through the hydroponic monitoring workflow.',
-                      style: AppTextStyles.body,
-                    ),
-                    const SizedBox(height: 20),
-                    for (var i = 0; i < _steps.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: AppDecorations.card(
-                            color: Theme.of(context).colorScheme.surface,
-                            radius: 12,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: AppColors.primaryButton,
-                                child: Text(
-                                  '${i + 1}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(_steps[i].$1, style: AppTextStyles.bodyBold),
-                                    const SizedBox(height: 4),
-                                    Text(_steps[i].$2, style: AppTextStyles.body),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 24),
-                    Text('FAQs', style: AppTextStyles.sectionTitle),
-                    const SizedBox(height: 16),
-                    for (final faq in _faqs)
-                      ExpansionTile(
-                        tilePadding: EdgeInsets.zero,
-                        childrenPadding: const EdgeInsets.only(bottom: 12),
-                        title: Text(faq.$1, style: AppTextStyles.bodyBold),
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(faq.$2, style: AppTextStyles.body),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+                    _buildSection(
+                        'Tutorials',
+                        articles.where((a) => a.type == 'tutorial').toList(),
+                        admin),
+                    _buildSection('FAQs',
+                        articles.where((a) => a.type == 'faq').toList(), admin),
+                  ]),
+            ),
+          ]),
         ),
       ),
     );
   }
 
-  static const _steps = [
-    (
-      'Read the dashboard',
-      'Review pH, EC, and temperature cards for the latest sensor values.',
-    ),
-    (
-      'Check an alert',
-      'Open a notification to see the affected parameter and recommended action.',
-    ),
-    (
-      'Review forecasts',
-      'Use Forecasts to compare recent readings with predicted trends.',
-    ),
-    (
-      'Inspect history',
-      'Use History logs to review sensor readings and calibration activity.',
-    ),
-  ];
+  Widget _buildSection(String title, List<HelpArticle> articles, bool admin) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: AppTextStyles.sectionTitle),
+        const SizedBox(height: 12),
+        for (final article in articles)
+          ExpansionTile(
+            title: Text(article.title, style: AppTextStyles.bodyBold),
+            children: [
+              Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(article.body, style: AppTextStyles.body),
+                  )),
+              if (admin && article.id != null)
+                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  TextButton(
+                      onPressed: () => _edit(article),
+                      child: const Text('Edit')),
+                  TextButton(
+                      onPressed: () async {
+                        await _service.delete(article.id!);
+                        await _load();
+                      },
+                      child: const Text('Delete')),
+                ]),
+            ],
+          ),
+      ],
+    );
+  }
 
-  static const _faqs = [
-    (
-      'What do the dashboard readings mean?',
-      'pH shows acidity, EC shows nutrient concentration, and temperature shows the water temperature.',
-    ),
-    (
-      'How often are readings updated?',
-      'The dashboard displays the latest reading reported by the connected monitoring system.',
-    ),
-    (
-      'What should I do when an alert appears?',
-      'Open the notification, review the affected parameter, and follow the recommended action before checking the reading again.',
-    ),
-    (
-      'Who can change calibration settings?',
-      'Only authorized administrators should perform calibration or change system settings.',
-    ),
-    (
-      'How do I get help with an account issue?',
-      'Review your profile settings first, then contact the system administrator for account or access problems.',
-    ),
+  static const _fallback = [
+    HelpArticle(
+        type: 'tutorial',
+        title: 'Getting started',
+        body: 'Review pH, EC, and temperature cards on the dashboard.'),
+    HelpArticle(
+        type: 'faq',
+        title: 'What should I do when an alert appears?',
+        body:
+            'Open the notification, review the affected parameter, and follow the recommended action.'),
   ];
 }

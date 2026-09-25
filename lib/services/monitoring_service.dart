@@ -1,6 +1,7 @@
 import '../models/monitoring_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
+import '../utils/manila_time.dart';
 
 enum HistoryAggregation { tenMinutes, eightHours, daily }
 
@@ -28,6 +29,7 @@ class MonitoringService {
 
   /// Powers the "Parameter Status" cards (pH / EC / Temperature).
   Future<List<ParameterStatus>> getParameterStatuses() async {
+    final ranges = await _getParameterRanges();
     final readings = await Future.wait([
       _getLatestReading('ph_readings'),
       _getLatestReading('ec_readings'),
@@ -35,16 +37,58 @@ class MonitoringService {
     ]);
 
     return [
-      _toParameterStatus('pH Level', readings[0], '', '5.5 - 6.5'),
-      _toParameterStatus('EC Level', readings[1], 'mS/cm', '1.2 - 1.8'),
-      _toParameterStatus('Temperature', readings[2], '°C', '18.0 - 24.0'),
+      _toParameterStatus(
+        'pH Level',
+        readings[0],
+        '',
+        ranges.phMin,
+        ranges.phMax,
+        2,
+      ),
+      _toParameterStatus(
+        'EC Level',
+        readings[1],
+        'mS/cm',
+        ranges.ecMin,
+        ranges.ecMax,
+        2,
+      ),
+      _toParameterStatus(
+        'Temperature',
+        readings[2],
+        '°C',
+        18.0,
+        24.0,
+        1,
+      ),
     ];
+  }
+
+  Future<_ParameterRanges> _getParameterRanges() async {
+    try {
+      final row = await supabase
+          .from('parameter_configurations')
+          .select('ph_min, ph_max, ec_min, ec_max')
+          .eq('id', 1)
+          .maybeSingle();
+      if (row != null) {
+        return _ParameterRanges(
+          phMin: (row['ph_min'] as num?)?.toDouble() ?? 5.5,
+          phMax: (row['ph_max'] as num?)?.toDouble() ?? 6.5,
+          ecMin: (row['ec_min'] as num?)?.toDouble() ?? 1.2,
+          ecMax: (row['ec_max'] as num?)?.toDouble() ?? 1.8,
+        );
+      }
+    } catch (_) {
+      // Older deployments may not have the admin configuration table yet.
+    }
+    return const _ParameterRanges();
   }
 
   Future<Map<String, dynamic>> _getLatestReading(String table) async {
     final rows = await supabase
         .from(table)
-        .select('value, recorded_at')
+        .select('value, recorded_at, status')
         .eq('is_average', false)
         .order('recorded_at', ascending: false)
         .limit(1);
@@ -59,23 +103,26 @@ class MonitoringService {
     String label,
     Map<String, dynamic> row,
     String unit,
-    String idealRange,
+    double minimum,
+    double maximum,
+    int decimals,
   ) {
     final value = (row['value'] as num).toDouble();
-    final timestamp = DateTime.parse(row['recorded_at'] as String).toLocal();
+    final rawTimestamp = row['recorded_at'] as String;
+    final parsedTimestamp = parseSupabaseTimestamp(rawTimestamp);
+    final timestamp = toSensorManilaTime(parsedTimestamp);
+    final status = value < minimum || value > maximum
+        ? 'Critical'
+        : row['status'] as String? ?? 'Normal';
     return ParameterStatus(
       label: label,
-      currentValue: value.toStringAsFixed(label == 'pH Level' ? 2 : 1),
+      currentValue: value.toStringAsFixed(decimals),
       unit: unit,
-      idealRange: idealRange,
-      lastUpdated: _formatTime(timestamp),
+      idealRange:
+          '${minimum.toStringAsFixed(decimals)} - ${maximum.toStringAsFixed(decimals)}',
+      lastUpdated: formatManilaDateTime(timestamp),
+      status: status,
     );
-  }
-
-  String _formatTime(DateTime value) {
-    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$hour:$minute ${value.hour < 12 ? 'AM' : 'PM'}';
   }
 
   RealtimeChannel subscribeToParameterChanges(void Function() onChange) {
@@ -164,8 +211,14 @@ class MonitoringService {
           .from(table)
           .select('value, recorded_at, status')
           .eq('is_average', true)
-          .gte('recorded_at', start.toUtc().toIso8601String())
-          .lt('recorded_at', end.toUtc().toIso8601String())
+          .gte(
+            'recorded_at',
+            sensorManilaWallTimeToStoredUtc(start).toIso8601String(),
+          )
+          .lt(
+            'recorded_at',
+            sensorManilaWallTimeToStoredUtc(end).toIso8601String(),
+          )
           .order('recorded_at', ascending: true)
           .range(from, from + pageSize - 1);
       allRows.addAll(page);
@@ -183,7 +236,9 @@ class MonitoringService {
     HistoryAggregation aggregation,
   ) {
     for (final row in rows) {
-      final timestamp = DateTime.parse(row['recorded_at'] as String).toLocal();
+      final timestamp = toSensorManilaTime(
+        parseSupabaseTimestamp(row['recorded_at'] as String),
+      );
       final bucket = _historyBucket(timestamp, aggregation);
       final bucketKey = bucket.millisecondsSinceEpoch;
       final summary = summaries.putIfAbsent(
@@ -231,11 +286,13 @@ class MonitoringService {
   ) {
     switch (aggregation) {
       case HistoryAggregation.tenMinutes:
-        return '${bucket.month}/${bucket.day} ${_formatTime(bucket)}';
+        return '${bucket.month}/${bucket.day}/${bucket.year} '
+            '${formatManilaClockTime(bucket)}';
       case HistoryAggregation.eightHours:
         final end = bucket.add(const Duration(hours: 8));
         return '${bucket.month}/${bucket.day} '
-            '${_formatTime(bucket)} - ${_formatTime(end)}';
+            '${formatManilaClockTime(bucket)} - '
+            '${formatManilaClockTime(end)}';
       case HistoryAggregation.daily:
         const months = [
           'January',
@@ -416,6 +473,20 @@ class MonitoringService {
       ]),
     ];
   }
+}
+
+class _ParameterRanges {
+  final double phMin;
+  final double phMax;
+  final double ecMin;
+  final double ecMax;
+
+  const _ParameterRanges({
+    this.phMin = 5.5,
+    this.phMax = 6.5,
+    this.ecMin = 1.2,
+    this.ecMax = 1.8,
+  });
 }
 
 class _HistorySummary {

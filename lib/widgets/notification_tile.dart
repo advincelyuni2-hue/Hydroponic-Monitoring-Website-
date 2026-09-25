@@ -6,22 +6,32 @@ import '../services/notification_service.dart';
 class NotificationTile extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
-  const NotificationTile({super.key, required this.notification, this.onTap});
+  const NotificationTile({
+    super.key,
+    required this.notification,
+    this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isCritical ? AppColors.alertBackground : AppColors.cardBackground,
+        color: notification.isCritical
+            ? AppColors.alertBackground
+            : AppColors.cardBackground,
         border: Border.all(
-          color: notification.isCritical ? AppColors.alertBorder : AppColors.cardBorder,
+          color: notification.isCritical
+              ? AppColors.alertBorder
+              : AppColors.cardBorder,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -46,7 +56,18 @@ class NotificationTile extends StatelessWidget {
                           ? AppTextStyles.alert
                           : AppTextStyles.bodyBold,
                     ),
-                    Text(notification.timeAgo, style: AppTextStyles.cardMeta),
+                    Row(
+                      children: [
+                        Text(notification.timeAgo,
+                            style: AppTextStyles.cardMeta),
+                        if (onDelete != null)
+                          IconButton(
+                            tooltip: 'Delete notification',
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            onPressed: onDelete,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 2),

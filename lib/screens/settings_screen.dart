@@ -65,7 +65,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text(
                       'Profile Management',
-                      style: AppTextStyles.sectionTitle.copyWith(color: textColor),
+                      style:
+                          AppTextStyles.sectionTitle.copyWith(color: textColor),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -73,13 +74,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const CircleAvatar(
                           radius: 32,
                           backgroundColor: AppColors.iconCircle,
-                          child: Icon(Icons.person, color: Colors.white, size: 30),
+                          child:
+                              Icon(Icons.person, color: Colors.white, size: 30),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
                             'Manage the account details used throughout the monitoring app.',
-                            style: AppTextStyles.body.copyWith(color: textColor),
+                            style:
+                                AppTextStyles.body.copyWith(color: textColor),
                           ),
                         ),
                       ],
@@ -111,18 +114,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 24),
                     Text(
                       'Preferences',
-                      style: AppTextStyles.sectionTitle.copyWith(color: textColor),
+                      style:
+                          AppTextStyles.sectionTitle.copyWith(color: textColor),
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         'Notifications',
-                        style: AppTextStyles.bodyBold.copyWith(color: textColor),
+                        style:
+                            AppTextStyles.bodyBold.copyWith(color: textColor),
                       ),
                       subtitle: Text(
                         'Receive alerts when sensor readings need attention.',
-                        style: AppTextStyles.cardMeta.copyWith(color: mutedColor),
+                        style:
+                            AppTextStyles.cardMeta.copyWith(color: mutedColor),
                       ),
                       value: appNotificationsEnabled.value,
                       activeThumbColor: AppColors.primaryButton,
@@ -135,11 +141,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         'Measurement Units',
-                        style: AppTextStyles.bodyBold.copyWith(color: textColor),
+                        style:
+                            AppTextStyles.bodyBold.copyWith(color: textColor),
                       ),
                       subtitle: Text(
                         'Choose how readings are displayed.',
-                        style: AppTextStyles.cardMeta.copyWith(color: mutedColor),
+                        style:
+                            AppTextStyles.cardMeta.copyWith(color: mutedColor),
                       ),
                       trailing: DropdownButton<String>(
                         value: appMeasurementUnits.value,
@@ -149,11 +157,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 16,
                         ),
-                        iconEnabledColor: Theme.of(context).colorScheme.onSurface,
+                        iconEnabledColor:
+                            Theme.of(context).colorScheme.onSurface,
                         underline: const SizedBox.shrink(),
                         items: const [
-                          DropdownMenuItem(value: 'Metric', child: Text('Metric')),
-                          DropdownMenuItem(value: 'Imperial', child: Text('Imperial')),
+                          DropdownMenuItem(
+                              value: 'Metric', child: Text('Metric')),
+                          DropdownMenuItem(
+                              value: 'Imperial', child: Text('Imperial')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -171,16 +182,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(
                             'Light/Dark Mode',
-                            style: AppTextStyles.bodyBold.copyWith(color: textColor),
+                            style: AppTextStyles.bodyBold
+                                .copyWith(color: textColor),
                           ),
                           subtitle: Text(
-                            isDark ? 'Dark mode is active.' : 'Light mode is active.',
-                            style: AppTextStyles.cardMeta.copyWith(color: mutedColor),
+                            isDark
+                                ? 'Dark mode is active.'
+                                : 'Light mode is active.',
+                            style: AppTextStyles.cardMeta
+                                .copyWith(color: mutedColor),
                           ),
                           value: isDark,
                           activeThumbColor: AppColors.primaryButton,
                           onChanged: (value) {
-                            appThemeMode.value = value ? ThemeMode.dark : ThemeMode.light;
+                            appThemeMode.value =
+                                value ? ThemeMode.dark : ThemeMode.light;
                           },
                         );
                       },
@@ -212,8 +228,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: InputDecoration(
         filled: true,
         fillColor: enabled
-          ? Theme.of(context).inputDecorationTheme.fillColor
-          : Theme.of(context).colorScheme.surface,
+            ? Theme.of(context).inputDecorationTheme.fillColor
+            : Theme.of(context).colorScheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.inputBorder),
@@ -227,21 +243,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _saveProfile() async {
-    final existing = appProfile.value ?? UserProfile(
-      id: 'local-user',
-      name: 'Alveus',
-      email: _emailController.text,
-      role: 'Employee',
-    );
+    final existing = appProfile.value ??
+        UserProfile(
+          id: 'local-user',
+          name: 'Alveus',
+          email: _emailController.text,
+          role: 'Employee',
+        );
     await UserService().updateProfile(UserProfile(
       id: existing.id,
       name: _nameController.text.trim(),
       email: existing.email,
       role: existing.role,
+      isActive: existing.isActive,
     ));
     if (mounted) _showMessage('Profile changes saved.');
   }

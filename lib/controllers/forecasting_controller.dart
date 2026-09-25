@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/user_service.dart';
+import '../services/app_state.dart';
+import '../services/supabase_client.dart';
 
 class ForecastingController extends ChangeNotifier {
   final MonitoringService _monitoringService = MonitoringService();
@@ -31,7 +33,11 @@ class ForecastingController extends ChangeNotifier {
 
     try {
       final results = await Future.wait([
-        _userService.getProfile('mock-user-id'),
+        _userService.getProfile(
+          supabaseClient?.auth.currentUser?.id ??
+              appProfile.value?.id ??
+              'mock-user-id',
+        ),
         _monitoringService.getForecastData(_parameterKey),
         _monitoringService.getPredictionInsight(_parameterKey),
       ]);
@@ -57,5 +63,4 @@ class ForecastingController extends ChangeNotifier {
     selectedHours = hours;
     notifyListeners();
   }
-
 }

@@ -10,7 +10,8 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../utils/responsive.dart';
 import 'forecasting_dashboard_screen.dart';
-
+import '../services/app_state.dart';
+import '../services/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -88,12 +89,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildParameterStatusSection(bool isMobile) {
     final statuses = _controller.parameterStatuses;
-    final cardColors = [
-      AppColors.statusCardGreen,
-      AppColors.statusCardYellow,
-      AppColors.statusCardGreen,
-    ];
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -109,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     for (int i = 0; i < statuses.length; i++) ...[
                       ParameterStatusCard(
                         data: statuses[i],
-                        backgroundColor: cardColors[i % cardColors.length],
+                        backgroundColor: _statusColor(statuses[i].status),
                       ),
                       if (i != statuses.length - 1) const SizedBox(height: 12),
                     ],
@@ -122,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         child: ParameterStatusCard(
                           data: statuses[i],
-                          backgroundColor: cardColors[i % cardColors.length],
+                          backgroundColor: _statusColor(statuses[i].status),
                         ),
                       ),
                       if (i != statuses.length - 1) const SizedBox(width: 16),
@@ -134,9 +129,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'critical':
+        return AppColors.alertBackground;
+      case 'warning':
+        return AppColors.statusCardYellow;
+      default:
+        return AppColors.statusCardGreen;
+    }
+  }
+
   Widget _buildInsightAndNotificationsSection(bool isMobile) {
     final insightCard = _buildLatestInsightCard();
-    final notificationsCard = _buildNotificationsCard(pushFooterToBottom: !isMobile);
+    final notificationsCard =
+        _buildNotificationsCard(pushFooterToBottom: !isMobile);
 
     if (isMobile) {
       return Column(
@@ -182,7 +189,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: AppColors.alertText, size: 20),
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(insight.warningTitle, style: AppTextStyles.alert),
+                        child: Text(insight.warningTitle,
+                            style: AppTextStyles.alert),
                       ),
                     ],
                   ),
@@ -204,12 +212,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 alignment: WrapAlignment.spaceBetween,
                 runSpacing: 8,
                 children: [
-                  Text('Humidity: ${insight.humidity}', style: AppTextStyles.bodyBold),
-                  Text('EC Level: ${insight.ecStatus}', style: AppTextStyles.bodyBold),
+                  Text('Humidity: ${insight.humidity}',
+                      style: AppTextStyles.bodyBold),
+                  Text('EC Level: ${insight.ecStatus}',
+                      style: AppTextStyles.bodyBold),
                 ],
               ),
             ),
             const SizedBox(height: 16),
+          ],
+          if (appProfile.value?.isAdmin != true) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: _showAlertAdminDialog,
+                icon: const Icon(Icons.campaign_outlined),
+                label: const Text('Alert Admin'),
+              ),
+            ),
+            const SizedBox(height: 10),
           ],
           SizedBox(
             width: double.infinity,
@@ -230,6 +252,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _showAlertAdminDialog() async {
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alert Admin'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Describe the issue for the administrator',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Send alert'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (message == null || message.isEmpty || !mounted) return;
+    try {
+      await NotificationService().sendAdminAlert(message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Alert sent to an administrator.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to send the alert right now.')),
+        );
+      }
+    }
+  }
+
   Widget _buildNotificationsCard({required bool pushFooterToBottom}) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -243,13 +309,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             NotificationTile(
               notification: n,
               onTap: () => _showNotifications(),
+              onDelete: !(_controller.profile?.isAdmin ?? false) ||
+                      n.databaseId == null
+                  ? null
+                  : () async {
+                      try {
+                        await NotificationService()
+                            .deleteNotification(n.databaseId!);
+                        await _controller.loadDashboard();
+                      } catch (_) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Unable to delete notification.')),
+                          );
+                        }
+                      }
+                    },
             ),
-          if (pushFooterToBottom) const Spacer() else const SizedBox(height: 12),
+          if (pushFooterToBottom)
+            const Spacer()
+          else
+            const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _showNotifications,
-              child: Text('View all notifications', style: AppTextStyles.cardMeta),
+              child:
+                  Text('View all notifications', style: AppTextStyles.cardMeta),
             ),
           ),
         ],
@@ -262,9 +350,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('All notifications'),
-        content: Text('${_controller.notifications.length} recent notifications available.'),
+        content: SizedBox(
+          width: 420,
+          child: _controller.notifications.isEmpty
+              ? const Text('No recent notifications available.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: _controller.notifications
+                      .map((notification) => ListTile(
+                            title: Text(notification.title),
+                            subtitle: Text(notification.detail),
+                            trailing: Text(notification.timeAgo),
+                          ))
+                      .toList(),
+                ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
         ],
       ),
     );

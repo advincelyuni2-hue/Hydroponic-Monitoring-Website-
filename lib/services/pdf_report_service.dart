@@ -16,6 +16,7 @@ class PdfReportService {
     required bool includeCalibrationLogs,
     required bool includePhOptimization,
     required bool includeEcOptimization,
+    required bool includeAllAnalytics,
   }) async {
     final document = pw.Document();
     final generatedAt = DateTime.now();
@@ -37,9 +38,21 @@ class PdfReportService {
           pw.TableHelper.fromTextArray(
             headers: const ['Metric', 'Value', 'Status'],
             data: [
-              ['Average pH (30d)', summary.avgPh.toStringAsFixed(1), summary.phStatus],
-              ['Average EC (30d)', '${summary.avgEc.toStringAsFixed(1)} mS/cm', summary.ecStatus],
-              ['Critical alerts', '${summary.criticalAlertsCount}', summary.alertsPeriod],
+              [
+                'Average pH (30d)',
+                summary.avgPh.toStringAsFixed(1),
+                summary.phStatus
+              ],
+              [
+                'Average EC (30d)',
+                '${summary.avgEc.toStringAsFixed(1)} mS/cm',
+                summary.ecStatus
+              ],
+              [
+                'Critical alerts',
+                '${summary.criticalAlertsCount}',
+                summary.alertsPeriod
+              ],
             ],
           ),
           pw.SizedBox(height: 20),
@@ -47,16 +60,34 @@ class PdfReportService {
           pw.TableHelper.fromTextArray(
             headers: const ['Parameter', 'Minimum', 'Maximum'],
             data: [
-              ['pH', phRange.start.toStringAsFixed(1), phRange.end.toStringAsFixed(1)],
-              ['EC', ecRange.start.toStringAsFixed(1), ecRange.end.toStringAsFixed(1)],
+              [
+                'pH',
+                phRange.start.toStringAsFixed(1),
+                phRange.end.toStringAsFixed(1)
+              ],
+              [
+                'EC',
+                ecRange.start.toStringAsFixed(1),
+                ecRange.end.toStringAsFixed(1)
+              ],
             ],
           ),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Included sections')),
-          pw.Bullet(text: 'Sensor history logs: ${includeSensorLogs ? 'Yes' : 'No'}'),
-          pw.Bullet(text: 'Calibration history logs: ${includeCalibrationLogs ? 'Yes' : 'No'}'),
-          pw.Bullet(text: 'pH optimization results: ${includePhOptimization ? 'Yes' : 'No'}'),
-          pw.Bullet(text: 'EC optimization results: ${includeEcOptimization ? 'Yes' : 'No'}'),
+          pw.Bullet(
+              text: 'Sensor history logs: ${includeSensorLogs ? 'Yes' : 'No'}'),
+          pw.Bullet(
+              text:
+                  'Calibration history logs: ${includeCalibrationLogs ? 'Yes' : 'No'}'),
+          pw.Bullet(
+              text:
+                  'pH optimization results: ${includePhOptimization ? 'Yes' : 'No'}'),
+          pw.Bullet(
+              text:
+                  'EC optimization results: ${includeEcOptimization ? 'Yes' : 'No'}'),
+          pw.Bullet(
+              text:
+                  'All analytics and graphs: ${includeAllAnalytics ? 'Yes' : 'No'}'),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Analytics snapshot')),
           pw.TableHelper.fromTextArray(
@@ -67,7 +98,8 @@ class PdfReportService {
           ),
           pw.SizedBox(height: 20),
           pw.Header(level: 1, child: pw.Text('Decision support')),
-          pw.Text(_recommendation(summary, predictionPoints, selectedParameter)),
+          pw.Text(
+              _recommendation(summary, predictionPoints, selectedParameter)),
         ],
       ),
     );

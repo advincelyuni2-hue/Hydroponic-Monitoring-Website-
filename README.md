@@ -13,8 +13,11 @@ each ten-minute summary, weekly views aggregate into eight-hour windows, and
 monthly views aggregate by calendar day.
 
 Copy `supabase.example.json` to the ignored `supabase.json`, fill in the project
-URL and publishable key, run `supabase/realtime_setup.sql` once in Supabase,
-then launch with:
+URL and publishable key, then run both `supabase/realtime_setup.sql` and
+`supabase/rbac_setup.sql` once in Supabase. The first script enables the sensor
+tables used by the realtime dashboard and history views; the second adds user
+profiles, roles, notifications, calibration logs, and administrator-managed
+parameter ranges. Then launch with:
 
 ```powershell
 flutter run -d chrome --dart-define-from-file=supabase.json
