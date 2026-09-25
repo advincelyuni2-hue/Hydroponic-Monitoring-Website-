@@ -10,6 +10,8 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../utils/responsive.dart';
 import 'forecasting_dashboard_screen.dart';
+import '../services/app_state.dart';
+import '../services/notification_service.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -211,6 +213,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
           ],
+          if (appProfile.value?.isAdmin != true) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: _showAlertAdminDialog,
+                icon: const Icon(Icons.campaign_outlined),
+                label: const Text('Alert Admin'),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -228,6 +242,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showAlertAdminDialog() async {
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alert Admin'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Describe the issue for the administrator',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Send alert'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (message == null || message.isEmpty || !mounted) return;
+    try {
+      await NotificationService().sendAdminAlert(message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Alert sent to an administrator.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to send the alert right now.')),
+        );
+      }
+    }
   }
 
   Widget _buildNotificationsCard({required bool pushFooterToBottom}) {

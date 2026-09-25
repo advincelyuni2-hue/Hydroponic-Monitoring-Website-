@@ -124,6 +124,14 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
       ),
     );
 
+    final deleteButton = _controller.canDelete
+        ? IconButton(
+            tooltip: 'Delete logs in selected range',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _confirmDelete,
+          )
+        : const SizedBox.shrink();
+
     if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,7 +139,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              tabs,
+              Row(children: [tabs, deleteButton]),
               activeText,
             ],
           ),
@@ -149,7 +157,7 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            tabs,
+            Row(children: [tabs, deleteButton]),
             Row(
               children: [
                 activeText,
@@ -162,6 +170,36 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
         const SizedBox(height: 12),
         Divider(height: 1, color: AppColors.cardBorder),
       ],
+    );
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete history logs?'),
+        content: Text('Delete logs for ${_controller.activeRangeLabel}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final deleted = await _controller.deleteSelectedLogs();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted ? 'History logs deleted.' : 'History logs could not be deleted.',
+        ),
+      ),
     );
   }
 

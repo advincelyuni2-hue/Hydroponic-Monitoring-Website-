@@ -3,6 +3,12 @@ import '../models/monitoring_models.dart';
 import '../services/monitoring_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
+<<<<<<< Updated upstream
+=======
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_client.dart';
+import '../services/app_state.dart';
+>>>>>>> Stashed changes
 
 class DashboardController extends ChangeNotifier {
   final MonitoringService _monitoringService = MonitoringService();
@@ -30,7 +36,11 @@ class DashboardController extends ChangeNotifier {
 
     try {
       final results = await Future.wait([
-        _userService.getProfile('mock-user-id'),
+        _userService.getProfile(
+          supabaseClient?.auth.currentUser?.id ??
+              appProfile.value?.id ??
+              'mock-user-id',
+        ),
         _monitoringService.getParameterStatuses(),
         _monitoringService.getLatestInsight(),
         _notificationService.getNotifications(),

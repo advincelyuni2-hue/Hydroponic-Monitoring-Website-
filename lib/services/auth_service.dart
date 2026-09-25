@@ -1,5 +1,6 @@
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'supabase_client.dart';
 import 'app_state.dart';
 import 'user_service.dart';
@@ -29,7 +30,7 @@ class AuthService {
 
     try {
       await client.auth.signInWithPassword(email: email, password: password);
-      _setAuthenticatedProfile(email);
+      await _setAuthenticatedProfile(email);
       return AuthResult(success: true, message: 'Login successful');
     } on AuthException catch (error) {
       return AuthResult(success: false, message: error.message);
@@ -93,7 +94,7 @@ class AuthService {
         email: email,
         token: token,
       );
-      _setAuthenticatedProfile(email);
+      await _setAuthenticatedProfile(email);
       return AuthResult(success: true, message: 'Account verified');
     } on AuthException catch (error) {
       return AuthResult(success: false, message: error.message);
@@ -125,20 +126,49 @@ class AuthService {
     }
   }
 
-  void _setAuthenticatedProfile(String email) {
+  Future<void> _setAuthenticatedProfile(String email) async {
     final user = supabaseClient?.auth.currentUser;
-    setAppProfile(UserProfile(
+    final profile = UserProfile(
       id: user?.id ?? 'authenticated-user',
       name: user?.userMetadata?['full_name'] as String? ?? 'User',
       email: user?.email ?? email,
-      role: 'Employee',
-    ));
+      role: 'employee',
+    );
+    if (user != null) {
+      setAppProfile(await UserService().getProfile(user.id));
+    } else {
+      setAppProfile(profile);
+    }
   }
 
   Future<AuthResult> loginWithGoogle() async {
-    await Future.delayed(const Duration(seconds: 1));
-    // TODO: replace with Supabase Google OAuth sign-in
-    return AuthResult(success: true, message: 'Google login successful');
+    final client = supabaseClient;
+    if (client == null) {
+      return AuthResult(
+        success: false,
+        message: 'Google login requires Supabase configuration.',
+      );
+    }
+
+    try {
+      final started = await client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? Uri.base.origin : null,
+      );
+      return AuthResult(
+        success: started,
+        message: started
+            ? 'Redirecting to Google...'
+            : 'Unable to start Google login.',
+      );
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to start Google login. Please try again.',
+      );
+    }
   }
 
   Future<void> logout() async {
@@ -186,5 +216,3 @@ class AuthResult {
     this.requiresOtp = false,
   });
 }
-
-

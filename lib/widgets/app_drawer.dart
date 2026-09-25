@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'side_nav.dart';
+import '../services/app_state.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/forecasting_dashboard_screen.dart';
 import '../screens/history_logs_screen.dart';
 import '../screens/reports_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/help_screen.dart';
+import '../screens/admin_settings_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final int selectedIndex;
@@ -55,6 +57,13 @@ class AppDrawer extends StatelessWidget {
         navigator.pushReplacement(
           MaterialPageRoute(builder: (_) => const HelpScreen()),
         );
+        break;
+      case 6:
+        if (appProfile.value?.isAdmin == true) {
+          navigator.pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
+          );
+        }
         break;
     }
   }

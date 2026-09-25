@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
@@ -8,6 +9,8 @@ import '../widgets/live_pulse_dot.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../screens/login_screen.dart';
+import '../services/notification_service.dart';
+import '../services/supabase_client.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
@@ -43,7 +46,8 @@ class AppHeader extends StatelessWidget {
               color: AppColors.iconCircle,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.menu, color: Colors.white, size: isMobile ? 18 : 22),
+            child:
+                Icon(Icons.menu, color: Colors.white, size: isMobile ? 18 : 22),
           ),
         ),
         SizedBox(width: isMobile ? 8 : 16),
@@ -63,7 +67,8 @@ class AppHeader extends StatelessWidget {
 
         SizedBox(width: isMobile ? 8 : 10),
         Container(
-          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 10, vertical: isMobile ? 4 : 5),
+          padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 8 : 10, vertical: isMobile ? 4 : 5),
           decoration: BoxDecoration(
             color: AppColors.statusCardGreen,
             borderRadius: BorderRadius.circular(20),
@@ -114,18 +119,20 @@ class AppHeader extends StatelessWidget {
           ),
           const SizedBox(width: 24),
         ] else ...[
-          _iconCircle(Icons.search, () => _openMobileSearch(context), size: iconSize),
+          _iconCircle(Icons.search, () => _openMobileSearch(context),
+              size: iconSize),
           SizedBox(width: iconGap),
         ],
 
         // Actions & Profile
         _iconCircle(Icons.add, onAddTap ?? () {}, size: iconSize),
         SizedBox(width: iconGap),
-        _iconCircle(
-          Icons.notifications_none,
-          onBellTap ?? () => _showNotifications(context),
-          size: iconSize,
-        ),
+        onBellTap != null
+            ? _iconCircle(Icons.notifications_none, onBellTap!, size: iconSize)
+            : AdminAlertBell(
+                size: iconSize,
+                fallback: () => _showNotifications(context),
+              ),
         if (!isMobile) ...[
           const SizedBox(width: 12),
           GestureDetector(
@@ -147,7 +154,7 @@ class AppHeader extends StatelessWidget {
                 ),
               ),
               Text(
-                profile?.role ?? '',
+                profile?.roleLabel ?? '',
                 style: AppTextStyles.cardMeta.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -190,14 +197,16 @@ class AppHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Search', style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
+                Text('Search',
+                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
                 const SizedBox(height: 12),
                 TextField(
                   autofocus: true,
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     hintStyle: AppTextStyles.cardMeta,
-                    prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+                    prefixIcon:
+                        Icon(Icons.search, color: AppColors.textSecondary),
                     filled: true,
                     fillColor: AppColors.background,
                     border: OutlineInputBorder(
@@ -221,7 +230,9 @@ class AppHeader extends StatelessWidget {
         title: const Text('Notifications'),
         content: const Text('You have 2 recent notifications to review.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
         ],
       ),
     );
@@ -264,9 +275,90 @@ class AppHeader extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(color: AppColors.iconCircle, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+            color: AppColors.iconCircle, shape: BoxShape.circle),
         child: Icon(icon, color: Colors.white, size: size * 0.5),
       ),
+    );
+  }
+}
+
+class AdminAlertBell extends StatefulWidget {
+  final double size;
+  final VoidCallback fallback;
+
+  const AdminAlertBell({
+    super.key,
+    required this.size,
+    required this.fallback,
+  });
+
+  @override
+  State<AdminAlertBell> createState() => _AdminAlertBellState();
+}
+
+class _AdminAlertBellState extends State<AdminAlertBell> {
+  final NotificationService _service = NotificationService();
+  RealtimeChannel? _channel;
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    if (appProfile.value?.isAdmin == true) {
+      _channel = _service.subscribeToAdminAlerts(onAlert: _refresh);
+    }
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final count = await _service.unreadAdminAlertCount();
+      if (mounted) setState(() => _unread = count);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    final channel = _channel;
+    if (channel != null && supabaseClient != null) {
+      supabaseClient!.removeChannel(channel);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: widget.fallback,
+          child: Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: const BoxDecoration(
+              color: AppColors.iconCircle,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.notifications_none,
+                color: Colors.white, size: widget.size * 0.5),
+          ),
+        ),
+        if (_unread > 0)
+          Positioned(
+            right: -2,
+            top: -4,
+            child: CircleAvatar(
+              radius: 9,
+              backgroundColor: Colors.red,
+              child: Text(
+                _unread > 9 ? '9+' : '$_unread',
+                style: const TextStyle(color: Colors.white, fontSize: 9),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

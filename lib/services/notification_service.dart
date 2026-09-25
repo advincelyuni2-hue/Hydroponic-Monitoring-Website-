@@ -1,7 +1,45 @@
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_state.dart';
+import 'supabase_client.dart';
 
 class NotificationService {
+  RealtimeChannel? subscribeToAdminAlerts({
+    required void Function() onAlert,
+  }) {
+    final client = supabaseClient;
+    if (client == null || appProfile.value?.isAdmin != true) return null;
+    return client
+        .channel('admin-alerts')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          callback: (_) => onAlert(),
+        )
+        .subscribe();
+  }
+
+  Future<void> sendAdminAlert(String message) async {
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) {
+      throw StateError('An authenticated Supabase session is required.');
+    }
+    await client.from('notifications').insert({
+      'employee_id': user.id,
+      'message': message,
+      'status': 'unread',
+    });
+  }
+
+  Future<int> unreadAdminAlertCount() async {
+    final client = supabaseClient;
+    if (client == null || appProfile.value?.isAdmin != true) return 0;
+    final rows =
+        await client.from('notifications').select('id').eq('status', 'unread');
+    return rows.length;
+  }
+
   Future<List<AppNotification>> getNotifications() async {
     await Future.delayed(const Duration(milliseconds: 500));
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../services/app_state.dart';
 
 
 class NavItem {
@@ -23,6 +24,9 @@ const List<NavItem> kNavFooterItems = [
   NavItem(icon: Icons.settings_outlined, label: 'Settings'),
   NavItem(icon: Icons.help_outline, label: 'Help'),
 ];
+
+const NavItem kAdminNavItem =
+    NavItem(icon: Icons.admin_panel_settings_outlined, label: 'Admin settings');
 
 class SideNav extends StatelessWidget {
   final int selectedIndex;
@@ -51,6 +55,12 @@ class SideNav extends StatelessWidget {
               item: item,
               selected: false,
               onTap: () => onSelect(kNavItems.length + kNavFooterItems.indexOf(item)),
+            ),
+          if (appProfile.value?.isAdmin == true)
+            _NavTile(
+              item: kAdminNavItem,
+              selected: selectedIndex == kNavItems.length + kNavFooterItems.length,
+              onTap: () => onSelect(kNavItems.length + kNavFooterItems.length),
             ),
         ],
       ),

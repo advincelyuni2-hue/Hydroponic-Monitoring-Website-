@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_client.dart';
+import '../services/user_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/custom_text_field.dart';
@@ -9,7 +11,6 @@ import 'dashboard_screen.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,6 +20,24 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final LoginController _controller = LoginController();
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreAuthenticatedSession();
+  }
+
+  Future<void> _restoreAuthenticatedSession() async {
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (user == null || !mounted) return;
+
+    await UserService().getProfile(user.id);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+    );
+  }
 
   @override
   void dispose() {
@@ -61,8 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     flex: 1,
                     child: Center(
                       child: SingleChildScrollView(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 48, vertical: 32),
                         child: formSection,
                       ),
                     ),
@@ -105,10 +124,10 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Text(
                 'Login your account',
-                style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
+                style:
+                    AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
               ),
               SizedBox(height: isMobile ? 24 : 32),
-
               Text('Your email', style: AppTextStyles.label),
               const SizedBox(height: 8),
               CustomTextField(
@@ -116,7 +135,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 24),
-
               Text('Password', style: AppTextStyles.label),
               const SizedBox(height: 8),
               CustomTextField(
@@ -124,8 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 obscureText: _controller.obscurePassword,
               ),
               const SizedBox(height: 16),
-
-            
               SizedBox(
                 width: double.infinity,
                 child: Wrap(
@@ -138,27 +154,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         Checkbox(
                           value: _controller.rememberMe,
                           onChanged: _controller.toggleRememberMe,
-                          side: const BorderSide(color: AppColors.checkboxBorder),
+                          side:
+                              const BorderSide(color: AppColors.checkboxBorder),
                         ),
                         Text('Remember me', style: AppTextStyles.bodySmall),
                       ],
                     ),
                     TextButton(
-  onPressed: () {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const ForgotPasswordScreen(),
-      ),
-    );
-  },
-  style: TextButton.styleFrom(padding: EdgeInsets.zero),
-  child: Text('Forgot Password?', style: AppTextStyles.bodySmall),
-),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen(),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      child: Text('Forgot Password?',
+                          style: AppTextStyles.bodySmall),
+                    ),
                   ],
                 ),
               ),
               SizedBox(height: isMobile ? 20 : 24),
-
               CustomButton(
                 text: 'Log In',
                 backgroundColor: AppColors.primaryButton,
@@ -167,17 +184,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _handleLogin,
               ),
               const SizedBox(height: 16),
-
               CustomButton(
                 text: 'Log In with Google',
                 backgroundColor: AppColors.googleButton,
                 textStyle: AppTextStyles.buttonDark,
+                isLoading: _controller.isLoading,
                 onPressed: () async {
-                  await _controller.loginWithGoogle();
+                  final success = await _controller.loginWithGoogle();
+                  if (!context.mounted) return;
+                  if (!success && _controller.errorMessage != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(_controller.errorMessage!)),
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 24),
-
               Center(
                 child: GestureDetector(
                   onTap: () {
@@ -190,19 +212,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: AppTextStyles.footer,
                       children: [
                         const TextSpan(text: "Don't have an account? "),
-                        TextSpan(text: 'Sign up', style: AppTextStyles.footerLink),
+                        TextSpan(
+                            text: 'Sign up', style: AppTextStyles.footerLink),
                       ],
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
               Center(
                 child: TextButton(
                   onPressed: () {
                     Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const DashboardScreen()),
                     );
                   },
                   child: Text(
