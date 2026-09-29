@@ -25,6 +25,8 @@ class DashboardController extends ChangeNotifier {
   UserProfile? profile;
   List<ParameterStatus> parameterStatuses = [];
   forecasting.PredictionInsightDetail? latestInsight;
+  forecasting.PredictionInsightDetail? phPredictionInsight;
+  forecasting.PredictionInsightDetail? ecPredictionInsight;
   List<AppNotificationItem> notifications = [];
   List<ForecastPoint> phForecast = [];
   List<ForecastPoint> ecForecast = [];
@@ -149,6 +151,8 @@ class DashboardController extends ChangeNotifier {
       predictedPh: predictedPh,
       predictedEc: predictedEc,
     );
+    phPredictionInsight = phInsight;
+    ecPredictionInsight = ecInsight;
     latestInsight =
         _severity(phInsight.statusBadge) >= _severity(ecInsight.statusBadge)
             ? phInsight

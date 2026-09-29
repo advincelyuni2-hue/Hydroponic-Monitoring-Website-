@@ -177,6 +177,7 @@ class MonitoringService {
       _getAverageReadings('ec_readings', start, end),
       _getAverageReadings('temp_readings', start, end),
     ]);
+    final ranges = await _getParameterRanges();
 
     final summaries = <int, _HistorySummary>{};
     _mergeAverageRows(summaries, results[0], 'ph', aggregation);
@@ -187,13 +188,41 @@ class MonitoringService {
       ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
 
     return ordered.map((summary) {
-      return HistoryLogEntry([
-        _historyLabel(summary.recordedAt, aggregation),
-        summary.ph?.toStringAsFixed(2) ?? '—',
-        summary.ec == null ? '—' : '${summary.ec!.toStringAsFixed(2)} mS/cm',
-        summary.temp == null ? '—' : '${summary.temp!.toStringAsFixed(1)} °C',
-        summary.status,
-      ]);
+      final phRange = HistoryValueRange(
+        minimum: ranges.phMin,
+        maximum: ranges.phMax,
+        value: summary.ph,
+      );
+      final ecRange = HistoryValueRange(
+        minimum: ranges.ecMin,
+        maximum: ranges.ecMax,
+        value: summary.ec,
+        unit: 'mS/cm',
+      );
+      final tempRange = HistoryValueRange(
+        minimum: 18,
+        maximum: 24,
+        value: summary.temp,
+        unit: '°C',
+      );
+      final outsideRange = [phRange, ecRange, tempRange].any(
+        (range) => range.isHigh || range.isLow,
+      );
+      return HistoryLogEntry(
+        [
+          _historyDate(summary.recordedAt),
+          _historyTime(summary.recordedAt, aggregation),
+          summary.ph?.toStringAsFixed(2) ?? '—',
+          summary.ec == null ? '—' : '${summary.ec!.toStringAsFixed(2)} mS/cm',
+          summary.temp == null ? '—' : '${summary.temp!.toStringAsFixed(1)} °C',
+          outsideRange ? 'Critical' : summary.status,
+        ],
+        ranges: {
+          2: phRange,
+          3: ecRange,
+          4: tempRange,
+        },
+      );
     }).toList();
   }
 
@@ -280,35 +309,37 @@ class MonitoringService {
     }
   }
 
-  String _historyLabel(
+  String _historyDate(DateTime bucket) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[bucket.month - 1]} ${bucket.day}, ${bucket.year}';
+  }
+
+  String _historyTime(
     DateTime bucket,
     HistoryAggregation aggregation,
   ) {
     switch (aggregation) {
       case HistoryAggregation.tenMinutes:
-        return '${bucket.month}/${bucket.day}/${bucket.year} '
-            '${formatManilaClockTime(bucket)}';
+        return formatManilaClockTime(bucket);
       case HistoryAggregation.eightHours:
         final end = bucket.add(const Duration(hours: 8));
-        return '${bucket.month}/${bucket.day} '
-            '${formatManilaClockTime(bucket)} - '
+        return '${formatManilaClockTime(bucket)} - '
             '${formatManilaClockTime(end)}';
       case HistoryAggregation.daily:
-        const months = [
-          'January',
-          'February',
-          'March',
-          'April',
-          'May',
-          'June',
-          'July',
-          'August',
-          'September',
-          'October',
-          'November',
-          'December',
-        ];
-        return '${months[bucket.month - 1]} ${bucket.day}, ${bucket.year}';
+        return 'All day';
     }
   }
 

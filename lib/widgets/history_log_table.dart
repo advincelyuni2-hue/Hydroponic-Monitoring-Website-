@@ -1,8 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/monitoring_models.dart';
-import '../utils/status_style.dart';
+import 'history_log_value.dart';
 
 class HistoryLogTable extends StatelessWidget {
   final List<String> columns;
@@ -11,79 +13,125 @@ class HistoryLogTable extends StatelessWidget {
   const HistoryLogTable({super.key, required this.columns, required this.rows});
 
   int get _statusColumnIndex => columns.indexOf('Status');
+  bool get _isSensorTable => columns.length == 6;
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _header(int index) {
+    final range = rows.isEmpty ? null : rows.first.ranges[index];
+    final parameter = switch (index) {
+      2 => 'pH',
+      3 => 'EC',
+      4 => 'Temp',
+      _ => '',
+    };
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Header row
-        Row(
-          children: [
-            for (final column in columns)
-              Expanded(
-                child: Text(column, style: AppTextStyles.cardLabel),
-              ),
-          ],
+        Text(
+          columns[index],
+          style: AppTextStyles.cardLabel,
+          textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 12),
-          Divider(height: 1, color: AppColors.cardBorder),
-
-        if (rows.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Center(
-              child: Text('No logs yet.', style: AppTextStyles.cardMeta),
-            ),
-          )
-        else
-          for (int r = 0; r < rows.length; r++)
-            Container(
-              color: r.isOdd ? AppColors.tableStripe : Colors.transparent,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                children: [
-                  for (int c = 0; c < columns.length; c++)
-                    Expanded(
-                      child: c == _statusColumnIndex
-                          ? _StatusPill(status: rows[r].values[c])
-                          : Text(
-                              rows[r].values[c],
-                              style: AppTextStyles.body,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                    ),
-                ],
-              ),
-            ),
+        if (range != null)
+          Text(
+            'Ideal $parameter Range: ${range.label}',
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
       ],
     );
   }
-}
-
-class _StatusPill extends StatelessWidget {
-  final String status;
-
-  const _StatusPill({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: StatusStyle.background(status),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          status,
-          style: AppTextStyles.cardMeta.copyWith(
-            fontWeight: FontWeight.w600,
-            color: StatusStyle.text(status),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tableWidth = math.max(
+          _isSensorTable ? 1200.0 : 620.0,
+          constraints.maxWidth,
+        );
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: tableWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 64,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    border: Border.symmetric(
+                      horizontal: BorderSide(color: AppColors.textSecondary),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      for (int c = 0; c < columns.length; c++)
+                        Expanded(child: Center(child: _header(c))),
+                    ],
+                  ),
+                ),
+                if (rows.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child:
+                          Text('No logs yet.', style: AppTextStyles.cardMeta),
+                    ),
+                  )
+                else
+                  for (int r = 0; r < rows.length; r++)
+                    Container(
+                      height: 62,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: r.isOdd ? AppColors.tableStripe : null,
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.textSecondary),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          for (int c = 0; c < columns.length; c++)
+                            Expanded(
+                              child: c == _statusColumnIndex
+                                  ? Align(
+                                      alignment: Alignment.center,
+                                      child: HistoryStatusBadge(
+                                        status: rows[r].values[c],
+                                      ),
+                                    )
+                                  : rows[r].ranges[c] != null
+                                      ? Center(
+                                          child: HistoryLogValue(
+                                            value: rows[r].values[c],
+                                            range: rows[r].ranges[c]!,
+                                            showRange: false,
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            rows[r].values[c],
+                                            style: AppTextStyles.body,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                            ),
+                        ],
+                      ),
+                    ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

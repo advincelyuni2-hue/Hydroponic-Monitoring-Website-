@@ -2,7 +2,7 @@ const Duration manilaUtcOffset = Duration(hours: 8);
 
 // Current sensor rows arrive from Supabase eight hours earlier than their
 // intended UTC instant. Keep this correction isolated to sensor data so other
-// application timestamps continue to use the normal UTC -> PHT conversion.
+// application timestamps continue to use the normal UTC -> Manila conversion.
 const Duration sensorStoredUtcCorrection = Duration(hours: 8);
 
 DateTime parseSupabaseTimestamp(String value) {
@@ -97,5 +97,5 @@ String formatManilaDateTime(DateTime value) {
     'Dec',
   ];
   return '${months[value.month - 1]} ${value.day}, ${value.year}, '
-      '${formatManilaClockTime(value)} PHT';
+      '${formatManilaClockTime(value)}';
 }

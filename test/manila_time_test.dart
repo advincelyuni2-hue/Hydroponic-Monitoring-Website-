@@ -8,7 +8,7 @@ void main() {
     );
 
     expect(result, DateTime(2026, 9, 25, 20, 30));
-    expect(formatManilaDateTime(result), 'Sep 25, 2026, 8:30 PM PHT');
+    expect(formatManilaDateTime(result), 'Sep 25, 2026, 8:30 PM');
   });
 
   test('treats a Supabase timestamp without an offset as UTC', () {
@@ -25,16 +25,16 @@ void main() {
     );
 
     expect(result, DateTime(2026, 9, 19, 8, 4));
-    expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM PHT');
+    expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM');
   });
 
-  test('corrects the live sensor storage skew before converting to PHT', () {
+  test('corrects the live sensor storage skew before converting to Manila', () {
     final result = toSensorManilaTime(
       parseSupabaseTimestamp('2026-09-18T16:04:00+00:00'),
     );
 
     expect(result, DateTime(2026, 9, 19, 8, 4));
-    expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM PHT');
+    expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM');
   });
 
   test('converts a Manila history boundary back to UTC', () {

@@ -122,7 +122,14 @@ class HistoryLogsController extends ChangeNotifier {
     notifyListeners();
     try {
       final range = _selectedDateRange();
-      columns = const ['Time (PHT)', 'Avg pH', 'Avg EC', 'Avg Temp', 'Status'];
+      columns = const [
+        'Date',
+        'Time',
+        'Average pH',
+        'Average EC',
+        'Average Temp',
+        'Status'
+      ];
       rows = await _monitoringService.getSensorHistory(
         start: range.start,
         end: range.end,

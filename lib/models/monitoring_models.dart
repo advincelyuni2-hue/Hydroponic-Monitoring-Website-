@@ -84,6 +84,26 @@ class PredictionInsightDetail {
 
 class HistoryLogEntry {
   final List<String> values;
+  final Map<int, HistoryValueRange> ranges;
 
-  const HistoryLogEntry(this.values);
+  const HistoryLogEntry(this.values, {this.ranges = const {}});
+}
+
+class HistoryValueRange {
+  final double minimum;
+  final double maximum;
+  final double? value;
+  final String unit;
+
+  const HistoryValueRange({
+    required this.minimum,
+    required this.maximum,
+    required this.value,
+    this.unit = '',
+  });
+
+  bool get isHigh => value != null && value! > maximum;
+  bool get isLow => value != null && value! < minimum;
+  String get label =>
+      '${minimum.toStringAsFixed(unit == '°C' ? 1 : 2)}–${maximum.toStringAsFixed(unit == '°C' ? 1 : 2)}${unit.isEmpty ? '' : ' $unit'}';
 }
