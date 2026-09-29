@@ -83,6 +83,128 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
+alter table public.notifications
+  add column if not exists title text,
+  add column if not exists parameter text,
+  add column if not exists type text,
+  add column if not exists source text not null default 'manual',
+  add column if not exists alert_key text,
+  add column if not exists current_value text,
+  add column if not exists ideal_range text,
+  add column if not exists recommendation text,
+  add column if not exists is_read boolean not null default false,
+  add column if not exists is_resolved boolean not null default false,
+  add column if not exists resolved_at timestamptz,
+  add column if not exists resolved_by uuid references auth.users(id) on delete set null,
+  add column if not exists resolved_by_name text;
+
+-- Sensor alerts are system-wide, so they do not belong to one employee.
+alter table public.notifications alter column employee_id drop not null;
+update public.notifications set source = 'manual' where source is null;
+alter table public.notifications alter column source set default 'manual';
+alter table public.notifications alter column source set not null;
+
+-- At most one unresolved alert is allowed for the same parameter/direction.
+create unique index if not exists notifications_one_unresolved_alert
+on public.notifications (alert_key)
+where alert_key is not null and is_resolved = false;
+
+create table if not exists public.forecast_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  parameter text not null,
+  status_badge text not null,
+  warning_text text not null,
+  temperature text not null,
+  ec_level text not null,
+  callout_text text not null,
+  current_val numeric not null,
+  target_val numeric not null,
+  suggested_fixes text[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.action_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  parameter text not null,
+  forecast_condition text not null,
+  horizon_hours integer not null,
+  current_ph numeric not null,
+  current_ec numeric not null,
+  current_temp numeric not null,
+  suggested_fixes text[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.dismissed_action_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  parameter text not null,
+  forecast_condition text not null,
+  horizon_hours integer not null,
+  current_ph numeric not null,
+  current_ec numeric not null,
+  current_temp numeric not null,
+  suggested_fixes text[] not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+-- Older versions of the forecasting branch created these tables without an
+-- owner column. CREATE TABLE IF NOT EXISTS does not upgrade an existing table,
+-- so add the column separately before the RLS policies reference it. Keep the
+-- migrated column nullable because legacy rows have no reliable user owner;
+-- new app inserts receive auth.uid() from the default.
+alter table public.forecast_logs
+  add column if not exists created_by uuid references auth.users(id) on delete cascade;
+alter table public.forecast_logs
+  alter column created_by set default auth.uid();
+
+alter table public.action_logs
+  add column if not exists created_by uuid references auth.users(id) on delete cascade;
+alter table public.action_logs
+  alter column created_by set default auth.uid();
+
+alter table public.dismissed_action_logs
+  add column if not exists created_by uuid references auth.users(id) on delete cascade;
+alter table public.dismissed_action_logs
+  alter column created_by set default auth.uid();
+
+alter table public.forecast_logs enable row level security;
+alter table public.action_logs enable row level security;
+alter table public.dismissed_action_logs enable row level security;
+
+grant select, insert on public.forecast_logs to authenticated;
+grant select, insert on public.action_logs to authenticated;
+grant select, insert on public.dismissed_action_logs to authenticated;
+
+drop policy if exists "Users can create forecast logs" on public.forecast_logs;
+create policy "Users can create forecast logs"
+on public.forecast_logs for insert to authenticated
+with check (created_by = auth.uid());
+drop policy if exists "Users can read relevant forecast logs" on public.forecast_logs;
+create policy "Users can read relevant forecast logs"
+on public.forecast_logs for select to authenticated
+using (created_by = auth.uid() or public.is_admin());
+
+drop policy if exists "Users can create action logs" on public.action_logs;
+create policy "Users can create action logs"
+on public.action_logs for insert to authenticated
+with check (created_by = auth.uid());
+drop policy if exists "Users can read relevant action logs" on public.action_logs;
+create policy "Users can read relevant action logs"
+on public.action_logs for select to authenticated
+using (created_by = auth.uid() or public.is_admin());
+
+drop policy if exists "Users can create dismissed action logs" on public.dismissed_action_logs;
+create policy "Users can create dismissed action logs"
+on public.dismissed_action_logs for insert to authenticated
+with check (created_by = auth.uid());
+drop policy if exists "Users can read relevant dismissed action logs" on public.dismissed_action_logs;
+create policy "Users can read relevant dismissed action logs"
+on public.dismissed_action_logs for select to authenticated
+using (created_by = auth.uid() or public.is_admin());
+
 create table if not exists public.calibration_logs (
   id uuid primary key default gen_random_uuid(),
   recorded_at timestamptz not null default now(),
@@ -129,29 +251,71 @@ on public.help_articles for all to authenticated
 using (public.is_admin()) with check (public.is_admin());
 
 alter table public.notifications enable row level security;
-grant select, insert, update, delete on public.notifications to authenticated;
+grant select, insert, delete on public.notifications to authenticated;
+revoke update on public.notifications from authenticated;
+grant update (is_resolved, status, is_read) on public.notifications to authenticated;
 
 drop policy if exists "Employees can create alerts" on public.notifications;
 create policy "Employees can create alerts"
 on public.notifications for insert to authenticated
-with check (employee_id = auth.uid() and not public.is_admin());
+with check (
+  employee_id = auth.uid()
+  and not public.is_admin()
+  and source = 'manual'
+  and alert_key is null
+  and is_resolved = false
+);
 
 drop policy if exists "Users can read relevant alerts" on public.notifications;
 create policy "Users can read relevant alerts"
 on public.notifications for select to authenticated
-using (employee_id = auth.uid() or public.is_admin());
+using (source = 'sensor' or employee_id = auth.uid() or public.is_admin());
 
 drop policy if exists "Admins can update alerts" on public.notifications;
-create policy "Admins can update alerts"
+drop policy if exists "Users can update relevant alerts" on public.notifications;
+create policy "Users can update relevant alerts"
 on public.notifications for update to authenticated
-using (public.is_admin())
-with check (public.is_admin());
+using (source = 'sensor' or employee_id = auth.uid() or public.is_admin())
+with check (source = 'sensor' or employee_id = auth.uid() or public.is_admin());
 
 drop policy if exists "Admins can delete alerts" on public.notifications;
 drop policy if exists "Users can delete relevant alerts" on public.notifications;
 create policy "Admins can delete alerts"
 on public.notifications for delete to authenticated
 using (public.is_admin());
+
+create or replace function public.stamp_notification_resolution()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.is_resolved is distinct from old.is_resolved then
+    if new.is_resolved then
+      new.resolved_at := now();
+      new.resolved_by := auth.uid();
+      select coalesce(nullif(trim(full_name), ''), email, 'User')
+      into new.resolved_by_name
+      from public.profiles
+      where id = auth.uid();
+      new.resolved_by_name := coalesce(new.resolved_by_name, 'User');
+      new.status := 'read';
+      new.is_read := true;
+    else
+      new.resolved_at := null;
+      new.resolved_by := null;
+      new.resolved_by_name := null;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists stamp_notification_resolution on public.notifications;
+create trigger stamp_notification_resolution
+before update of is_resolved on public.notifications
+for each row execute function public.stamp_notification_resolution();
 
 create or replace function public.create_parameter_alert()
 returns trigger
@@ -164,6 +328,11 @@ declare
   minimum_value numeric;
   maximum_value numeric;
   parameter_name text;
+  unit_name text;
+  direction_name text;
+  severity_name text;
+  recommendation_text text;
+  alert_key_value text;
 begin
   if coalesce(new.is_average, false) then
     return new;
@@ -176,26 +345,84 @@ begin
 
   if tg_table_name = 'ph_readings' then
     parameter_name := 'pH Level';
+    unit_name := 'pH';
     minimum_value := coalesce(config.ph_min, 5.5);
     maximum_value := coalesce(config.ph_max, 6.5);
   elsif tg_table_name = 'ec_readings' then
     parameter_name := 'EC Level';
+    unit_name := 'mS/cm';
     minimum_value := coalesce(config.ec_min, 1.2);
     maximum_value := coalesce(config.ec_max, 1.8);
   else
     parameter_name := 'Temperature';
+    unit_name := '°C';
     minimum_value := 18;
     maximum_value := 28;
   end if;
 
   if new.value < minimum_value or new.value > maximum_value then
-    insert into public.notifications (employee_id, message, status)
-    select id,
-      format('%s reading %s is outside the configured range (%s - %s).',
-        parameter_name, new.value, minimum_value, maximum_value),
-      'unread'
-    from public.profiles
-    where role = 'admin' and is_active;
+    direction_name := case when new.value < minimum_value then 'Low' else 'High' end;
+    alert_key_value := format('%s:%s', tg_table_name, lower(direction_name));
+
+    if tg_table_name = 'ph_readings' then
+      severity_name := case when new.value < 5.0 or new.value > 7.0 then 'critical' else 'warning' end;
+      recommendation_text := case
+        when new.value < minimum_value then 'Add pH-up solution gradually, circulate the solution, and verify the reading before adding more.'
+        else 'Add pH-down solution gradually, circulate the solution, and verify the reading before adding more.'
+      end;
+    elsif tg_table_name = 'ec_readings' then
+      severity_name := case when new.value < 0.8 or new.value > 2.2 then 'critical' else 'warning' end;
+      recommendation_text := case
+        when new.value < minimum_value then 'Check the nutrient mixture and replenish nutrients gradually, then verify the EC reading.'
+        else 'Check water level and nutrient concentration; dilute gradually with clean water, then verify the EC reading.'
+      end;
+    else
+      severity_name := case when new.value < 15 or new.value > 30 then 'critical' else 'warning' end;
+      recommendation_text := case
+        when new.value < minimum_value then 'Inspect the heater and environment, raise the temperature gradually, and verify the sensor reading.'
+        else 'Improve cooling or ventilation, inspect the reservoir, and verify the temperature sensor reading.'
+      end;
+    end if;
+
+    -- Keep the existing unresolved alert current without creating or sending
+    -- another notification for the same parameter and direction.
+    update public.notifications
+    set message = format('%s is %s at %s %s. The configured range is %s - %s %s.',
+          parameter_name, lower(direction_name), new.value, unit_name,
+          minimum_value, maximum_value, unit_name),
+        type = severity_name,
+        current_value = format('%s %s', new.value, unit_name),
+        ideal_range = format('%s - %s %s', minimum_value, maximum_value, unit_name),
+        recommendation = recommendation_text,
+        timestamp = now()
+    where alert_key = alert_key_value
+      and is_resolved = false;
+
+    if found then
+      return new;
+    end if;
+
+    insert into public.notifications (
+      employee_id, source, alert_key, parameter, title, message, type,
+      current_value, ideal_range, recommendation, status, is_read, is_resolved
+    ) values (
+      null,
+      'sensor',
+      alert_key_value,
+      parameter_name,
+      format('%s %s', parameter_name, direction_name),
+      format('%s is %s at %s %s. The configured range is %s - %s %s.',
+        parameter_name, lower(direction_name), new.value, unit_name,
+        minimum_value, maximum_value, unit_name),
+      severity_name,
+      format('%s %s', new.value, unit_name),
+      format('%s - %s %s', minimum_value, maximum_value, unit_name),
+      recommendation_text,
+      'unread',
+      false,
+      false
+    )
+    on conflict do nothing;
   end if;
   return new;
 end;

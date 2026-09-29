@@ -28,6 +28,20 @@ class ForecastPoint {
   });
 }
 
+class ForecastHorizonSummary {
+  final int hoursAhead;
+  final double phValue;
+  final double ecValue;
+  final DateTime predictedFor;
+
+  const ForecastHorizonSummary({
+    required this.hoursAhead,
+    required this.phValue,
+    required this.ecValue,
+    required this.predictedFor,
+  });
+}
+
 class LatestInsight {
   final String warningTitle;
   final String warningDetail;

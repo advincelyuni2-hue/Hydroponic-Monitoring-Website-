@@ -9,6 +9,7 @@ import '../widgets/live_pulse_dot.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../screens/login_screen.dart';
+import '../screens/notifications_screen.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_client.dart';
 
@@ -224,17 +225,8 @@ class AppHeader extends StatelessWidget {
   }
 
   void _showNotifications(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notifications'),
-        content: const Text('You have 2 recent notifications to review.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
-        ],
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
     );
   }
 
@@ -306,17 +298,11 @@ class _AdminAlertBellState extends State<AdminAlertBell> {
   void initState() {
     super.initState();
     _refresh();
-    if (appProfile.value?.isAdmin == true) {
-      _channel = _service.subscribeToAdminAlerts(onAlert: _handleAlert);
-    }
+    _channel = _service.subscribeToAdminAlerts(onAlert: _handleAlert);
   }
 
   Future<void> _handleAlert() async {
     await _refresh();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('A new employee alert was received.')),
-    );
   }
 
   Future<void> _refresh() async {
