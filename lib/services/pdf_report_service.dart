@@ -14,9 +14,9 @@ class PdfReportService {
     Future<void> Function(Uint8List bytes, String filename)? output,
   }) : _output = output ?? outputPdf;
 
-  static const _reportTitle =
-      'SMART DECISION SUPPORT SYSTEM FOR PRECISION HYDROPONICS: '
-      'REALTIME PH AND EC OPTIMIZATION USING PREDICTIVE ANALYTICS';
+  static const _reportTitle = 'SMART DECISION SUPPORT SYSTEM FOR PRECISION\n'
+      'HYDROPONICS: REALTIME PH AND EC OPTIMIZATION\n'
+      'USING PREDICTIVE ANALYTICS';
   static const _textColor = PdfColor.fromInt(0xFF202124);
   static const _ruleColor = PdfColor.fromInt(0xFF929292);
   static const _phColor = PdfColor.fromInt(0xFF18764A);
