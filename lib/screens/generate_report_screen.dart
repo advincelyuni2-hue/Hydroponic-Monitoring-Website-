@@ -47,13 +47,24 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
                   onToggleAllAnalytics: _controller.toggleAllAnalytics,
                   onDismiss: () => Navigator.of(context).pop(),
                   onGenerate: () async {
-                    await _controller.generatePdfReport();
-                    if (!context.mounted) return;
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('PDF report ready.')),
+                    try {
+                      await _controller.generatePdfReport(
+                        timeframe: '30d',
+                        anchorDate: DateTime.now(),
                       );
+                    } catch (error) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Could not generate report: $error'),
+                        ),
+                      );
+                      return;
                     }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('PDF report ready.')),
+                    );
                   },
                 ),
               ],

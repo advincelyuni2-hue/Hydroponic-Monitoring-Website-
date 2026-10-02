@@ -53,15 +53,15 @@ class AppHeader extends StatelessWidget {
         SizedBox(width: isMobile ? 8 : 16),
 
         // Title
-        SizedBox(
-          width: isMobile ? 150 : 230,
+        Flexible(
           child: Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: AppTextStyles.pageHeading.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: isMobile ? 18 : 24,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
 

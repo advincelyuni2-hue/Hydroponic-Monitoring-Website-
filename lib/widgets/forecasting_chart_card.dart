@@ -5,12 +5,15 @@ import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
 import '../models/monitoring_models.dart';
 import '../utils/responsive.dart';
+import 'date_picker_button.dart';
 
 class ForecastingChartCard extends StatelessWidget {
   final String activeTab; // 'pH Forecast' or 'EC Forecast'
   final ValueChanged<String> onTabChanged;
   final int selectedHours; // 6, 12, or 24
   final ValueChanged<int> onHoursChanged;
+  final String selectedDateLabel;
+  final VoidCallback? onDatePickerTap;
   final List<ForecastPoint> points;
 
   const ForecastingChartCard({
@@ -19,6 +22,8 @@ class ForecastingChartCard extends StatelessWidget {
     required this.onTabChanged,
     required this.selectedHours,
     required this.onHoursChanged,
+    required this.selectedDateLabel,
+    this.onDatePickerTap,
     required this.points,
   });
 
@@ -29,15 +34,13 @@ class ForecastingChartCard extends StatelessWidget {
     final historical = points
         .where((p) => !p.isPredicted && p.hour >= -selectedHours)
         .toList();
-    final predicted = points
-        .where((p) => p.isPredicted && p.hour <= selectedHours)
-        .toList();
+    final predicted =
+        points.where((p) => p.isPredicted && p.hour <= selectedHours).toList();
 
-    final historicalSpots = historical.map((p) => FlSpot(p.hour, p.value)).toList();
-    final predictedSpots = <FlSpot>[
-      if (historical.isNotEmpty) FlSpot(historical.last.hour, historical.last.value),
+    final allSpots = <FlSpot>[
+      ...historical.map((p) => FlSpot(p.hour, p.value)),
       ...predicted.map((p) => FlSpot(p.hour, p.value)),
-    ];
+    ]..sort((a, b) => a.x.compareTo(b.x));
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -56,10 +59,20 @@ class ForecastingChartCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildTab('pH Forecast', isMobile),
-                        const SizedBox(width: 16),
-                        _buildTab('EC Forecast', isMobile),
+                        Row(
+                          children: [
+                            _buildTab('pH Forecast', isMobile),
+                            const SizedBox(width: 16),
+                            _buildTab('EC Forecast', isMobile),
+                          ],
+                        ),
+                        DatePickerButton(
+                          onTap: onDatePickerTap ?? () {},
+                          dateText: selectedDateLabel,
+                          isSelected: false,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -76,11 +89,21 @@ class ForecastingChartCard extends StatelessWidget {
                         _buildTab('EC Forecast', isMobile),
                       ],
                     ),
-                    _buildTimeFilterPills(),
+                    Row(
+                      children: [
+                        DatePickerButton(
+                          onTap: onDatePickerTap ?? () {},
+                          dateText: selectedDateLabel,
+                          isSelected: false,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildTimeFilterPills(),
+                      ],
+                    ),
                   ],
                 ),
           const SizedBox(height: 12),
-           Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
+          Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
           const SizedBox(height: 24),
 
           // 2. CHART — same visual language as the dashboard's mini chart:
@@ -99,9 +122,12 @@ class ForecastingChartCard extends StatelessWidget {
                   border: Border.all(color: AppColors.chartGrid),
                 ),
                 titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -154,7 +180,7 @@ class ForecastingChartCard extends StatelessWidget {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: historicalSpots,
+                    spots: allSpots,
                     isCurved: true,
                     color: AppColors.chartLine,
                     barWidth: 2,
@@ -166,25 +192,6 @@ class ForecastingChartCard extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           AppColors.chartLine.withValues(alpha: 0.22),
-                          AppColors.chartLine.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                  LineChartBarData(
-                    spots: predictedSpots,
-                    isCurved: true,
-                    color: AppColors.chartLine,
-                    barWidth: 2,
-                    dashArray: [6, 4],
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.chartLine.withValues(alpha: 0.10),
                           AppColors.chartLine.withValues(alpha: 0.0),
                         ],
                       ),
@@ -277,7 +284,9 @@ class ForecastingChartCard extends StatelessWidget {
             margin: const EdgeInsets.only(left: 6),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primaryButton : const Color(0xFFE2E2E2),
+              color: isSelected
+                  ? AppColors.primaryButton
+                  : const Color(0xFFE2E2E2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(

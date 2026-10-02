@@ -12,6 +12,7 @@ import '../widgets/report_generation_card.dart';
 import '../widgets/target_distribution_card.dart';
 import '../widgets/alerts_frequency_card.dart';
 import '../widgets/sensor_health_card.dart';
+import '../widgets/custom_calendar_popup.dart';
 import '../utils/responsive.dart';
 import 'generate_report_screen.dart';
 
@@ -29,6 +30,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _openDatePicker() {
+    showDialog(
+      context: context,
+      builder: (context) => CustomCalendarPopup(
+        mode: CalendarMode.daily,
+        initialDate: _controller.selectedDate,
+        onDateSelected: (date, _) => _controller.updateSelectedDate(date),
+      ),
+    );
   }
 
   @override
@@ -157,6 +169,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           : _controller.ecRange.end,
       onParameterChanged: _controller.setParameter,
       onTimeframeChanged: _controller.setTimeframe,
+      onDatePickerTap: _openDatePicker,
     );
 
     final card2 = ReportPredictionCard(

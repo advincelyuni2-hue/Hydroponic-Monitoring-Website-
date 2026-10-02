@@ -5,9 +5,9 @@ import '../widgets/forecasting_chart_card.dart';
 import '../widgets/prediction_insights_card.dart';
 import '../widgets/report_issue_card.dart';
 import '../widgets/app_drawer.dart';
-import 'package:monitoring_app/widgets/app_header.dart';
+import '../widgets/custom_calendar_popup.dart';
+import '../widgets/app_header.dart';
 import '../utils/responsive.dart';
-
 
 class ForecastingDashboardScreen extends StatefulWidget {
   const ForecastingDashboardScreen({super.key});
@@ -25,6 +25,19 @@ class _ForecastingDashboardScreenState
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _openDatePicker() {
+    showDialog(
+      context: context,
+      builder: (context) => CustomCalendarPopup(
+        mode: CalendarMode.daily,
+        initialDate: _controller.selectedDate,
+        onDateSelected: (selectedDate, weekRange) {
+          _controller.updateSelectedDate(selectedDate);
+        },
+      ),
+    );
   }
 
   @override
@@ -74,23 +87,19 @@ class _ForecastingDashboardScreenState
                       onTabChanged: _controller.selectTab,
                       selectedHours: _controller.selectedHours,
                       onHoursChanged: _controller.selectHours,
+                      selectedDateLabel: _controller.selectedDateLabel,
+                      onDatePickerTap: _openDatePicker,
                       points: _controller.chartPoints,
                     ),
                     const SizedBox(height: 16),
                     if (_controller.insightDetail != null)
                       PredictionInsightsCard(
                         detail: _controller.insightDetail!,
-                        onApplyFix: () {
-                         
-                        },
-                        onDismiss: () {
-                         
-                        },
+                        onApplyFix: () {},
+                        onDismiss: () {},
                       ),
                     const SizedBox(height: 16),
-                    ReportIssueCard(onAlertAdmin: () {
-                    
-                    }),
+                    ReportIssueCard(onAlertAdmin: () {}),
                   ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,6 +111,8 @@ class _ForecastingDashboardScreenState
                             onTabChanged: _controller.selectTab,
                             selectedHours: _controller.selectedHours,
                             onHoursChanged: _controller.selectHours,
+                            selectedDateLabel: _controller.selectedDateLabel,
+                            onDatePickerTap: _openDatePicker,
                             points: _controller.chartPoints,
                           ),
                         ),

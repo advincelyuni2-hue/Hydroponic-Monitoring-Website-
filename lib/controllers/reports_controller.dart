@@ -35,14 +35,22 @@ class ReportsController extends ChangeNotifier {
   ];
 
   List<PredictedAnalyticsPoint> predictionPoints = [
-    PredictedAnalyticsPoint(label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
-    PredictedAnalyticsPoint(label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
-    PredictedAnalyticsPoint(label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
-    PredictedAnalyticsPoint(label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
-    PredictedAnalyticsPoint(label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
-    PredictedAnalyticsPoint(label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
-    PredictedAnalyticsPoint(label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
-    PredictedAnalyticsPoint(label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
+    PredictedAnalyticsPoint(
+        label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
+    PredictedAnalyticsPoint(
+        label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
+    PredictedAnalyticsPoint(
+        label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
+    PredictedAnalyticsPoint(
+        label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
+    PredictedAnalyticsPoint(
+        label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
+    PredictedAnalyticsPoint(
+        label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
+    PredictedAnalyticsPoint(
+        label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
+    PredictedAnalyticsPoint(
+        label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
   ];
 
   TargetDistributionData targetDistribution = const TargetDistributionData(
@@ -83,8 +91,11 @@ class ReportsController extends ChangeNotifier {
   ];
 
   String selectedParameter = 'pH'; // 'pH' or 'EC'
-  String selectedTimeframe = '7d';  // '7d', '30d', '90d'
+  String selectedTimeframe = '7d'; // '7d', '30d', '90d'
   String selectedDistributionParam = 'pH';
+  DateTime selectedDate = DateTime.now();
+  int _trendRequestId = 0;
+  int _distributionRequestId = 0;
 
   RangeValues phRange = const RangeValues(5.5, 6.5);
   RangeValues ecRange = const RangeValues(5.0, 6.0);
@@ -114,7 +125,13 @@ class ReportsController extends ChangeNotifier {
   }
 
   void setDistributionParam(String param) {
+    if (selectedDistributionParam == param) return;
     selectedDistributionParam = param;
+    loadTargetDistribution();
+  }
+
+  void updateSelectedDate(DateTime date) {
+    selectedDate = date;
     notifyListeners();
   }
 
@@ -168,14 +185,19 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> generatePdfReport() async {
+  Future<void> generatePdfReport({
+    String? timeframe,
+    DateTime? anchorDate,
+  }) async {
+    final reportTimeframe = timeframe ?? selectedTimeframe;
+    final reportData = await _reportsService.getPdfReportData(
+      anchorDate: anchorDate ?? selectedDate,
+      timeframe: reportTimeframe,
+      includeSensorLogs: includeSensorLogs,
+    );
     await _pdfReportService.generateAndShare(
-      summary: summary,
-      trendPoints: trendPoints,
-      predictionPoints: predictionPoints,
-      phRange: phRange,
-      ecRange: ecRange,
-      selectedParameter: selectedParameter,
+      reportData: reportData,
+      timeframe: reportTimeframe,
       includeSensorLogs: includeSensorLogs,
       includeCalibrationLogs: includeCalibrationLogs,
       includePhOptimization: includePhOptimization,
@@ -197,13 +219,27 @@ class ReportsController extends ChangeNotifier {
   }
 
   Future<void> loadTrendData() async {
+    final requestId = ++_trendRequestId;
     try {
-      final points = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
-      if (points.isNotEmpty) {
+      final points = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
+      if (requestId == _trendRequestId && points.isNotEmpty) {
         trendPoints = points;
       }
-    } catch (_) {
+    } catch (_) {}
+    notifyListeners();
+  }
 
+  Future<void> loadTargetDistribution() async {
+    final requestId = ++_distributionRequestId;
+    try {
+      final data = await _reportsService
+          .getTargetDistribution(selectedDistributionParam);
+      if (requestId == _distributionRequestId) {
+        targetDistribution = data;
+      }
+    } catch (_) {
+      // Keep the previous distribution when the request fails.
     }
     notifyListeners();
   }
@@ -215,22 +251,19 @@ class ReportsController extends ChangeNotifier {
 
     try {
       profile = await _userService.getProfile('mock-user-id');
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     try {
       summary = await _reportsService.getSummaryData();
-    } catch (_) {
-
-    }
+    } catch (_) {}
 
     try {
-      final t = await _reportsService.getTrendData(selectedParameter, selectedTimeframe);
+      final t = await _reportsService.getTrendData(
+          selectedParameter, selectedTimeframe);
       if (t.isNotEmpty) trendPoints = t;
-    } catch (_) {
+    } catch (_) {}
 
-    }
+    await loadTargetDistribution();
 
     isLoading = false;
     notifyListeners();

@@ -71,7 +71,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
                   ],
                 ),
           const SizedBox(height: 12),
-           Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
+          Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
           const SizedBox(height: 24),
 
           // 2. CHART CANVAS
@@ -91,7 +91,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
         Text('Visual analytics', style: AppTextStyles.sectionTitle),
         const SizedBox(height: 2),
         Text(
-          '$selectedParameter trend, last 30 days',
+          '$selectedParameter trend, last $selectedTimeframe',
           style: AppTextStyles.cardMeta,
         ),
       ],
@@ -163,7 +163,8 @@ class ReportsAnalyticsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selectedTimeframe == tf ? Colors.white : Colors.black87,
+                  color:
+                      selectedTimeframe == tf ? Colors.white : Colors.black87,
                 ),
               ),
             ),
@@ -173,12 +174,7 @@ class ReportsAnalyticsCard extends StatelessWidget {
 
         // Reusable Calendar Icon Button
         DatePickerButton(
-          onTap: onDatePickerTap ??
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Date picker coming soon')),
-                );
-              },
+          onTap: onDatePickerTap ?? () {},
         ),
       ],
     );
@@ -210,7 +206,8 @@ class ReportsAnalyticsCard extends StatelessWidget {
       ),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles:
+            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,

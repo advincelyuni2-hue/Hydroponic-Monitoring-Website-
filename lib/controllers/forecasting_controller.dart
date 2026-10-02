@@ -14,6 +14,7 @@ class ForecastingController extends ChangeNotifier {
 
   String selectedTab = 'pH Forecast';
   int selectedHours = 12; // 6, 12, or 24
+  DateTime selectedDate = DateTime.now();
 
   List<ForecastPoint> chartPoints = [];
   PredictionInsightDetail? insightDetail;
@@ -23,6 +24,24 @@ class ForecastingController extends ChangeNotifier {
   }
 
   String get _parameterKey => selectedTab.startsWith('pH') ? 'ph' : 'ec';
+
+  String get selectedDateLabel {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[selectedDate.month - 1]} ${selectedDate.day}, ${selectedDate.year}';
+  }
 
   Future<void> loadData() async {
     isLoading = true;
@@ -58,4 +77,8 @@ class ForecastingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateSelectedDate(DateTime date) {
+    selectedDate = date;
+    notifyListeners();
+  }
 }
