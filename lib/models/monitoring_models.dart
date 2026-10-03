@@ -28,6 +28,20 @@ class ForecastPoint {
   });
 }
 
+class ForecastHorizonSummary {
+  final int hoursAhead;
+  final double phValue;
+  final double ecValue;
+  final DateTime predictedFor;
+
+  const ForecastHorizonSummary({
+    required this.hoursAhead,
+    required this.phValue,
+    required this.ecValue,
+    required this.predictedFor,
+  });
+}
+
 class LatestInsight {
   final String warningTitle;
   final String warningDetail;
@@ -70,12 +84,26 @@ class PredictionInsightDetail {
 
 class HistoryLogEntry {
   final List<String> values;
+  final Map<int, HistoryValueRange> ranges;
 
-  const HistoryLogEntry(this.values);
+  const HistoryLogEntry(this.values, {this.ranges = const {}});
 }
 
-enum HistoryAggregation {
-  tenMinutes,
-  eightHours,
-  daily,
+class HistoryValueRange {
+  final double minimum;
+  final double maximum;
+  final double? value;
+  final String unit;
+
+  const HistoryValueRange({
+    required this.minimum,
+    required this.maximum,
+    required this.value,
+    this.unit = '',
+  });
+
+  bool get isHigh => value != null && value! > maximum;
+  bool get isLow => value != null && value! < minimum;
+  String get label =>
+      '${minimum.toStringAsFixed(unit == '°C' ? 1 : 2)}–${maximum.toStringAsFixed(unit == '°C' ? 1 : 2)}${unit.isEmpty ? '' : ' $unit'}';
 }

@@ -1,239 +1,335 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
+import 'package:flutter/material.dart';
+
 import '../models/reports_models.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
+import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 
 class ReportPredictionCard extends StatelessWidget {
-  final List<PredictedAnalyticsPoint> points;
+  final List<AnalyticsPoint> phPoints;
+  final List<AnalyticsPoint> ecPoints;
   final String selectedParameter;
-  final VoidCallback? onApplyRecommendation;
-  final VoidCallback? onDismissRecommendation;
+  final bool isLoading;
+  final String? errorMessage;
+  final ValueChanged<String> onParameterChanged;
 
   const ReportPredictionCard({
     super.key,
-    required this.points,
+    required this.phPoints,
+    required this.ecPoints,
     required this.selectedParameter,
-    this.onApplyRecommendation,
-    this.onDismissRecommendation,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.onParameterChanged,
   });
+
+  static const _phColor = AppColors.primaryButton;
+  static const _ecColor = Color(0xFF1599A8);
 
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
-    final hasData = points.isNotEmpty;
+    final noData = selectedParameter == 'Both'
+        ? phPoints.isEmpty && ecPoints.isEmpty
+        : selectedParameter == 'pH'
+            ? phPoints.isEmpty
+            : ecPoints.isEmpty;
 
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Visual analytics', style: AppTextStyles.sectionTitle),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Actual vs. Predicted ($selectedParameter)',
-                      style: AppTextStyles.cardMeta,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.statusCardGreen,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '95.8% Accuracy',
-                  style: AppTextStyles.cardMeta.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryButton,
-                  ),
-                ),
-              ),
-            ],
+          _buildHeader(isMobile),
+          const SizedBox(height: 5),
+          Text(
+            'Recorded sensor readings from Supabase. Historical model '
+            'predictions are not currently stored for comparison.',
+            style: AppTextStyles.cardMeta,
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _legendItem('Actual Value', AppColors.primaryButton),
-              const SizedBox(width: 16),
-              _legendItem('Predicted Value', const Color(0xFFE67E22)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: AppColors.cardBorder),
-          const SizedBox(height: 20),
+          SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
-            height: isMobile ? 220 : 320,
-            child: hasData
-                ? LineChart(_buildChartData())
-                : Center(child: Text('No prediction data yet', style: AppTextStyles.cardMeta)),
+            height: isMobile ? 230 : 350,
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                    ? Center(
+                        child: Text(
+                          errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.cardMeta,
+                        ),
+                      )
+                    : noData
+                        ? Center(
+                            child: Text(
+                              'No readings available for this selection.',
+                              style: AppTextStyles.cardMeta,
+                            ),
+                          )
+                        : selectedParameter == 'Both'
+                            ? Column(
+                                children: [
+                                  Expanded(
+                                    child: _seriesChart(
+                                      phPoints,
+                                      'pH',
+                                      _phColor,
+                                      isMobile,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Expanded(
+                                    child: _seriesChart(
+                                      ecPoints,
+                                      'EC',
+                                      _ecColor,
+                                      isMobile,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : _seriesChart(
+                                selectedParameter == 'pH'
+                                    ? phPoints
+                                    : ecPoints,
+                                selectedParameter,
+                                selectedParameter == 'pH'
+                                    ? _phColor
+                                    : _ecColor,
+                                isMobile,
+                              ),
           ),
-          if (onApplyRecommendation != null || onDismissRecommendation != null) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                if (onApplyRecommendation != null)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: onApplyRecommendation,
-                      icon: const Icon(Icons.check, size: 18),
-                      label: const Text('Apply recommendation'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryButton,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                if (onApplyRecommendation != null && onDismissRecommendation != null)
-                  const SizedBox(width: 12),
-                if (onDismissRecommendation != null)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onDismissRecommendation,
-                      icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Dismiss'),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+          const SizedBox(height: 12),
+          _buildLegend(),
         ],
       ),
     );
   }
 
-  Widget _legendItem(String label, Color color) {
+  Widget _buildHeader(bool isMobile) {
+    final title = Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
+      ],
+    );
+    final controls = _selector(
+      const ['Both', 'pH', 'EC'],
+      selectedParameter,
+      onParameterChanged,
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [title, const SizedBox(height: 12), controls],
+      );
+    }
     return Row(
       children: [
-        Container(
-          width: 16,
-          height: 3,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-        ),
-        const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.cardMeta.copyWith(fontSize: 12)),
+        Expanded(child: title),
+        controls,
       ],
     );
   }
 
-  LineChartData _buildChartData() {
-    final actualSpots = <FlSpot>[];
-    final predictedSpots = <FlSpot>[];
-
-    for (int i = 0; i < points.length; i++) {
-      actualSpots.add(FlSpot(i.toDouble(), points[i].actualValue));
-      predictedSpots.add(FlSpot(i.toDouble(), points[i].predictedValue));
-    }
-
-    return LineChartData(
-      minX: 0,
-      // Guard against a single-point list where minX == maxX, which some
-      // chart internals don't like.
-      maxX: points.length > 1 ? (points.length - 1).toDouble() : 1,
-      minY: 5.0,
-      maxY: 7.5,
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (val) => const FlLine(
-          color: AppColors.chartGrid,
-          strokeWidth: 1,
-          dashArray: [4, 4],
-        ),
+  Widget _selector(
+    List<String> values,
+    String selected,
+    ValueChanged<String> onSelected,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
       ),
-      borderData: FlBorderData(show: true, border: Border.all(color: AppColors.chartGrid)),
-      titlesData: FlTitlesData(
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        leftTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 36,
-            interval: 0.5,
-            getTitlesWidget: (val, meta) => Text(
-              val.toStringAsFixed(1),
-              style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final value in values)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => onSelected(value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: selected == value
+                      ? AppColors.primaryButton
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  value,
+                  style: AppTextStyles.cardMeta.copyWith(
+                    color: selected == value
+                        ? Colors.white
+                        : AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _seriesChart(
+    List<AnalyticsPoint> points,
+    String parameter,
+    Color color,
+    bool isMobile,
+  ) {
+    if (points.isEmpty) {
+      return Center(
+        child: Text(
+          'No $parameter readings available for this period.',
+          style: AppTextStyles.cardMeta,
+        ),
+      );
+    }
+    final spots = [
+      for (var i = 0; i < points.length; i++)
+        FlSpot(i.toDouble(), points[i].value),
+    ];
+    final values = points.map((point) => point.value).toList();
+    var minY = values.reduce(math.min);
+    var maxY = values.reduce(math.max);
+    final span = maxY - minY;
+    final padding = span == 0 ? math.max(maxY.abs() * 0.1, 0.1) : span * 0.15;
+    minY -= padding;
+    maxY += padding;
+    final interval = math.max((maxY - minY) / 4, 0.1);
+    final labelInterval = math.max(1, (points.length / 5).ceil());
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: math.max(points.length - 1, 1).toDouble(),
+        minY: minY,
+        maxY: maxY,
+        gridData: const FlGridData(show: true),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: AppColors.chartGrid),
+        ),
+        titlesData: FlTitlesData(
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            axisNameWidget: Text(
+              parameter == 'EC' ? 'mS/cm' : 'pH',
+              style: AppTextStyles.cardMeta,
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: isMobile ? 38 : 48,
+              interval: interval,
+              getTitlesWidget: (value, _) => Text(
+                value.toStringAsFixed(1),
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 9),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              interval: labelInterval.toDouble(),
+              getTitlesWidget: (value, _) {
+                final index = value.toInt();
+                if (index < 0 || index >= points.length) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    points[index].label,
+                    style: AppTextStyles.cardMeta.copyWith(
+                      fontSize: 8,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
-        bottomTitles: AxisTitles(
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: 28,
-            interval: 1,
-            getTitlesWidget: (val, meta) {
-              final idx = val.toInt();
-              if (idx >= 0 && idx < points.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    points[idx].label,
-                    style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => AppColors.cardBackground,
+            tooltipRoundedRadius: 8,
+            getTooltipItems: (items) => items
+                .map(
+                  (spot) => LineTooltipItem(
+                    '${spot.y.toStringAsFixed(2)}'
+                    '${parameter == 'EC' ? ' mS/cm' : ''}',
+                    AppTextStyles.bodyBold.copyWith(color: color),
                   ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
+                )
+                .toList(),
           ),
         ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: color,
+            barWidth: 2.5,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: color.withValues(alpha: 0.10),
+            ),
+          ),
+        ],
       ),
-      lineTouchData: LineTouchData(
-        touchTooltipData: LineTouchTooltipData(
-          getTooltipColor: (_) => const Color(0xFF1A1A1A),
-          tooltipRoundedRadius: 8,
-          getTooltipItems: (touchedSpots) {
-            if (touchedSpots.isEmpty) return [];
-            final idx = touchedSpots.first.spotIndex;
-            if (idx < 0 || idx >= points.length) return [];
-            final pt = points[idx];
+    );
+  }
 
-            return touchedSpots.map((spot) {
-              if (spot.barIndex == 0) {
-                return LineTooltipItem(
-                  'Actual: ${pt.actualValue}\nPredicted: ${pt.predictedValue}\nDiff: \u00b1${pt.delta.toStringAsFixed(2)}',
-                  const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    height: 1.3,
-                    fontWeight: FontWeight.w600,
-                  ),
-                );
-              }
-              return null;
-            }).toList();
-          },
-        ),
-      ),
-      lineBarsData: [
-        LineChartBarData(
-          spots: actualSpots,
-          isCurved: true,
-          color: AppColors.primaryButton,
-          barWidth: 2.5,
-          dotData: const FlDotData(show: true),
-        ),
-        LineChartBarData(
-          spots: predictedSpots,
-          isCurved: true,
-          color: const Color(0xFFE67E22),
-          barWidth: 2,
-          dashArray: [6, 4],
-          dotData: const FlDotData(show: false),
-        ),
+  Widget _buildLegend() {
+    final items = selectedParameter == 'Both'
+        ? [('pH measured values', _phColor), ('EC measured values', _ecColor)]
+        : [
+            (
+              '$selectedParameter measured values',
+              selectedParameter == 'pH' ? _phColor : _ecColor,
+            ),
+          ];
+    return Wrap(
+      spacing: 18,
+      runSpacing: 8,
+      children: [
+        for (final item in items)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: item.$2,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(item.$1, style: AppTextStyles.cardMeta),
+            ],
+          ),
       ],
     );
   }

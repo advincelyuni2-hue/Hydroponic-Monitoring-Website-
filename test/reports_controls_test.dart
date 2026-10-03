@@ -17,7 +17,7 @@ void main() {
           body: ReportsAnalyticsCard(
             selectedParameter: 'pH',
             selectedTimeframe: '7d',
-            points: [AnalyticsPoint(label: 'Oct 1', value: 6.2)],
+            points: const [AnalyticsPoint(label: 'Oct 1', value: 6.2)],
             minThreshold: 5.5,
             maxThreshold: 6.5,
             onParameterChanged: parameters.add,
@@ -35,38 +35,30 @@ void main() {
     expect(timeframes, ['30d']);
   });
 
-  testWidgets('forecast evaluation displays selected parameter and responds',
+  testWidgets('forecast evaluation Both, pH, and EC controls respond',
       (tester) async {
-    var applied = false;
-    var dismissed = false;
+    final selections = <String>[];
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: ReportPredictionCard(
-            points: [
-              PredictedAnalyticsPoint(
-                label: 'Oct 1',
-                actualValue: 6.2,
-                predictedValue: 6.3,
-              ),
-            ],
-            selectedParameter: 'pH',
-            onApplyRecommendation: () => applied = true,
-            onDismissRecommendation: () => dismissed = true,
+            phPoints: const [AnalyticsPoint(label: 'Oct 1', value: 6.2)],
+            ecPoints: const [AnalyticsPoint(label: 'Oct 1', value: 0.37)],
+            selectedParameter: 'Both',
+            isLoading: false,
+            errorMessage: null,
+            onParameterChanged: selections.add,
           ),
         ),
       ),
     );
 
-    expect(find.text('Actual vs. Predicted (pH)'), findsOneWidget);
-
-    await tester.tap(find.text('Apply recommendation'));
+    await tester.tap(find.text('EC').first);
     await tester.pump();
-    await tester.tap(find.text('Dismiss'));
+    await tester.tap(find.text('pH').first);
 
-    expect(applied, isTrue);
-    expect(dismissed, isTrue);
+    expect(selections, ['EC', 'pH']);
   });
 
   testWidgets('frequency distribution parameter control responds',

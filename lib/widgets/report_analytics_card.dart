@@ -1,21 +1,21 @@
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
+import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
+import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
-import 'date_picker_button.dart';
 
-class ReportsAnalyticsCard extends StatelessWidget {
-  final String selectedParameter; // 'pH' or 'EC'
-  final String selectedTimeframe; // '7d', '30d', or '90d'
+class ReportsAnalyticsCard extends StatefulWidget {
+  final String selectedParameter;
+  final String selectedTimeframe;
   final List<AnalyticsPoint> points;
   final double minThreshold;
   final double maxThreshold;
+  final bool isLoading;
+  final String? errorMessage;
   final ValueChanged<String> onParameterChanged;
   final ValueChanged<String> onTimeframeChanged;
-  final VoidCallback? onDatePickerTap; // DatePicker callback
 
   const ReportsAnalyticsCard({
     super.key,
@@ -24,180 +24,218 @@ class ReportsAnalyticsCard extends StatelessWidget {
     required this.points,
     required this.minThreshold,
     required this.maxThreshold,
+    this.isLoading = false,
+    this.errorMessage,
     required this.onParameterChanged,
     required this.onTimeframeChanged,
-    this.onDatePickerTap,
   });
+
+  @override
+  State<ReportsAnalyticsCard> createState() => ReportsAnalyticsCardState();
+}
+
+class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
+  static const phColor = AppColors.primaryButton;
+  static const ecColor = Color(0xFF1599A8);
 
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. TOP HEADER: Title & Parameter Toggle + Timeframe Pills & Calendar
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildTitleSection(),
-                        _buildParameterTogglePill(),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTimeframeFilterPills(context),
-                  ],
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        _buildTitleSection(),
-                        const SizedBox(width: 16),
-                        _buildParameterTogglePill(),
-                      ],
-                    ),
-                    _buildTimeframeFilterPills(context),
-                  ],
-                ),
-          const SizedBox(height: 12),
-          Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
-          const SizedBox(height: 24),
-
-          // 2. CHART CANVAS
-          SizedBox(
-            height: isMobile ? 240 : 340,
-            child: LineChart(_buildTrendChartData()),
+          _buildHeader(isMobile),
+          const SizedBox(height: 5),
+          Text(
+            'Historical sensor trends and parameter telemetry',
+            style: AppTextStyles.cardMeta,
           ),
+          SizedBox(height: isMobile ? 16 : 22),
+          SizedBox(
+            height: isMobile ? 230 : 350,
+            child: widget.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : widget.errorMessage != null
+                    ? Center(
+                        child: Text(
+                          widget.errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.cardMeta,
+                        ),
+                      )
+                    : widget.points.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No sensor readings available for this period.',
+                              style: AppTextStyles.cardMeta,
+                            ),
+                          )
+                        : LineChart(_buildTrendChartData(isMobile)),
+          ),
+          const SizedBox(height: 12),
+          _buildLegend(),
         ],
       ),
     );
   }
 
-  Widget _buildTitleSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHeader(bool isMobile) {
+    final title = Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text('Visual analytics', style: AppTextStyles.sectionTitle),
-        const SizedBox(height: 2),
+        const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        Text('Historical Telemetry Trends', style: AppTextStyles.sectionTitle),
+      ],
+    );
+
+    final controls = Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _selector<String>(
+          values: const ['pH', 'EC'],
+          selected: widget.selectedParameter,
+          label: (val) => val,
+          onSelected: widget.onParameterChanged,
+        ),
+        _selector<String>(
+          values: const ['7d', '30d', '90d'],
+          selected: widget.selectedTimeframe,
+          label: (val) => val,
+          onSelected: widget.onTimeframeChanged,
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [title, const SizedBox(height: 12), controls],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: title),
+        controls,
+      ],
+    );
+  }
+
+  Widget _selector<T>({
+    required List<T> values,
+    required T selected,
+    required String Function(T) label,
+    required ValueChanged<T> onSelected,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final value in values)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => onSelected(value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: selected == value
+                      ? AppColors.primaryButton
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  label(value),
+                  style: AppTextStyles.cardMeta.copyWith(
+                    color: selected == value
+                        ? Colors.white
+                        : AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegend() {
+    final currentColor =
+        widget.selectedParameter == 'pH' ? phColor : ecColor;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: currentColor,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
         Text(
-          '$selectedParameter trend, last $selectedTimeframe',
+          '${widget.selectedParameter} measured values',
           style: AppTextStyles.cardMeta,
         ),
       ],
     );
   }
 
-  Widget _buildParameterTogglePill() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE2E2E2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _toggleOption('pH'),
-          _toggleOption('EC'),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleOption(String label) {
-    final isSelected = selectedParameter == label;
-    return GestureDetector(
-      onTap: () => onParameterChanged(label),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryButton : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : Colors.black87,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Timeframe Pills + DatePickerButton
-  Widget _buildTimeframeFilterPills(BuildContext context) {
-    final options = ['7d', '30d', '90d'];
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final tf in options) ...[
-          GestureDetector(
-            onTap: () => onTimeframeChanged(tf),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(left: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: selectedTimeframe == tf
-                    ? AppColors.primaryButton
-                    : const Color(0xFFE2E2E2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                tf,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      selectedTimeframe == tf ? Colors.white : Colors.black87,
-                ),
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(width: 8),
-
-        // Reusable Calendar Icon Button
-        DatePickerButton(
-          onTap: onDatePickerTap ?? () {},
-        ),
-      ],
-    );
-  }
-
-  LineChartData _buildTrendChartData() {
+  LineChartData _buildTrendChartData(bool isMobile) {
     final spots = <FlSpot>[];
-    for (int i = 0; i < points.length; i++) {
-      spots.add(FlSpot(i.toDouble(), points[i].value));
+    for (int i = 0; i < widget.points.length; i++) {
+      spots.add(FlSpot(i.toDouble(), widget.points[i].value));
     }
+
+    final currentColor =
+        widget.selectedParameter == 'pH' ? phColor : ecColor;
+    final values = widget.points.map((point) => point.value).toList();
+    var minY = values.reduce((a, b) => a < b ? a : b);
+    var maxY = values.reduce((a, b) => a > b ? a : b);
+    minY = minY < widget.minThreshold ? minY : widget.minThreshold;
+    maxY = maxY > widget.maxThreshold ? maxY : widget.maxThreshold;
+    final span = maxY - minY;
+    final padding = span == 0 ? (maxY.abs() * 0.1).clamp(0.1, 1.0) : span * 0.12;
+    minY -= padding;
+    maxY += padding;
+    final interval = (maxY - minY) / 5;
+    final titleInterval = (widget.points.length / 6).ceil().clamp(1, 1000);
 
     return LineChartData(
       minX: 0,
-      maxX: (points.length - 1).toDouble(),
-      minY: 5.0,
-      maxY: 7.5,
+      maxX: (widget.points.length - 1).clamp(1, 100000).toDouble(),
+      minY: minY,
+      maxY: maxY,
       gridData: FlGridData(
         show: true,
-        drawVerticalLine: false,
-        getDrawingHorizontalLine: (value) => const FlLine(
-          color: AppColors.chartGrid,
+        drawVerticalLine: true,
+        getDrawingHorizontalLine: (_) => FlLine(
+          color: AppColors.chartGrid.withValues(alpha: 0.65),
           strokeWidth: 1,
-          dashArray: [4, 4],
+        ),
+        getDrawingVerticalLine: (_) => FlLine(
+          color: AppColors.chartGrid.withValues(alpha: 0.35),
+          strokeWidth: 1,
         ),
       ),
       borderData: FlBorderData(
@@ -206,34 +244,45 @@ class ReportsAnalyticsCard extends StatelessWidget {
       ),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles:
-            const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        leftTitles: AxisTitles(
+        rightTitles: AxisTitles(
+          axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 36,
-            interval: 0.5,
-            getTitlesWidget: (val, meta) {
-              return Text(
-                val.toStringAsFixed(1),
-                style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
-              );
-            },
+            reservedSize: isMobile ? 33 : 42,
+            interval: interval,
+            getTitlesWidget: (val, _) => Text(
+              val.toStringAsFixed(1),
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            ),
+          ),
+        ),
+        leftTitles: AxisTitles(
+          axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: isMobile ? 33 : 42,
+            interval: interval,
+            getTitlesWidget: (val, _) => Text(
+              val.toStringAsFixed(1),
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            ),
           ),
         ),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 28,
-            interval: 1,
-            getTitlesWidget: (val, meta) {
-              final index = val.toInt();
-              if (index >= 0 && index < points.length) {
+            reservedSize: 30,
+            interval: titleInterval.toDouble(),
+            getTitlesWidget: (val, _) {
+              final idx = val.toInt();
+              if (idx >= 0 && idx < widget.points.length) {
                 return Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
+                  padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    points[index].label,
-                    style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+                    widget.points[idx].label,
+                    style: AppTextStyles.cardMeta.copyWith(
+                      fontSize: isMobile ? 10 : null,
+                    ),
                   ),
                 );
               }
@@ -245,14 +294,14 @@ class ReportsAnalyticsCard extends StatelessWidget {
       extraLinesData: ExtraLinesData(
         horizontalLines: [
           HorizontalLine(
-            y: maxThreshold,
-            color: const Color(0xFFC0392B),
+            y: widget.maxThreshold,
+            color: AppColors.alertBorder,
             strokeWidth: 1.2,
             dashArray: [5, 5],
           ),
           HorizontalLine(
-            y: minThreshold,
-            color: const Color(0xFFC0392B),
+            y: widget.minThreshold,
+            color: AppColors.alertBorder,
             strokeWidth: 1.2,
             dashArray: [5, 5],
           ),
@@ -260,43 +309,27 @@ class ReportsAnalyticsCard extends StatelessWidget {
       ),
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
-          getTooltipColor: (touchedSpot) => const Color(0xFFE5FFDE),
+          getTooltipColor: (_) => AppColors.cardBackground,
           tooltipRoundedRadius: 8,
-          getTooltipItems: (touchedSpots) {
-            if (touchedSpots.isEmpty) return [];
-            final primarySpot = touchedSpots.first;
-            return touchedSpots.map((spot) {
-              if (spot == primarySpot) {
-                return LineTooltipItem(
-                  spot.y.toStringAsFixed(2),
-                  AppTextStyles.cardMeta.copyWith(
-                    color: const Color(0xFF1A1A1A),
-                    fontWeight: FontWeight.w600,
-                  ),
-                );
-              }
-              return null;
-            }).toList();
-          },
+          getTooltipItems: (spots) => spots.map((spot) {
+            final unit = widget.selectedParameter == 'pH' ? '' : ' mS/cm';
+            return LineTooltipItem(
+              '${widget.selectedParameter} ${spot.y.toStringAsFixed(2)}$unit',
+              AppTextStyles.bodyBold.copyWith(color: currentColor),
+            );
+          }).toList(),
         ),
       ),
       lineBarsData: [
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: AppColors.chartLine,
-          barWidth: 2,
+          color: currentColor,
+          barWidth: 2.5,
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.chartLine.withValues(alpha: 0.22),
-                AppColors.chartLine.withValues(alpha: 0.0),
-              ],
-            ),
+            color: currentColor.withValues(alpha: 0.10),
           ),
         ),
       ],

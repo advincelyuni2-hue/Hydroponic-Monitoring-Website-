@@ -20,3 +20,14 @@ Future<void> initSupabase() async {
 
 SupabaseClient? get supabaseClient =>
     isSupabaseConfigured ? Supabase.instance.client : null;
+
+SupabaseClient get supabase {
+  final client = supabaseClient;
+  if (client == null) {
+    throw StateError(
+      'Supabase is not configured. Run Flutter with '
+      '--dart-define-from-file=supabase.json.',
+    );
+  }
+  return client;
+}

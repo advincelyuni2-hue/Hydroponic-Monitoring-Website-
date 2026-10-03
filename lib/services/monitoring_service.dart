@@ -1,17 +1,12 @@
-import 'package:supabase_flutter/supabase_flutter.dart'; // NEW — needed for RealtimeChannel, PostgresChangeEvent, PostgresChangeFilter, PostgresChangeFilterType
 import '../models/monitoring_models.dart';
-import 'app_state.dart';
-import 'supabase_client.dart'; // NEW — TODO: confirm this file exports `supabase` (used below). history_logs_controller.dart instead imports/uses a nullable `supabaseClient` — check whether that's the same client under a different name, or two different things, and make this consistent.
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_client.dart';
+import '../utils/manila_time.dart';
+
+enum HistoryAggregation { tenMinutes, eightHours, daily }
 
 class MonitoringService {
-  SupabaseClient get _client {
-    final client = supabaseClient;
-    if (client == null) {
-      throw StateError('Supabase is not configured');
-    }
-    return client;
-  }
-
   /// Column headers for the "Sensor logs" tab on the History Logs screen.
   static const List<String> sensorLogColumns = [
     'Time',
@@ -35,93 +30,104 @@ class MonitoringService {
 
   /// Powers the "Parameter Status" cards (pH / EC / Temperature).
   Future<List<ParameterStatus>> getParameterStatuses() async {
-    final config = await _client
-        .from('parameter_configurations')
-        .select('ph_min, ph_max, ec_min, ec_max')
-        .eq('id', 1)
-        .maybeSingle();
-    final phMin = (config?['ph_min'] as num?)?.toDouble() ?? 5.5;
-    final phMax = (config?['ph_max'] as num?)?.toDouble() ?? 6.5;
-    final ecMin = (config?['ec_min'] as num?)?.toDouble() ?? 1.2;
-    final ecMax = (config?['ec_max'] as num?)?.toDouble() ?? 1.8;
-
+    final ranges = await _getParameterRanges();
     final readings = await Future.wait([
-      _latestReading('ph_readings'),
-      _latestReading('ec_readings'),
-      _latestReading('temp_readings'),
+      _getLatestReading('ph_readings'),
+      _getLatestReading('ec_readings'),
+      _getLatestReading('temp_readings'),
     ]);
+
     return [
-      _statusFromReading(
-        label: 'pH Level',
-        row: readings[0],
-        unit: '',
-        min: phMin,
-        max: phMax,
-        decimals: 2,
+      _toParameterStatus(
+        'pH Level',
+        readings[0],
+        '',
+        ranges.phMin,
+        ranges.phMax,
+        2,
       ),
-      _statusFromReading(
-        label: 'EC Level',
-        row: readings[1],
-        unit: 'mS/cm',
-        min: ecMin,
-        max: ecMax,
-        decimals: 2,
+      _toParameterStatus(
+        'EC Level',
+        readings[1],
+        'mS/cm',
+        ranges.ecMin,
+        ranges.ecMax,
+        2,
       ),
-      _statusFromReading(
-        label: 'Temperature',
-        row: readings[2],
-        unit: '°C',
-        min: 18,
-        max: 28,
-        decimals: 1,
+      _toParameterStatus(
+        'Temperature',
+        readings[2],
+        '°C',
+        18.0,
+        24.0,
+        1,
       ),
     ];
   }
 
-  Future<Map<String, dynamic>?> _latestReading(String table) async {
-    final rows = await _client
-        .from(table)
-        .select('value, recorded_at, status')
-        .order('recorded_at', ascending: false)
-        .limit(1);
-    return rows.isEmpty ? null : rows.first;
+  Future<_ParameterRanges> _getParameterRanges() async {
+    try {
+      final row = await supabase
+          .from('parameter_configurations')
+          .select('ph_min, ph_max, ec_min, ec_max')
+          .eq('id', 1)
+          .maybeSingle();
+      if (row != null) {
+        return _ParameterRanges(
+          phMin: (row['ph_min'] as num?)?.toDouble() ?? 5.5,
+          phMax: (row['ph_max'] as num?)?.toDouble() ?? 6.5,
+          ecMin: (row['ec_min'] as num?)?.toDouble() ?? 1.2,
+          ecMax: (row['ec_max'] as num?)?.toDouble() ?? 1.8,
+        );
+      }
+    } catch (_) {
+      // Older deployments may not have the admin configuration table yet.
+    }
+    return const _ParameterRanges();
   }
 
-  ParameterStatus _statusFromReading({
-    required String label,
-    required Map<String, dynamic>? row,
-    required String unit,
-    required double min,
-    required double max,
-    required int decimals,
-  }) {
-    final value = (row?['value'] as num?)?.toDouble();
-    final recordedAt = row?['recorded_at'] as String?;
-    final status = value == null
-        ? 'No data'
-        : value < min || value > max
-            ? 'Critical'
-            : row?['status'] as String? ?? 'Normal';
+  Future<Map<String, dynamic>> _getLatestReading(String table) async {
+    final rows = await supabase
+        .from(table)
+        .select('value, recorded_at, status')
+        .eq('is_average', false)
+        .order('recorded_at', ascending: false)
+        .limit(1);
+
+    if (rows.isEmpty) {
+      throw StateError('No non-average readings found in $table');
+    }
+    return rows.first;
+  }
+
+  ParameterStatus _toParameterStatus(
+    String label,
+    Map<String, dynamic> row,
+    String unit,
+    double minimum,
+    double maximum,
+    int decimals,
+  ) {
+    final value = (row['value'] as num).toDouble();
+    final rawTimestamp = row['recorded_at'] as String;
+    final parsedTimestamp = parseSupabaseTimestamp(rawTimestamp);
+    final timestamp = toSensorManilaTime(parsedTimestamp);
+    final status = value < minimum || value > maximum
+        ? 'Critical'
+        : row['status'] as String? ?? 'Normal';
     return ParameterStatus(
       label: label,
-      currentValue: value?.toStringAsFixed(decimals) ?? '—',
+      currentValue: value.toStringAsFixed(decimals),
       unit: unit,
-      idealRange: '${min.toStringAsFixed(decimals)} - ${max.toStringAsFixed(decimals)}',
-      lastUpdated: recordedAt == null
-          ? 'No data'
-          : _formatTime(DateTime.parse(recordedAt).toLocal()),
+      idealRange:
+          '${minimum.toStringAsFixed(decimals)} - ${maximum.toStringAsFixed(decimals)}',
+      lastUpdated: formatManilaDateTime(timestamp),
       status: status,
     );
   }
 
-  String _formatTime(DateTime value) {
-    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$hour:$minute ${value.hour < 12 ? 'AM' : 'PM'}';
-  }
-
   RealtimeChannel subscribeToParameterChanges(void Function() onChange) {
-    return _client
+    return supabase
         .channel('dashboard-parameter-readings')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
@@ -160,7 +166,40 @@ class MonitoringService {
   }
 
   Future<void> unsubscribe(RealtimeChannel channel) =>
-      _client.removeChannel(channel);
+      supabase.removeChannel(channel);
+
+  Future<DateTimeRange?> getSensorCollectionDateRange() async {
+    final boundaries = await Future.wait([
+      _getReadingBoundary('ph_readings', ascending: true),
+      _getReadingBoundary('ec_readings', ascending: true),
+      _getReadingBoundary('temp_readings', ascending: true),
+      _getReadingBoundary('ph_readings', ascending: false),
+      _getReadingBoundary('ec_readings', ascending: false),
+      _getReadingBoundary('temp_readings', ascending: false),
+    ]);
+    final starts = boundaries.take(3).whereType<DateTime>().toList();
+    final ends = boundaries.skip(3).whereType<DateTime>().toList();
+    if (starts.isEmpty || ends.isEmpty) return null;
+    starts.sort();
+    ends.sort();
+    return DateTimeRange(start: starts.first, end: ends.last);
+  }
+
+  Future<DateTime?> _getReadingBoundary(
+    String table, {
+    required bool ascending,
+  }) async {
+    final rows = await supabase
+        .from(table)
+        .select('recorded_at')
+        .eq('is_average', true)
+        .order('recorded_at', ascending: ascending)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return toSensorManilaTime(
+      parseSupabaseTimestamp(rows.first['recorded_at'] as String),
+    );
+  }
 
   Future<List<HistoryLogEntry>> getSensorHistory({
     required DateTime start,
@@ -172,6 +211,7 @@ class MonitoringService {
       _getAverageReadings('ec_readings', start, end),
       _getAverageReadings('temp_readings', start, end),
     ]);
+    final ranges = await _getParameterRanges();
 
     final summaries = <int, _HistorySummary>{};
     _mergeAverageRows(summaries, results[0], 'ph', aggregation);
@@ -182,12 +222,67 @@ class MonitoringService {
       ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
 
     return ordered.map((summary) {
+      final phRange = HistoryValueRange(
+        minimum: ranges.phMin,
+        maximum: ranges.phMax,
+        value: summary.ph,
+      );
+      final ecRange = HistoryValueRange(
+        minimum: ranges.ecMin,
+        maximum: ranges.ecMax,
+        value: summary.ec,
+        unit: 'mS/cm',
+      );
+      final tempRange = HistoryValueRange(
+        minimum: 18,
+        maximum: 24,
+        value: summary.temp,
+        unit: '°C',
+      );
+      final outsideRange = [phRange, ecRange, tempRange].any(
+        (range) => range.isHigh || range.isLow,
+      );
+      return HistoryLogEntry(
+        [
+          _historyDate(summary.recordedAt),
+          _historyTime(summary.recordedAt, aggregation),
+          summary.ph?.toStringAsFixed(2) ?? '—',
+          summary.ec == null ? '—' : '${summary.ec!.toStringAsFixed(2)} mS/cm',
+          summary.temp == null ? '—' : '${summary.temp!.toStringAsFixed(1)} °C',
+          outsideRange ? 'Critical' : summary.status,
+        ],
+        ranges: {
+          2: phRange,
+          3: ecRange,
+          4: tempRange,
+        },
+      );
+    }).toList();
+  }
+
+  Future<List<HistoryLogEntry>> getCalibrationHistory({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final rows = await supabase
+        .from('calibration_logs')
+        .select(
+          'recorded_at, parameter, calibration_type, adjustment, performed_by, status',
+        )
+        .gte('recorded_at', manilaWallTimeToUtc(start).toIso8601String())
+        .lt('recorded_at', manilaWallTimeToUtc(end).toIso8601String())
+        .order('recorded_at', ascending: false);
+    return rows.map<HistoryLogEntry>((row) {
+      final recordedAt = toManilaTime(
+        parseSupabaseTimestamp(row['recorded_at'] as String),
+      );
       return HistoryLogEntry([
-        _historyLabel(summary.recordedAt, aggregation),
-        summary.ph?.toStringAsFixed(2) ?? '—',
-        summary.ec == null ? '—' : '${summary.ec!.toStringAsFixed(2)} mS/cm',
-        summary.temp == null ? '—' : '${summary.temp!.toStringAsFixed(1)} °C',
-        summary.status,
+        '${_historyDate(recordedAt)} ${formatManilaClockTime(recordedAt)}',
+        row['parameter'] as String? ?? 'Unknown',
+        row['calibration_type'] as String? ?? 'Calibration',
+        row['adjustment'] as String? ?? '',
+        row['performed_by'] as String? ?? 'Unknown',
+        row['status'] as String? ?? 'Completed',
       ]);
     }).toList();
   }
@@ -196,50 +291,28 @@ class MonitoringService {
     required DateTime start,
     required DateTime end,
   }) async {
+    final storedStart =
+        sensorManilaWallTimeToStoredUtc(start).toIso8601String();
+    final storedEnd = sensorManilaWallTimeToStoredUtc(end).toIso8601String();
     for (final table in ['ph_readings', 'ec_readings', 'temp_readings']) {
-      await _client
+      await supabase
           .from(table)
           .delete()
           .eq('is_average', true)
-          .gte('recorded_at', start.toUtc().toIso8601String())
-          .lt('recorded_at', end.toUtc().toIso8601String());
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd);
     }
-
-  }
-
-  Future<List<HistoryLogEntry>> getCalibrationHistory({
-    required DateTime start,
-    required DateTime end,
-  }) async {
-    final rows = await _client
-        .from('calibration_logs')
-        .select(
-            'recorded_at, parameter, calibration_type, adjustment, performed_by, status')
-        .gte('recorded_at', start.toUtc().toIso8601String())
-        .lt('recorded_at', end.toUtc().toIso8601String())
-        .order('recorded_at', ascending: false);
-    return rows
-        .map<HistoryLogEntry>((row) => HistoryLogEntry([
-              _formatTime(
-                  DateTime.parse(row['recorded_at'] as String).toLocal()),
-              row['parameter'] as String? ?? 'Unknown',
-              row['calibration_type'] as String? ?? 'Calibration',
-              row['adjustment'] as String? ?? '',
-              row['performed_by'] as String? ?? 'Unknown',
-              row['status'] as String? ?? 'Completed',
-            ]))
-        .toList();
   }
 
   Future<void> deleteCalibrationLogs({
     required DateTime start,
     required DateTime end,
   }) async {
-    await _client
+    await supabase
         .from('calibration_logs')
         .delete()
-        .gte('recorded_at', start.toUtc().toIso8601String())
-        .lt('recorded_at', end.toUtc().toIso8601String());
+        .gte('recorded_at', manilaWallTimeToUtc(start).toIso8601String())
+        .lt('recorded_at', manilaWallTimeToUtc(end).toIso8601String());
   }
 
   Future<List<Map<String, dynamic>>> _getAverageReadings(
@@ -252,12 +325,18 @@ class MonitoringService {
     var from = 0;
 
     while (true) {
-      final page = await _client
+      final page = await supabase
           .from(table)
           .select('value, recorded_at, status')
           .eq('is_average', true)
-          .gte('recorded_at', start.toUtc().toIso8601String())
-          .lt('recorded_at', end.toUtc().toIso8601String())
+          .gte(
+            'recorded_at',
+            sensorManilaWallTimeToStoredUtc(start).toIso8601String(),
+          )
+          .lt(
+            'recorded_at',
+            sensorManilaWallTimeToStoredUtc(end).toIso8601String(),
+          )
           .order('recorded_at', ascending: true)
           .range(from, from + pageSize - 1);
       allRows.addAll(page);
@@ -275,7 +354,9 @@ class MonitoringService {
     HistoryAggregation aggregation,
   ) {
     for (final row in rows) {
-      final timestamp = DateTime.parse(row['recorded_at'] as String).toLocal();
+      final timestamp = toSensorManilaTime(
+        parseSupabaseTimestamp(row['recorded_at'] as String),
+      );
       final bucket = _historyBucket(timestamp, aggregation);
       final bucketKey = bucket.millisecondsSinceEpoch;
       final summary = summaries.putIfAbsent(
@@ -317,33 +398,37 @@ class MonitoringService {
     }
   }
 
-  String _historyLabel(
+  String _historyDate(DateTime bucket) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[bucket.month - 1]} ${bucket.day}, ${bucket.year}';
+  }
+
+  String _historyTime(
     DateTime bucket,
     HistoryAggregation aggregation,
   ) {
     switch (aggregation) {
       case HistoryAggregation.tenMinutes:
-        return '${bucket.month}/${bucket.day} ${_formatTime(bucket)}';
+        return formatManilaClockTime(bucket);
       case HistoryAggregation.eightHours:
         final end = bucket.add(const Duration(hours: 8));
-        return '${bucket.month}/${bucket.day} '
-            '${_formatTime(bucket)} - ${_formatTime(end)}';
+        return '${formatManilaClockTime(bucket)} - '
+            '${formatManilaClockTime(end)}';
       case HistoryAggregation.daily:
-        const months = [
-          'January',
-          'February',
-          'March',
-          'April',
-          'May',
-          'June',
-          'July',
-          'August',
-          'September',
-          'October',
-          'November',
-          'December',
-        ];
-        return '${months[bucket.month - 1]} ${bucket.day}, ${bucket.year}';
+        return 'All day';
     }
   }
 
@@ -436,127 +521,106 @@ class MonitoringService {
   }
 
   /// Powers the "Sensor logs" tab on the History Logs screen.
-  // NOTE: this and getCalibrationLogs() below appear to no longer be called
-  // by history_logs_controller.dart — _loadSelectedLogs() there calls
-  // getSensorHistory() directly instead. Confirm whether these two mock
-  // methods are still used anywhere (e.g. dashboard cards) or are dead code
-  // now that real data exists for the Sensor logs tab.
   Future<List<HistoryLogEntry>> getSensorLogs() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // TODO: replace with a real Supabase query against your readings
-    // table, e.g.:
-    //   final response = await supabase
-    //       .from('sensor_readings')
-    //       .select()
-    //       .order('created_at', ascending: false)
-    //       .limit(50);
-    return [
-      const HistoryLogEntry(
-          ['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
-      const HistoryLogEntry(['7:45 AM', 'EC', '5.8 mS/cm', 'Stable', 'None']),
-      HistoryLogEntry([
-        '7:30 AM',
-        'Temperature',
-        formatTemperature(24.6),
-        'Stable',
-        'None'
-      ]),
-      const HistoryLogEntry(
-          ['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
-      const HistoryLogEntry(['7:00 AM', 'EC', '5.9 mS/cm', 'Stable', 'None']),
-      HistoryLogEntry([
-        '6:45 AM',
-        'Temperature',
-        formatTemperature(26.8),
-        'Critical',
-        'Alert sent to admin'
-      ]),
-      const HistoryLogEntry(['6:30 AM', 'pH', '6.6', 'Stable', 'None']),
-      const HistoryLogEntry(['6:15 AM', 'EC', '5.7 mS/cm', 'Stable', 'None']),
-    ];
+    final today = manilaNow();
+    final end = DateTime(today.year, today.month, today.day)
+        .add(const Duration(days: 1));
+    final start = end.subtract(const Duration(days: 30));
+    return getSensorHistory(
+      start: start,
+      end: end,
+      aggregation: HistoryAggregation.daily,
+    );
   }
 
   /// Powers the "Calibration logs" tab on the History Logs screen.
-  // NOTE: unlike Sensor logs, there is no real-data equivalent for
-  // calibration logs yet (no getCalibrationHistory() wired to Supabase).
-  // If the Calibration logs tab should also show/delete real data, that
-  // still needs to be built — this is still mock data.
   Future<List<HistoryLogEntry>> getCalibrationLogs() async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    final response = await supabase
+        .from('calibration_logs')
+        .select(
+          'recorded_at, parameter, calibration_type, adjustment, performed_by, status',
+        )
+        .order('recorded_at', ascending: false)
+        .limit(500);
 
-    // TODO: replace with a real Supabase query against your calibration
-    // events table.
-    return [
-      const HistoryLogEntry([
-        '8:00 AM',
-        'pH',
-        '2-Point Calibration',
-        '+0.2',
-        'Auto-system',
-        'Success'
-      ]),
-      const HistoryLogEntry([
-        'Yesterday, 6:00 PM',
-        'EC',
-        '1-Point Calibration',
-        '-0.1 mS/cm',
-        'Alveus',
-        'Success'
-      ]),
-      HistoryLogEntry([
-        '2 days ago, 8:00 AM',
-        'Temperature',
-        'Sensor Reset',
-        formatTemperature(0.0),
-        'Auto-system',
-        'Success'
-      ]),
-      const HistoryLogEntry([
-        '3 days ago, 8:00 AM',
-        'pH',
-        '2-Point Calibration',
-        '+0.1',
-        'Auto-system',
-        'Failed'
-      ]),
-    ];
+    return response.map((row) {
+      final recordedAt = toSensorManilaTime(
+        parseSupabaseTimestamp(row['recorded_at'] as String),
+      );
+      return HistoryLogEntry([
+        '${_historyDate(recordedAt)} ${_historyTime(recordedAt, HistoryAggregation.tenMinutes)}',
+        row['parameter'] as String,
+        row['calibration_type'] as String,
+        row['adjustment'] as String,
+        row['performed_by'] as String,
+        row['status'] as String,
+      ]);
+    }).toList();
   }
 }
 
-// NEW — was referenced throughout getSensorHistory()/​_mergeAverageRows() but
-// never defined anywhere in the conflict. Reconstructed from how it's used:
-// one instance per time bucket, accumulating whichever of ph/ec/temp arrive
-// for that bucket, plus a rolled-up status. The status logic (worst-of wins)
-// is a guess — confirm it matches what you actually want shown per row.
+class _ParameterRanges {
+  final double phMin;
+  final double phMax;
+  final double ecMin;
+  final double ecMax;
+
+  const _ParameterRanges({
+    this.phMin = 5.5,
+    this.phMax = 6.5,
+    this.ecMin = 1.2,
+    this.ecMax = 1.8,
+  });
+}
+
 class _HistorySummary {
+  final DateTime recordedAt;
+  double _phTotal = 0;
+  int _phCount = 0;
+  double _ecTotal = 0;
+  int _ecCount = 0;
+  double _tempTotal = 0;
+  int _tempCount = 0;
+  String status = 'Stable';
+
   _HistorySummary(this.recordedAt);
 
-  final DateTime recordedAt;
-  double? ph;
-  double? ec;
-  double? temp;
-  final List<String> _statuses = [];
+  double? get ph => _phCount == 0 ? null : _phTotal / _phCount;
+  double? get ec => _ecCount == 0 ? null : _ecTotal / _ecCount;
+  double? get temp => _tempCount == 0 ? null : _tempTotal / _tempCount;
 
-  void add({required String parameter, required double value, String? status}) {
-    switch (parameter) {
-      case 'ph':
-        ph = value;
-        break;
-      case 'ec':
-        ec = value;
-        break;
-      case 'temp':
-        temp = value;
-        break;
+  void add({
+    required String parameter,
+    required double value,
+    required String? status,
+  }) {
+    if (parameter == 'ph') {
+      _phTotal += value;
+      _phCount++;
+    } else if (parameter == 'ec') {
+      _ecTotal += value;
+      _ecCount++;
+    } else if (parameter == 'temp') {
+      _tempTotal += value;
+      _tempCount++;
     }
-    if (status != null) _statuses.add(status);
+
+    if (_severity(status) > _severity(this.status)) {
+      this.status = status!;
+    }
   }
 
-  String get status {
-    if (_statuses.contains('Critical')) return 'Critical';
-    if (_statuses.contains('Warning')) return 'Warning';
-    if (_statuses.isNotEmpty) return _statuses.first;
-    return 'Normal';
+  int _severity(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'critical':
+        return 3;
+      case 'warning':
+        return 2;
+      case 'stable':
+      case 'normal':
+        return 1;
+      default:
+        return 0;
+    }
   }
 }
