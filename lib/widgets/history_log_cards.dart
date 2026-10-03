@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_decorations.dart';
 import '../models/monitoring_models.dart';
-import '../utils/status_style.dart';
+import 'history_log_value.dart';
 
 class HistoryLogCards extends StatelessWidget {
   final List<String> columns;
@@ -26,7 +26,11 @@ class HistoryLogCards extends StatelessWidget {
     return Column(
       children: [
         for (int r = 0; r < rows.length; r++) ...[
-          _LogCard(columns: columns, values: rows[r].values, statusIndex: _statusColumnIndex),
+          _LogCard(
+            columns: columns,
+            entry: rows[r],
+            statusIndex: _statusColumnIndex,
+          ),
           if (r != rows.length - 1) const SizedBox(height: 10),
         ],
       ],
@@ -36,10 +40,14 @@ class HistoryLogCards extends StatelessWidget {
 
 class _LogCard extends StatelessWidget {
   final List<String> columns;
-  final List<String> values;
+  final HistoryLogEntry entry;
   final int statusIndex;
 
-  const _LogCard({required this.columns, required this.values, required this.statusIndex});
+  const _LogCard({
+    required this.columns,
+    required this.entry,
+    required this.statusIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -55,29 +63,24 @@ class _LogCard extends StatelessWidget {
               children: [
                 Text(columns[i], style: AppTextStyles.cardMeta),
                 const SizedBox(width: 12),
-                i == statusIndex
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: StatusStyle.background(values[i]),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          values[i],
-                          style: AppTextStyles.cardMeta.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: StatusStyle.text(values[i]),
+                if (i == statusIndex)
+                  HistoryStatusBadge(status: entry.values[i])
+                else
+                  Flexible(
+                    child: entry.ranges[i] != null
+                        ? HistoryLogValue(
+                            value: entry.values[i],
+                            range: entry.ranges[i]!,
+                            alignRight: true,
+                          )
+                        : Text(
+                            entry.values[i],
+                            style:
+                                AppTextStyles.bodyBold.copyWith(fontSize: 13),
+                            textAlign: TextAlign.right,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      )
-                    : Flexible(
-                        child: Text(
-                          values[i],
-                          style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
-                          textAlign: TextAlign.right,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                  ),
               ],
             ),
             if (i != columns.length - 1) const SizedBox(height: 6),

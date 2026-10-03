@@ -1,20 +1,21 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
+import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
+import '../theme/app_text_styles.dart';
+import '../utils/manila_time.dart';
 import '../utils/responsive.dart';
-import 'date_picker_button.dart';
 
-class ForecastingChartCard extends StatelessWidget {
-  final String activeTab; // 'pH Forecast' or 'EC Forecast'
+class ForecastingChartCard extends StatefulWidget {
+  final String activeTab; // 'pH', 'EC', or 'Both'
   final ValueChanged<String> onTabChanged;
-  final int selectedHours; // 6, 12, or 24
+  final int selectedHours; // 4, 8, or 12
   final ValueChanged<int> onHoursChanged;
-  final String selectedDateLabel;
-  final VoidCallback? onDatePickerTap;
   final List<ForecastPoint> points;
+  final List<ForecastPoint>? ecPoints;
+  final DateTime? generatedAt;
 
   const ForecastingChartCard({
     super.key,
@@ -22,284 +23,552 @@ class ForecastingChartCard extends StatelessWidget {
     required this.onTabChanged,
     required this.selectedHours,
     required this.onHoursChanged,
-    required this.selectedDateLabel,
-    this.onDatePickerTap,
     required this.points,
+    this.ecPoints,
+    this.generatedAt,
   });
 
   @override
+  State<ForecastingChartCard> createState() => ForecastingChartCardState();
+}
+
+class ForecastingChartCardState extends State<ForecastingChartCard> {
+  static const phHistoricalColor = AppColors.primaryButton;
+  static const ecHistoricalColor = Color(0xFF1599A8);
+  static const predictedColor = Color(0xFFD97706);
+
+  @override
   Widget build(BuildContext context) {
+    final isDesktop = Responsive.isDesktop(context);
     final isMobile = Responsive.isMobile(context);
 
-    final historical = points
-        .where((p) => !p.isPredicted && p.hour >= -selectedHours)
-        .toList();
-    final predicted =
-        points.where((p) => p.isPredicted && p.hour <= selectedHours).toList();
+    final showPh = widget.activeTab == 'pH' || widget.activeTab == 'Both';
+    final showEc = widget.activeTab == 'EC' || widget.activeTab == 'Both';
 
-    final allSpots = <FlSpot>[
-      ...historical.map((p) => FlSpot(p.hour, p.value)),
-      ...predicted.map((p) => FlSpot(p.hour, p.value)),
-    ]..sort((a, b) => a.x.compareTo(b.x));
+    // Extract pH and EC points from real model streams
+    final allFiltered = _filterPoints(widget.points);
+    final ecFiltered = _filterPoints(widget.ecPoints ?? []);
+
+    // If activeTab == 'Both' and ecPoints was omitted, extract EC spots vs pH spots by value range
+    final phFiltered = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
+        ? allFiltered.where((p) => p.value > 3.0).toList()
+        : (showPh ? allFiltered : <ForecastPoint>[]);
+
+    final ecPointsResolved = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
+        ? allFiltered.where((p) => p.value <= 3.0).toList()
+        : (showEc
+            ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered)
+            : <ForecastPoint>[]);
+
+    final phRange =
+        _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
+    final ecRange =
+        _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
+
+    late _ChartRange chartRange;
+    if (widget.activeTab == 'EC') {
+      chartRange = ecRange;
+    } else if (widget.activeTab == 'pH') {
+      chartRange = phRange;
+    } else {
+      chartRange = const _ChartRange(0.0, 15.0);
+    }
+
+    final currentLabel = _getReadingLabel(
+      phFiltered,
+      ecPointsResolved,
+      showPh,
+      showEc,
+      predicted: false,
+    );
+    final forecastLabel = _getReadingLabel(
+      phFiltered,
+      ecPointsResolved,
+      showPh,
+      showEc,
+      predicted: true,
+    );
 
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      width: double.infinity,
+      height: isDesktop ? 689 : null,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: isDesktop ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          // 1. TABS & FILTER PILLS
-          // Cramming both into one spaceBetween Row overflows on narrow
-          // phones (tabs alone run ~240px, pills another ~135px, more
-          // than a phone's available width) — so mobile stacks them
-          // instead of squeezing them side by side.
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            _buildTab('pH Forecast', isMobile),
-                            const SizedBox(width: 16),
-                            _buildTab('EC Forecast', isMobile),
-                          ],
-                        ),
-                        DatePickerButton(
-                          onTap: onDatePickerTap ?? () {},
-                          dateText: selectedDateLabel,
-                          isSelected: false,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTimeFilterPills(),
-                  ],
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        _buildTab('pH Forecast', isMobile),
-                        const SizedBox(width: 24),
-                        _buildTab('EC Forecast', isMobile),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        DatePickerButton(
-                          onTap: onDatePickerTap ?? () {},
-                          dateText: selectedDateLabel,
-                          isSelected: false,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildTimeFilterPills(),
-                      ],
-                    ),
-                  ],
-                ),
-          const SizedBox(height: 12),
-          Divider(height: 1, thickness: 1, color: AppColors.cardBorder),
-          const SizedBox(height: 24),
+          _buildHeader(isMobile),
+          const SizedBox(height: 6),
+          Text(
+            'Real-time sensor tracking vs. machine-learning forecast trajectory',
+            style: AppTextStyles.cardMeta,
+          ),
+          SizedBox(height: isMobile ? 12 : 16),
 
-          // 2. CHART — same visual language as the dashboard's mini chart:
-          // curved lines, gradient fill, gridlines, hover tooltip.
-          SizedBox(
-            height: isMobile ? 240 : 340,
-            child: LineChart(
-              LineChartData(
-                minX: -selectedHours.toDouble(),
-                maxX: selectedHours.toDouble(),
-                minY: 3.0,
-                maxY: 9.0,
-                gridData: const FlGridData(show: true, drawVerticalLine: false),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(color: AppColors.chartGrid),
-                ),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: isMobile ? 48 : 56,
-                      interval: 0.5,
-                      // fl_chart's `interval` already guarantees clean tick
-                      // values, so there's no need to manually filter with
-                      // a modulo check (which is unreliable with floating
-                      // point numbers and can silently drop labels).
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          'pH ${value.toStringAsFixed(1)}',
-                          style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                extraLinesData: ExtraLinesData(
-                  verticalLines: [
-                    VerticalLine(
-                      x: 0,
-                      color: AppColors.textSecondary,
-                      strokeWidth: 1,
-                      dashArray: [4, 4],
-                    ),
-                  ],
-                ),
-                lineTouchData: LineTouchData(
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (touchedSpot) => const Color(0xFFE5FFDE),
-                    tooltipRoundedRadius: 8,
-                    getTooltipItems: (touchedSpots) {
-                      if (touchedSpots.isEmpty) return [];
-                      final primarySpot = touchedSpots.first;
-                      return touchedSpots.map((spot) {
-                        if (spot == primarySpot) {
-                          return LineTooltipItem(
-                            spot.y.toStringAsFixed(2),
-                            AppTextStyles.cardMeta.copyWith(
-                              color: const Color(0xFF1A1A1A),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          );
-                        }
-                        return null;
-                      }).toList();
-                    },
-                  ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: allSpots,
-                    isCurved: true,
-                    color: AppColors.chartLine,
-                    barWidth: 2,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.chartLine.withValues(alpha: 0.22),
-                          AppColors.chartLine.withValues(alpha: 0.0),
-                        ],
+          // Scrollable Chart Viewport
+          Expanded(
+            flex: isDesktop ? 1 : 0,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    physics: const BouncingScrollPhysics(),
+                    child: SizedBox(
+                      height: widget.activeTab == 'Both'
+                          ? 750
+                          : (isDesktop ? 500 : 320),
+                      width: double.infinity,
+                      child: LineChart(
+                        _buildChartData(
+                          chartRange,
+                          isMobile,
+                          phFiltered,
+                          ecPointsResolved,
+                          showPh,
+                          showEc,
+                        ),
                       ),
                     ),
                   ),
+                  _buildCalloutBadge(isMobile, currentLabel, forecastLabel),
                 ],
               ),
             ),
           ),
+
           const SizedBox(height: 12),
-
-          // 3. AXIS LABELS — three fixed slots (not a spaceBetween Row) so
-          // this can't overflow on narrow phones, same fix as the
-          // dashboard's mini chart needed earlier.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  '(Historical $selectedHours Hours)',
-                  style: AppTextStyles.cardMeta,
-                  textAlign: TextAlign.left,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  'Current Time',
-                  style: AppTextStyles.cardMeta,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  '(Predicted $selectedHours Hours)',
-                  style: AppTextStyles.cardMeta,
-                  textAlign: TextAlign.right,
-                ),
-              ),
-            ],
-          ),
+          _buildLegendAndDate(isMobile),
         ],
       ),
     );
   }
 
-  Widget _buildTab(String title, bool isMobile) {
-    final isActive = activeTab == title;
-    return GestureDetector(
-      onTap: () => onTabChanged(title),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppTextStyles.sectionTitle.copyWith(
-              fontSize: isMobile ? 16 : 20,
-              color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+  Widget _buildCalloutBadge(
+      bool isMobile, String currentLabel, String forecastLabel) {
+    return Positioned(
+      top: 8,
+      left: isMobile ? 35 : 50,
+      right: isMobile ? 35 : 50,
+      child: IgnorePointer(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text.rich(
+            TextSpan(
+              style: AppTextStyles.cardMeta.copyWith(
+                fontSize: isMobile ? 9 : 11,
+              ),
+              children: [
+                const TextSpan(text: 'Current '),
+                TextSpan(
+                  text: currentLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const TextSpan(text: '  Forecast '),
+                TextSpan(
+                  text: forecastLabel,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: predictedColor,
+                  ),
+                ),
+              ],
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 3,
-            width: isActive ? (isMobile ? 65 : 85) : 0,
-            decoration: BoxDecoration(
-              color: AppColors.primaryButton,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  /// Same rounded-pill visual language as the dashboard's mini chart's
-  /// time filter, just with 6h/12h/24h instead of 4hr/8hr/12hr.
-  Widget _buildTimeFilterPills() {
-    final options = [6, 12, 24];
+  LineChartData _buildChartData(
+    _ChartRange chartRange,
+    bool isMobile,
+    List<ForecastPoint> phFiltered,
+    List<ForecastPoint> ecFiltered,
+    bool showPh,
+    bool showEc,
+  ) {
+    return LineChartData(
+      minX: -widget.selectedHours.toDouble(),
+      maxX: widget.selectedHours.toDouble(),
+      minY: chartRange.minimum,
+      maxY: chartRange.maximum,
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: true,
+        getDrawingHorizontalLine: (_) => FlLine(
+          color: AppColors.chartGrid.withValues(alpha: 0.65),
+          strokeWidth: 1,
+        ),
+        getDrawingVerticalLine: (_) => FlLine(
+          color: AppColors.chartGrid.withValues(alpha: 0.35),
+          strokeWidth: 1,
+        ),
+      ),
+      borderData: FlBorderData(
+        show: true,
+        border: Border.all(color: AppColors.chartGrid),
+      ),
+      titlesData: _buildTitlesData(chartRange, isMobile),
+      extraLinesData: ExtraLinesData(
+        verticalLines: [
+          VerticalLine(
+            x: 0,
+            color: AppColors.textSecondary,
+            strokeWidth: 1,
+            dashArray: [5, 4],
+          ),
+        ],
+      ),
+      lineTouchData: LineTouchData(
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (_) => AppColors.cardBackground,
+          tooltipRoundedRadius: 8,
+          getTooltipItems: (spots) => spots.map((spot) {
+            final isConnector = spot.x <= 0 && spot.barIndex.isOdd;
+            if (isConnector) return null;
 
-    return Row(
+            final isPh = spot.y > 3.0;
+            final label = isPh ? 'pH' : 'EC';
+            final isPredicted = spot.barIndex.isOdd;
+            final color = isPredicted
+                ? predictedColor
+                : (isPh ? phHistoricalColor : ecHistoricalColor);
+            final unit = isPh ? '' : ' mS/cm';
+
+            return LineTooltipItem(
+              '$label ${spot.y.toStringAsFixed(2)}$unit',
+              AppTextStyles.bodyBold.copyWith(color: color),
+            );
+          }).toList(),
+        ),
+      ),
+      lineBarsData: [
+        if (showPh && phFiltered.isNotEmpty)
+          ..._buildSeriesBars(phFiltered, color: phHistoricalColor),
+        if (showEc && ecFiltered.isNotEmpty)
+          ..._buildSeriesBars(ecFiltered, color: ecHistoricalColor),
+      ],
+    );
+  }
+
+  Widget _buildHeader(bool isMobile) {
+    final tabs = Row(
       mainAxisSize: MainAxisSize.min,
-      children: options.map((hours) {
-        final isSelected = selectedHours == hours;
+      children: ['pH Forecast', 'EC Forecast', 'Both'].map((tabLabel) {
+        final key = tabLabel.contains('pH')
+            ? 'pH'
+            : tabLabel.contains('EC')
+                ? 'EC'
+                : 'Both';
+        final isSelected = widget.activeTab == key;
+
         return GestureDetector(
-          onTap: () => onHoursChanged(hours),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.only(left: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          onTap: () => widget.onTabChanged(key),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primaryButton
-                  : const Color(0xFFE2E2E2),
-              borderRadius: BorderRadius.circular(12),
+              border: Border(
+                bottom: BorderSide(
+                  color:
+                      isSelected ? AppColors.primaryButton : Colors.transparent,
+                  width: 2,
+                ),
+              ),
             ),
             child: Text(
-              '${hours}h',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.black87,
+              tabLabel,
+              style: AppTextStyles.sectionTitle.copyWith(
+                fontSize: isMobile ? 14 : 16,
+                color: isSelected
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
               ),
             ),
           ),
         );
       }).toList(),
     );
+
+    final hourControls = Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [4, 8, 12].map((h) {
+          final isSelected = widget.selectedHours == h;
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => widget.onHoursChanged(h),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${h}h',
+                style: AppTextStyles.cardMeta.copyWith(
+                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          tabs,
+          const SizedBox(height: 12),
+          hourControls,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        tabs,
+        hourControls,
+      ],
+    );
   }
+
+  FlTitlesData _buildTitlesData(_ChartRange range, bool isMobile) {
+    final interval =
+        math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
+    final decimals = widget.activeTab == 'EC' ? 2 : 1;
+    final centerTime = widget.generatedAt ?? manilaNow();
+    final horizontalInterval =
+        isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
+
+    return FlTitlesData(
+      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      leftTitles: AxisTitles(
+        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: isMobile ? 38 : 46,
+          interval: interval,
+          getTitlesWidget: (val, _) => Text(
+            val.toStringAsFixed(decimals),
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+          ),
+        ),
+      ),
+      rightTitles: AxisTitles(
+        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: isMobile ? 38 : 46,
+          interval: interval,
+          getTitlesWidget: (val, _) => Text(
+            val.toStringAsFixed(decimals),
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+          ),
+        ),
+      ),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 30,
+          interval: horizontalInterval,
+          getTitlesWidget: (val, _) {
+            final time = centerTime.add(Duration(minutes: (val * 60).round()));
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                formatManilaClockTime(time),
+                style: AppTextStyles.cardMeta
+                    .copyWith(fontSize: isMobile ? 10 : null),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendAndDate(bool isMobile) {
+    final legend = Wrap(
+      spacing: 18,
+      runSpacing: 8,
+      children: [
+        if (widget.activeTab != 'EC')
+          _legendItem('pH Historical', phHistoricalColor, isDashed: false),
+        if (widget.activeTab != 'pH')
+          _legendItem('EC Historical', ecHistoricalColor, isDashed: false),
+        _legendItem('Predicted (ML)', predictedColor, isDashed: true),
+      ],
+    );
+
+    final generated = widget.generatedAt == null
+        ? null
+        : Text(
+            'Generated ${formatManilaDateTime(widget.generatedAt!)}',
+            style: AppTextStyles.cardMeta,
+          );
+
+    if (generated == null) return legend;
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          legend,
+          const SizedBox(height: 8),
+          generated,
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        legend,
+        generated,
+      ],
+    );
+  }
+
+  Widget _legendItem(String label, Color color, {required bool isDashed}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 3,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: AppTextStyles.cardMeta),
+      ],
+    );
+  }
+
+  List<ForecastPoint> _filterPoints(List<ForecastPoint> pts) {
+    return pts.where((p) {
+      if (p.isPredicted) {
+        return p.hour <= widget.selectedHours;
+      } else {
+        return p.hour >= -widget.selectedHours;
+      }
+    }).toList();
+  }
+
+  List<LineChartBarData> _buildSeriesBars(List<ForecastPoint> points,
+      {required Color color}) {
+    final historical = points.where((p) => !p.isPredicted).toList();
+    final predicted = points.where((p) => p.isPredicted).toList();
+
+    final historicalSpots =
+        historical.map((p) => FlSpot(p.hour, p.value)).toList();
+    final predictedSpots = <FlSpot>[
+      if (historical.isNotEmpty)
+        FlSpot(historical.last.hour, historical.last.value),
+      ...predicted.map((p) => FlSpot(p.hour, p.value)),
+    ];
+
+    return [
+      if (historicalSpots.isNotEmpty)
+        LineChartBarData(
+          spots: historicalSpots,
+          isCurved: true,
+          color: color,
+          barWidth: 2.5,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(
+            show: true,
+            color: color.withValues(alpha: 0.10),
+          ),
+        ),
+      if (predictedSpots.isNotEmpty)
+        LineChartBarData(
+          spots: predictedSpots,
+          isCurved: true,
+          color: predictedColor,
+          barWidth: 2,
+          dashArray: [6, 4],
+          dotData: const FlDotData(show: true),
+          belowBarData: BarAreaData(
+            show: true,
+            color: predictedColor.withValues(alpha: 0.06),
+          ),
+        ),
+    ];
+  }
+
+  String _getReadingLabel(
+    List<ForecastPoint> ph,
+    List<ForecastPoint> ec,
+    bool showPh,
+    bool showEc, {
+    required bool predicted,
+  }) {
+    String? valueFor(List<ForecastPoint> pts) {
+      final matching = pts.where((p) => p.isPredicted == predicted).toList();
+      if (matching.isEmpty) return null;
+      final point = predicted
+          ? matching.reduce((a, b) => (a.hour - widget.selectedHours).abs() <=
+                  (b.hour - widget.selectedHours).abs()
+              ? a
+              : b)
+          : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
+      return point.value.toStringAsFixed(2);
+    }
+
+    final values = <String>[];
+    if (showPh && ph.isNotEmpty) {
+      final val = valueFor(ph);
+      if (val != null) values.add('pH $val');
+    }
+    if (showEc && ec.isNotEmpty) {
+      final val = valueFor(ec);
+      if (val != null) values.add('EC $val');
+    }
+
+    return values.isEmpty ? '--' : values.join(' / ');
+  }
+
+  _ChartRange _computeRange(
+    List<ForecastPoint> points, {
+    required double defaultMin,
+    required double defaultMax,
+  }) {
+    if (points.isEmpty) {
+      return _ChartRange(defaultMin, defaultMax);
+    }
+    final values = points.map((p) => p.value).toList();
+    final minVal = values.reduce(math.min);
+    final maxVal = values.reduce(math.max);
+    final spread = maxVal - minVal;
+    final padding = math.max(spread * 0.18, 0.2);
+    return _ChartRange(
+      math.max(0, minVal - padding),
+      maxVal + padding,
+    );
+  }
+}
+
+class _ChartRange {
+  final double minimum;
+  final double maximum;
+  const _ChartRange(this.minimum, this.maximum);
 }

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import '../theme/app_text_styles.dart';
 import '../controllers/forecasting_controller.dart';
+import '../models/monitoring_models.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
+import '../utils/responsive.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/app_header.dart';
 import '../widgets/forecasting_chart_card.dart';
 import '../widgets/prediction_insights_card.dart';
 import '../widgets/report_issue_card.dart';
-import '../widgets/app_drawer.dart';
-import '../widgets/custom_calendar_popup.dart';
-import '../widgets/app_header.dart';
-import '../utils/responsive.dart';
 
 class ForecastingDashboardScreen extends StatefulWidget {
   const ForecastingDashboardScreen({super.key});
@@ -27,23 +28,21 @@ class _ForecastingDashboardScreenState
     super.dispose();
   }
 
-  void _openDatePicker() {
-    showDialog(
-      context: context,
-      builder: (context) => CustomCalendarPopup(
-        mode: CalendarMode.daily,
-        initialDate: _controller.selectedDate,
-        onDateSelected: (selectedDate, weekRange) {
-          _controller.updateSelectedDate(selectedDate);
-        },
-      ),
-    );
+  List<ForecastPoint> _mapToForecastPoint(List<dynamic> points) {
+    return points.map((p) {
+      if (p is ForecastPoint) return p;
+      return ForecastPoint(
+        hour: (p.hour as num).toDouble(),
+        value: (p.value as num).toDouble(),
+        isPredicted: p.isPredicted as bool,
+      );
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.background,
       drawer: const AppDrawer(selectedIndex: 1),
       body: SafeArea(
         child: ListenableBuilder(
@@ -58,7 +57,8 @@ class _ForecastingDashboardScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!, style: AppTextStyles.body),
+                    Text(_controller.errorMessage!,
+                        style: AppTextStyles.body),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _controller.loadData,
@@ -69,7 +69,16 @@ class _ForecastingDashboardScreenState
               );
             }
 
+            final isDesktop = Responsive.isDesktop(context);
             final isMobile = Responsive.isMobile(context);
+
+            final phPointsMapped =
+                _mapToForecastPoint(_controller.phPoints);
+            final ecPointsMapped =
+                _mapToForecastPoint(_controller.ecPoints);
+
+            final insight = _controller.activeInsightDetail;
+            final isBothTab = _controller.selectedTab == 'Both';
 
             return SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -81,22 +90,26 @@ class _ForecastingDashboardScreenState
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-                  if (isMobile) ...[
+                  if (!isDesktop) ...[
                     ForecastingChartCard(
                       activeTab: _controller.selectedTab,
                       onTabChanged: _controller.selectTab,
                       selectedHours: _controller.selectedHours,
                       onHoursChanged: _controller.selectHours,
-                      selectedDateLabel: _controller.selectedDateLabel,
-                      onDatePickerTap: _openDatePicker,
-                      points: _controller.chartPoints,
+                      points: phPointsMapped,
+                      ecPoints: ecPointsMapped,
                     ),
                     const SizedBox(height: 16),
-                    if (_controller.insightDetail != null)
+                    if (insight != null)
                       PredictionInsightsCard(
-                        detail: _controller.insightDetail!,
-                        onApplyFix: () {},
-                        onDismiss: () {},
+                        detail: insight,
+                        onApplyFix: () => _controller.applyFix(insight),
+                        onDismiss: () => _controller.dismissFix(insight),
+                        showParamSelector: isBothTab,
+                        selectedInsightParam:
+                            _controller.selectedBothInsightParam,
+                        onInsightParamChanged:
+                            _controller.setBothInsightParam,
                       ),
                     const SizedBox(height: 16),
                     ReportIssueCard(onAlertAdmin: () {}),
@@ -104,6 +117,31 @@ class _ForecastingDashboardScreenState
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // LEFT SIDEBAR: SINGLE CLEAN INSIGHT CARD WITH OPTIONAL INNER PILL
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            children: [
+                              if (insight != null)
+                                PredictionInsightsCard(
+                                  detail: insight,
+                                  onApplyFix: () =>
+                                      _controller.applyFix(insight),
+                                  onDismiss: () =>
+                                      _controller.dismissFix(insight),
+                                  showParamSelector: isBothTab,
+                                  selectedInsightParam:
+                                      _controller.selectedBothInsightParam,
+                                  onInsightParamChanged:
+                                      _controller.setBothInsightParam,
+                                ),
+                              const SizedBox(height: 16),
+                              ReportIssueCard(onAlertAdmin: () {}),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // RIGHT MAIN CHART
                         Expanded(
                           flex: 6,
                           child: ForecastingChartCard(
@@ -111,25 +149,8 @@ class _ForecastingDashboardScreenState
                             onTabChanged: _controller.selectTab,
                             selectedHours: _controller.selectedHours,
                             onHoursChanged: _controller.selectHours,
-                            selectedDateLabel: _controller.selectedDateLabel,
-                            onDatePickerTap: _openDatePicker,
-                            points: _controller.chartPoints,
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          flex: 4,
-                          child: Column(
-                            children: [
-                              if (_controller.insightDetail != null)
-                                PredictionInsightsCard(
-                                  detail: _controller.insightDetail!,
-                                  onApplyFix: () {},
-                                  onDismiss: () {},
-                                ),
-                              const SizedBox(height: 20),
-                              ReportIssueCard(onAlertAdmin: () {}),
-                            ],
+                            points: phPointsMapped,
+                            ecPoints: ecPointsMapped,
                           ),
                         ),
                       ],

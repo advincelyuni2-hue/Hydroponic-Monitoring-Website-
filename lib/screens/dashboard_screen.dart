@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
+
 import '../controllers/dashboard_controller.dart';
-import '../widgets/parameter_status_card.dart';
-import '../widgets/forecast_chart_card.dart';
-import '../widgets/notification_tile.dart';
-import '../widgets/app_drawer.dart';
-import '../widgets/app_header.dart';
-import '../utils/responsive.dart';
-import 'forecasting_dashboard_screen.dart';
+import '../models/forecasting_models.dart';
+import '../models/monitoring_models.dart' show ParameterStatus;
 import '../services/app_state.dart';
 import '../services/notification_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/app_header.dart';
+import '../widgets/dashboard_forecast_overview.dart';
+import '../widgets/dashboard_parameter_gauge.dart';
+import 'forecasting_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -47,39 +48,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (_controller.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
+            if (_controller.errorMessage != null) return _buildErrorState();
 
-            if (_controller.errorMessage != null) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_controller.errorMessage!, style: AppTextStyles.body),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: _controller.loadDashboard,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            final isMobile = Responsive.isMobile(context);
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppHeader(title: 'Dashboard', profile: _controller.profile),
-                  const SizedBox(height: 24),
-                  _buildParameterStatusSection(isMobile),
-                  const SizedBox(height: 24),
-                  _buildInsightAndNotificationsSection(isMobile),
-                  const SizedBox(height: 24),
-                  _buildForecastSection(isMobile),
-                ],
-              ),
+            return LayoutBuilder(
+              builder: (context, viewport) {
+                final isMobile = viewport.maxWidth < 600;
+                final useSideColumn = viewport.maxWidth >= 1150;
+                return SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppHeader(
+                        title: 'Dashboard',
+                        profile: _controller.profile,
+                      ),
+                      const SizedBox(height: 22),
+                      if (useSideColumn)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _buildRealtimeParameterSection(false),
+                            ),
+                            const SizedBox(width: 18),
+                            Expanded(
+                              flex: 7,
+                              child: _buildDashboardMain(false),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          children: [
+                            _buildRealtimeParameterSection(isMobile),
+                            const SizedBox(height: 16),
+                            _buildDashboardMain(isMobile),
+                          ],
+                        ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         ),
@@ -87,169 +98,412 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildParameterStatusSection(bool isMobile) {
-    final statuses = _controller.parameterStatuses;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
+  Widget _buildErrorState() {
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Parameter Status', style: AppTextStyles.sectionTitle),
-          const SizedBox(height: 16),
-          isMobile
-              ? Column(
-                  children: [
-                    for (int i = 0; i < statuses.length; i++) ...[
-                      ParameterStatusCard(
-                        data: statuses[i],
-                        backgroundColor: _statusColor(statuses[i].status),
-                      ),
-                      if (i != statuses.length - 1) const SizedBox(height: 12),
-                    ],
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (int i = 0; i < statuses.length; i++) ...[
-                      Expanded(
-                        child: ParameterStatusCard(
-                          data: statuses[i],
-                          backgroundColor: _statusColor(statuses[i].status),
-                        ),
-                      ),
-                      if (i != statuses.length - 1) const SizedBox(width: 16),
-                    ],
-                  ],
-                ),
-        ],
-      ),
-    );
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'critical':
-        return AppColors.alertBackground;
-      case 'warning':
-        return AppColors.statusCardYellow;
-      default:
-        return AppColors.statusCardGreen;
-    }
-  }
-
-  Widget _buildInsightAndNotificationsSection(bool isMobile) {
-    final insightCard = _buildLatestInsightCard();
-    final notificationsCard =
-        _buildNotificationsCard(pushFooterToBottom: !isMobile);
-
-    if (isMobile) {
-      return Column(
-        children: [
-          insightCard,
-          const SizedBox(height: 16),
-          notificationsCard,
-        ],
-      );
-    }
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: insightCard),
-          const SizedBox(width: 16),
-          Expanded(child: notificationsCard),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLatestInsightCard() {
-    final insight = _controller.latestInsight;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Latest Insight', style: AppTextStyles.sectionTitle),
-          const Divider(height: 24),
-          if (insight != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          color: AppColors.alertText, size: 20),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(insight.warningTitle,
-                            style: AppTextStyles.alert),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(insight.expectedIn, style: AppTextStyles.cardMeta),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(insight.warningDetail, style: AppTextStyles.body),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.cardBorder),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                runSpacing: 8,
-                children: [
-                  Text('Humidity: ${insight.humidity}',
-                      style: AppTextStyles.bodyBold),
-                  Text('EC Level: ${insight.ecStatus}',
-                      style: AppTextStyles.bodyBold),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (appProfile.value?.isAdmin != true) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton.icon(
-                onPressed: _showAlertAdminDialog,
-                icon: const Icon(Icons.campaign_outlined),
-                label: const Text('Alert Admin'),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _openForecastingScreen,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryButton,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              child: Text('View details', style: AppTextStyles.button),
-            ),
+          Text(_controller.errorMessage!, style: AppTextStyles.body),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _controller.loadDashboard,
+            child: const Text('Retry'),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildRealtimeParameterSection(bool compact) {
+    final statuses = _controller.parameterStatuses;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 14 : 16),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Realtime Parameter Status',
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    fontSize: compact ? 17 : 19,
+                  ),
+                ),
+              ),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryButton,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text('Live', style: AppTextStyles.cardMeta),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (compact)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < statuses.length; i++) ...[
+                    DashboardParameterGauge(data: statuses[i], compact: true),
+                    if (i != statuses.length - 1) const SizedBox(width: 12),
+                  ],
+                ],
+              ),
+            )
+          else
+            for (var i = 0; i < statuses.length; i++) ...[
+              DashboardParameterGauge(data: statuses[i], dense: true),
+              if (i != statuses.length - 1) const SizedBox(height: 8),
+            ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardMain(bool isMobile) {
+    return Column(
+      children: [
+        _buildLatestInsightCard(isMobile),
+        const SizedBox(height: 18),
+        DashboardForecastOverview(
+          phPoints: _controller.phForecast,
+          ecPoints: _controller.ecForecast,
+          summaries: _controller.forecastSummaries,
+          generatedAt: _controller.forecastGeneratedAt,
+          onViewDetails: _openForecastingScreen,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLatestInsightCard(bool isMobile) {
+    final insight = _controller.latestInsight;
+    if (insight == null) return const SizedBox.shrink();
+    final phInsight = _controller.phPredictionInsight ?? insight;
+    final ecInsight = _controller.ecPredictionInsight ?? insight;
+    final displayStatus = _combinedPredictionStatus(phInsight, ecInsight);
+    final statusColor = _insightColor(displayStatus);
+    final content = _buildInsightContent(
+      insight,
+      phInsight,
+      ecInsight,
+      displayStatus,
+      statusColor,
+    );
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 18,
+        vertical: isMobile ? 14 : 12,
+      ),
+      decoration: AppDecorations.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                displayStatus == 'Stable'
+                    ? Icons.lightbulb_outline
+                    : Icons.warning_amber_rounded,
+                color: statusColor,
+                size: 21,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child:
+                    Text('Latest Insight', style: AppTextStyles.sectionTitle),
+              ),
+              if (appProfile.value?.isAdmin != true)
+                if (isMobile)
+                  IconButton(
+                    tooltip: 'Alert Admin',
+                    onPressed: _showAlertAdminDialog,
+                    icon: const Icon(Icons.campaign_outlined, size: 20),
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: _showAlertAdminDialog,
+                    icon: const Icon(Icons.campaign_outlined, size: 18),
+                    label: const Text('Alert Admin'),
+                  ),
+              if (isMobile)
+                IconButton(
+                  tooltip: 'View insight details',
+                  onPressed: _openForecastingScreen,
+                  icon: const Icon(Icons.open_in_new, size: 19),
+                )
+              else
+                TextButton(
+                  onPressed: _openForecastingScreen,
+                  child: const Text('View insight details'),
+                ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 10 : 6),
+          content,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightContent(
+    PredictionInsightDetail insight,
+    PredictionInsightDetail phInsight,
+    PredictionInsightDetail ecInsight,
+    String displayStatus,
+    Color statusColor,
+  ) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.cardBorder),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stack = constraints.maxWidth < 650;
+          final narrativePanel = Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: stack
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInsightFactors(insight),
+                      const SizedBox(height: 6),
+                      _buildInsightDescription(insight),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(flex: 4, child: _buildInsightFactors(insight)),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 1,
+                        height: 58,
+                        color: AppColors.cardBorder,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        flex: 6,
+                        child: _buildInsightDescription(insight),
+                      ),
+                    ],
+                  ),
+          );
+          final predictionsPanel = Container(
+            width: stack ? double.infinity : constraints.maxWidth * 0.32,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: statusColor.withValues(alpha: 0.13),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Status', style: AppTextStyles.cardMeta),
+                      const SizedBox(height: 3),
+                      Text(
+                        displayStatus,
+                        style: AppTextStyles.sectionTitle.copyWith(
+                          color: statusColor,
+                          fontSize: 20,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 58,
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  color: AppColors.cardBorder,
+                ),
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '12h prediction',
+                        style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                      ),
+                      const SizedBox(height: 4),
+                      _buildPredictedValue(
+                        'pH',
+                        _predictedInsightValue(phInsight),
+                      ),
+                      const SizedBox(height: 4),
+                      _buildPredictedValue(
+                        'EC',
+                        '${_predictedInsightValue(ecInsight)} mS/cm',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          return stack
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [predictionsPanel, narrativePanel],
+                )
+              : IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      predictionsPanel,
+                      Expanded(child: narrativePanel),
+                    ],
+                  ),
+                );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPredictedValue(String parameter, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 24,
+          child: Text(parameter, style: AppTextStyles.cardMeta),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            value,
+            style: AppTextStyles.bodyBold,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInsightFactors(PredictionInsightDetail insight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('Contributing factors', style: AppTextStyles.bodyBold),
+        const SizedBox(height: 4),
+        _factorRow('Temperature', insight.temperature),
+        const SizedBox(height: 2),
+        _factorRow('EC', insight.ecLevel),
+      ],
+    );
+  }
+
+  Widget _buildInsightDescription(PredictionInsightDetail insight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(insight.warningText, style: AppTextStyles.bodySmall),
+        const SizedBox(height: 4),
+        Text(
+          insight.calloutText,
+          style: AppTextStyles.cardMeta,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _factorRow(String label, String value) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 3,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('$label:', style: AppTextStyles.bodySmall),
+        Text(value, style: AppTextStyles.bodyBold),
+      ],
+    );
+  }
+
+  String _predictedInsightValue(PredictionInsightDetail insight) {
+    if (_controller.forecastSummaries.isEmpty) {
+      return insight.currentPh.toStringAsFixed(2);
+    }
+    final summary = _controller.forecastSummaries.last;
+    if (insight.statusLabel.toLowerCase().contains('ec')) {
+      return summary.ecValue.toStringAsFixed(2);
+    }
+    return summary.phValue.toStringAsFixed(2);
+  }
+
+  Color _insightColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'critical':
+        return AppColors.alertText;
+      case 'warning':
+        return const Color(0xFFE79A08);
+      default:
+        return AppColors.primaryButton;
+    }
+  }
+
+  String _combinedPredictionStatus(
+    PredictionInsightDetail phInsight,
+    PredictionInsightDetail ecInsight,
+  ) {
+    if (_controller.forecastSummaries.isNotEmpty) {
+      final forecast = _controller.forecastSummaries.last;
+      final phCritical = _isOutsideConfiguredRange('pH', forecast.phValue);
+      final ecCritical = _isOutsideConfiguredRange('EC', forecast.ecValue);
+      if (phCritical && ecCritical) return 'Critical';
+      if (!phCritical && !ecCritical) return 'Stable';
+      return 'Warning';
+    }
+
+    String normalize(String status) =>
+        status.toLowerCase() == 'normal' ? 'Stable' : status;
+    final phStatus = normalize(phInsight.statusBadge);
+    final ecStatus = normalize(ecInsight.statusBadge);
+    return phStatus.toLowerCase() == ecStatus.toLowerCase()
+        ? phStatus
+        : 'Warning';
+  }
+
+  bool _isOutsideConfiguredRange(String parameter, double value) {
+    ParameterStatus? configured;
+    for (final status in _controller.parameterStatuses) {
+      if (status.label.toLowerCase().contains(parameter.toLowerCase())) {
+        configured = status;
+        break;
+      }
+    }
+
+    final matches = RegExp(r'\d+(?:\.\d+)?')
+        .allMatches(configured?.idealRange ?? '')
+        .map((match) => double.tryParse(match.group(0)!))
+        .whereType<double>()
+        .toList();
+    final fallback =
+        parameter.toLowerCase() == 'ph' ? const [5.5, 6.5] : const [1.2, 1.8];
+    final minimum = matches.length >= 2 ? matches[0] : fallback[0];
+    final maximum = matches.length >= 2 ? matches[1] : fallback[1];
+    return value < minimum || value > maximum;
   }
 
   Future<void> _showAlertAdminDialog() async {
@@ -294,115 +548,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     }
-  }
-
-  Widget _buildNotificationsCard({required bool pushFooterToBottom}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recent Notifications', style: AppTextStyles.sectionTitle),
-          const SizedBox(height: 16),
-          for (final n in _controller.notifications)
-            NotificationTile(
-              notification: n,
-              onTap: () => _showNotifications(),
-              onDelete: !(_controller.profile?.isAdmin ?? false) ||
-                      n.databaseId == null
-                  ? null
-                  : () async {
-                      try {
-                        await NotificationService()
-                            .deleteNotification(n.databaseId!);
-                        await _controller.loadDashboard();
-                      } catch (_) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('Unable to delete notification.')),
-                          );
-                        }
-                      }
-                    },
-            ),
-          if (pushFooterToBottom)
-            const Spacer()
-          else
-            const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _showNotifications,
-              child:
-                  Text('View all notifications', style: AppTextStyles.cardMeta),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNotifications() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('All notifications'),
-        content: SizedBox(
-          width: 420,
-          child: _controller.notifications.isEmpty
-              ? const Text('No recent notifications available.')
-              : ListView(
-                  shrinkWrap: true,
-                  children: _controller.notifications
-                      .map((notification) => ListTile(
-                            title: Text(notification.title),
-                            subtitle: Text(notification.detail),
-                            trailing: Text(notification.timeAgo),
-                          ))
-                      .toList(),
-                ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildForecastSection(bool isMobile) {
-    final phCard = ForecastChartCard(
-      title: 'pH Forecast Overview',
-      points: _controller.phForecast,
-      onExpand: _openForecastingScreen,
-    );
-    final ecCard = ForecastChartCard(
-      title: 'EC Forecast Overview',
-      points: _controller.ecForecast,
-      onExpand: _openForecastingScreen,
-    );
-
-    if (isMobile) {
-      return Column(
-        children: [
-          phCard,
-          const SizedBox(height: 16),
-          ecCard,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: phCard),
-        const SizedBox(width: 16),
-        Expanded(child: ecCard),
-      ],
-    );
   }
 }

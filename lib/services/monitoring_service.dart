@@ -256,6 +256,12 @@ class MonitoringService {
           3: ecRange,
           4: tempRange,
         },
+        recordStart: summary.recordedAt,
+        recordDuration: switch (aggregation) {
+          HistoryAggregation.tenMinutes => const Duration(minutes: 1),
+          HistoryAggregation.eightHours => const Duration(hours: 8),
+          HistoryAggregation.daily => const Duration(days: 1),
+        },
       );
     }).toList();
   }
@@ -283,7 +289,7 @@ class MonitoringService {
         row['adjustment'] as String? ?? '',
         row['performed_by'] as String? ?? 'Unknown',
         row['status'] as String? ?? 'Completed',
-      ]);
+      ], recordStart: recordedAt);
     }).toList();
   }
 
@@ -313,6 +319,51 @@ class MonitoringService {
         .delete()
         .gte('recorded_at', manilaWallTimeToUtc(start).toIso8601String())
         .lt('recorded_at', manilaWallTimeToUtc(end).toIso8601String());
+  }
+
+  Future<void> deleteCalibrationLog(DateTime recordedAt) async {
+    await supabase
+        .from('calibration_logs')
+        .delete()
+        .eq('recorded_at', manilaWallTimeToUtc(recordedAt).toIso8601String());
+  }
+
+  Future<void> updateSensorHistoryBucket({
+    required DateTime start,
+    required DateTime end,
+    required double ph,
+    required double ec,
+    required double temperature,
+  }) async {
+    final storedStart =
+        sensorManilaWallTimeToStoredUtc(start).toIso8601String();
+    final storedEnd = sensorManilaWallTimeToStoredUtc(end).toIso8601String();
+    final results = await Future.wait([
+      supabase
+          .from('ph_readings')
+          .update({'value': ph})
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+      supabase
+          .from('ec_readings')
+          .update({'value': ec})
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+      supabase
+          .from('temp_readings')
+          .update({'value': temperature})
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+    ]);
+    if (results.every((rows) => rows.isEmpty)) {
+      throw StateError('No sensor history records matched the selected entry.');
+    }
   }
 
   Future<List<Map<String, dynamic>>> _getAverageReadings(
