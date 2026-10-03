@@ -18,13 +18,17 @@ class ForecastingController extends ChangeNotifier {
   String selectedTab = 'pH Forecast'; // 'pH Forecast', 'EC Forecast', or 'Both'
   int selectedHours = 12;
 
+  String selectedBothInsightParam = 'pH'; // Inner tab selection when in 'Both' view
+
   double currentPh = 6.5;
   double currentEc = 1.5;
   double currentTemp = 24.0;
 
   List<ForecastingChartPoint> phPoints = [];
   List<ForecastingChartPoint> ecPoints = [];
-  PredictionInsightDetail? insightDetail;
+
+  PredictionInsightDetail? phInsightDetail;
+  PredictionInsightDetail? ecInsightDetail;
 
   ForecastingController() {
     loadData();
@@ -34,9 +38,18 @@ class ForecastingController extends ChangeNotifier {
       ? 'ph'
       : (selectedTab.startsWith('EC') ? 'ec' : 'both');
 
-  /// Dynamic chart points for single-parameter views
-  List<ForecastingChartPoint> get chartPoints =>
-      selectedTab.startsWith('EC') ? ecPoints : phPoints;
+  /// Active single insight detail to display
+  PredictionInsightDetail? get activeInsightDetail {
+    if (selectedTab == 'Both') {
+      return selectedBothInsightParam == 'pH'
+          ? (phInsightDetail ?? ecInsightDetail)
+          : (ecInsightDetail ?? phInsightDetail);
+    } else if (selectedTab.startsWith('EC')) {
+      return ecInsightDetail;
+    } else {
+      return phInsightDetail;
+    }
+  }
 
   Future<void> loadData() async {
     isLoading = true;
@@ -59,7 +72,6 @@ class ForecastingController extends ChangeNotifier {
           appProfile.value?.id ??
           'mock-user-id';
 
-      // Fetch Profile, pH Chart Data, and EC Chart Data concurrently
       final results = await Future.wait([
         userService.getProfile(userId),
         forecastingService.getForecastChartData(
@@ -94,16 +106,37 @@ class ForecastingController extends ChangeNotifier {
           ? predictedEcPoints.last.value
           : currentEc;
 
-      final activeParamKey = parameterKey == 'both' ? 'ph' : parameterKey;
+      final insightResults = await Future.wait([
+        forecastingService.getPredictionInsight(
+          'ph',
+          currentPh: currentPh,
+          currentEc: currentEc,
+          currentTemp: currentTemp,
+          predictedPh: predictedPh,
+          predictedEc: predictedEc,
+          horizonHours: selectedHours,
+        ),
+        forecastingService.getPredictionInsight(
+          'ec',
+          currentPh: currentPh,
+          currentEc: currentEc,
+          currentTemp: currentTemp,
+          predictedPh: predictedPh,
+          predictedEc: predictedEc,
+          horizonHours: selectedHours,
+        ),
+      ]);
 
-      insightDetail = await forecastingService.getPredictionInsight(
-        activeParamKey,
-        currentPh: currentPh,
-        currentEc: currentEc,
-        currentTemp: currentTemp,
-        predictedPh: predictedPh,
-        predictedEc: predictedEc,
-      );
+      phInsightDetail = insightResults[0];
+      ecInsightDetail = insightResults[1];
+
+      // Auto-focus the inner tab on whichever parameter has an active warning/critical badge
+      if (ecInsightDetail?.statusBadge.toLowerCase() != 'stable' &&
+          phInsightDetail?.statusBadge.toLowerCase() == 'stable') {
+        selectedBothInsightParam = 'EC';
+      } else {
+        selectedBothInsightParam = 'pH';
+      }
 
       isLoading = false;
       notifyListeners();
@@ -117,7 +150,13 @@ class ForecastingController extends ChangeNotifier {
   void selectTab(String tab) {
     if (selectedTab == tab) return;
     selectedTab = tab;
-    loadData();
+    notifyListeners();
+  }
+
+  void setBothInsightParam(String param) {
+    if (selectedBothInsightParam == param) return;
+    selectedBothInsightParam = param;
+    notifyListeners();
   }
 
   void selectHours(int hours) {
@@ -126,47 +165,58 @@ class ForecastingController extends ChangeNotifier {
     loadData();
   }
 
-  Future<void> applyFix() async {
-    if (insightDetail == null) return;
+  Future<void> applyFix(PredictionInsightDetail detail) async {
+    final param = detail.statusLabel.contains('pH') ? 'ph' : 'ec';
     await forecastingService.saveActionLog(
-      parameter: parameterKey == 'both' ? 'ph' : parameterKey,
-      forecastCondition: insightDetail!.warningText,
+      parameter: param,
+      forecastCondition: detail.warningText,
       horizonHours: selectedHours,
       currentPh: currentPh,
       currentEc: currentEc,
       currentTemp: currentTemp,
-      suggestedFixes: insightDetail!.suggestedFixes,
+      suggestedFixes: detail.suggestedFixes,
     );
-    _clearSuggestedFixesOnly();
+    _resolveInsightState(param, isApplied: true);
   }
 
-  Future<void> dismissFix() async {
-    if (insightDetail == null) return;
+  Future<void> dismissFix(PredictionInsightDetail detail) async {
+    final param = detail.statusLabel.contains('pH') ? 'ph' : 'ec';
     await forecastingService.saveDismissedActionLog(
-      parameter: parameterKey == 'both' ? 'ph' : parameterKey,
-      forecastCondition: insightDetail!.warningText,
+      parameter: param,
+      forecastCondition: detail.warningText,
       horizonHours: selectedHours,
       currentPh: currentPh,
       currentEc: currentEc,
       currentTemp: currentTemp,
-      suggestedFixes: insightDetail!.suggestedFixes,
+      suggestedFixes: detail.suggestedFixes,
     );
-    _clearSuggestedFixesOnly();
+    _resolveInsightState(param, isApplied: false);
   }
 
-  void _clearSuggestedFixesOnly() {
-    if (insightDetail == null) return;
-    insightDetail = PredictionInsightDetail(
-      statusLabel: insightDetail!.statusLabel,
-      statusBadge: insightDetail!.statusBadge,
-      warningText: insightDetail!.warningText,
-      temperature: insightDetail!.temperature,
-      ecLevel: insightDetail!.ecLevel,
-      calloutText: insightDetail!.calloutText,
-      currentPh: insightDetail!.currentPh,
-      targetPh: insightDetail!.targetPh,
-      suggestedFixes: ['No recommendation for now'],
+  void _resolveInsightState(String param, {required bool isApplied}) {
+    final updatedDetail = PredictionInsightDetail(
+      statusLabel: param == 'ph' ? 'pH Level' : 'EC Level',
+      statusBadge: 'Stable',
+      warningText: param == 'ph'
+          ? 'pH levels are stable and within optimal bounds.'
+          : 'EC levels are stable and within safe parameters.',
+      temperature: '${currentTemp.toStringAsFixed(1)} °C',
+      ecLevel: param == 'ph'
+          ? '${currentEc.toStringAsFixed(1)} mS/cm'
+          : '${currentPh.toStringAsFixed(1)} pH',
+      calloutText: isApplied
+          ? 'Recent intervention logged: parameter fix applied successfully.'
+          : 'Insight dismissed by operator.',
+      currentPh: param == 'ph' ? currentPh : currentEc,
+      targetPh: param == 'ph' ? 6.5 : 1.5,
+      suggestedFixes: const ['No recommendation for now'],
     );
+
+    if (param == 'ph') {
+      phInsightDetail = updatedDetail;
+    } else {
+      ecInsightDetail = updatedDetail;
+    }
     notifyListeners();
   }
 }

@@ -28,7 +28,6 @@ class _ForecastingDashboardScreenState
     super.dispose();
   }
 
-  /// Maps ForecastingChartPoint instances from controller to ForecastPoint required by ForecastingChartCard
   List<ForecastPoint> _mapToForecastPoint(List<dynamic> points) {
     return points.map((p) {
       if (p is ForecastPoint) return p;
@@ -58,7 +57,8 @@ class _ForecastingDashboardScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!, style: AppTextStyles.body),
+                    Text(_controller.errorMessage!,
+                        style: AppTextStyles.body),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _controller.loadData,
@@ -72,8 +72,13 @@ class _ForecastingDashboardScreenState
             final isDesktop = Responsive.isDesktop(context);
             final isMobile = Responsive.isMobile(context);
 
-            final phPointsMapped = _mapToForecastPoint(_controller.phPoints);
-            final ecPointsMapped = _mapToForecastPoint(_controller.ecPoints);
+            final phPointsMapped =
+                _mapToForecastPoint(_controller.phPoints);
+            final ecPointsMapped =
+                _mapToForecastPoint(_controller.ecPoints);
+
+            final insight = _controller.activeInsightDetail;
+            final isBothTab = _controller.selectedTab == 'Both';
 
             return SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -85,7 +90,6 @@ class _ForecastingDashboardScreenState
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-
                   if (!isDesktop) ...[
                     ForecastingChartCard(
                       activeTab: _controller.selectedTab,
@@ -96,11 +100,16 @@ class _ForecastingDashboardScreenState
                       ecPoints: ecPointsMapped,
                     ),
                     const SizedBox(height: 16),
-                    if (_controller.insightDetail != null)
+                    if (insight != null)
                       PredictionInsightsCard(
-                        detail: _controller.insightDetail!,
-                        onApplyFix: _controller.applyFix,
-                        onDismiss: _controller.dismissFix,
+                        detail: insight,
+                        onApplyFix: () => _controller.applyFix(insight),
+                        onDismiss: () => _controller.dismissFix(insight),
+                        showParamSelector: isBothTab,
+                        selectedInsightParam:
+                            _controller.selectedBothInsightParam,
+                        onInsightParamChanged:
+                            _controller.setBothInsightParam,
                       ),
                     const SizedBox(height: 16),
                     ReportIssueCard(onAlertAdmin: () {}),
@@ -108,15 +117,23 @@ class _ForecastingDashboardScreenState
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // LEFT SIDEBAR: SINGLE CLEAN INSIGHT CARD WITH OPTIONAL INNER PILL
                         Expanded(
                           flex: 4,
                           child: Column(
                             children: [
-                              if (_controller.insightDetail != null)
+                              if (insight != null)
                                 PredictionInsightsCard(
-                                  detail: _controller.insightDetail!,
-                                  onApplyFix: _controller.applyFix,
-                                  onDismiss: _controller.dismissFix,
+                                  detail: insight,
+                                  onApplyFix: () =>
+                                      _controller.applyFix(insight),
+                                  onDismiss: () =>
+                                      _controller.dismissFix(insight),
+                                  showParamSelector: isBothTab,
+                                  selectedInsightParam:
+                                      _controller.selectedBothInsightParam,
+                                  onInsightParamChanged:
+                                      _controller.setBothInsightParam,
                                 ),
                               const SizedBox(height: 16),
                               ReportIssueCard(onAlertAdmin: () {}),
@@ -124,6 +141,7 @@ class _ForecastingDashboardScreenState
                           ),
                         ),
                         const SizedBox(width: 20),
+                        // RIGHT MAIN CHART
                         Expanded(
                           flex: 6,
                           child: ForecastingChartCard(

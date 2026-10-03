@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
 import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/status_style.dart';
 
@@ -21,11 +21,24 @@ class HistoryLogValue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final direction = range.isHigh
-        ? Icons.arrow_upward_rounded
-        : range.isLow
-            ? Icons.arrow_downward_rounded
-            : null;
+    IconData icon;
+    Color iconColor;
+    String tooltipMsg;
+
+    if (range.isHigh) {
+      icon = Icons.arrow_upward_rounded;
+      iconColor = const Color(0xFFDC2626); // Red for critical high
+      tooltipMsg = 'Above ideal range (Critical)';
+    } else if (range.isLow) {
+      icon = Icons.arrow_downward_rounded;
+      iconColor = const Color(0xFFDC2626); // Red for critical low
+      tooltipMsg = 'Below ideal range (Critical)';
+    } else {
+      icon = Icons.arrow_forward_rounded;
+      iconColor = const Color(0xFF16A34A); // Green for stable
+      tooltipMsg = 'Within optimal bounds (Stable)';
+    }
+
     return Column(
       crossAxisAlignment:
           alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -41,14 +54,11 @@ class HistoryLogValue extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (direction != null) ...[
-              const SizedBox(width: 5),
-              Tooltip(
-                message:
-                    range.isHigh ? 'Above ideal range' : 'Below ideal range',
-                child: Icon(direction, size: 17, color: AppColors.textPrimary),
-              ),
-            ],
+            const SizedBox(width: 5),
+            Tooltip(
+              message: tooltipMsg,
+              child: Icon(icon, size: 17, color: iconColor),
+            ),
           ],
         ),
         if (showRange) ...[
@@ -66,7 +76,6 @@ class HistoryLogValue extends StatelessWidget {
 
 class HistoryStatusBadge extends StatelessWidget {
   final String status;
-
   const HistoryStatusBadge({super.key, required this.status});
 
   @override
@@ -78,8 +87,10 @@ class HistoryStatusBadge extends StatelessWidget {
       'stable' || 'normal' || 'success' => Icons.check_circle_outline_rounded,
       _ => Icons.info_outline_rounded,
     };
+
     final label = normalized == 'normal' ? 'Stable' : status;
     final color = StatusStyle.text(status);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -100,6 +111,100 @@ class HistoryStatusBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Interactive "See legend" dialog popup
+class HistoryLogLegend {
+  static void show(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          constraints: const BoxConstraints(maxWidth: 360),
+          decoration: AppDecorations.card(radius: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Indicator Legend', style: AppTextStyles.sectionTitle),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Divider(color: AppColors.cardBorder, height: 1),
+              const SizedBox(height: 16),
+              _buildLegendRow(
+                icon: Icons.arrow_upward_rounded,
+                color: const Color(0xFFDC2626),
+                title: 'High Critical Breach',
+                subtitle: 'Reading is above maximum ideal threshold',
+              ),
+              const SizedBox(height: 12),
+              _buildLegendRow(
+                icon: Icons.arrow_downward_rounded,
+                color: const Color(0xFFDC2626),
+                title: 'Low Critical Breach',
+                subtitle: 'Reading is below minimum ideal threshold',
+              ),
+              const SizedBox(height: 12),
+              _buildLegendRow(
+                icon: Icons.arrow_forward_rounded,
+                color: const Color(0xFF16A34A),
+                title: 'Stable / In Range',
+                subtitle: 'Parameter is within optimal operating bounds',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildLegendRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
+              ),
+              Text(
+                subtitle,
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

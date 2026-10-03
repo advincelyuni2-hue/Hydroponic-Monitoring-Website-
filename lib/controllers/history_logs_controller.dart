@@ -7,29 +7,31 @@ import '../services/supabase_client.dart';
 import '../utils/manila_time.dart';
 
 class HistoryLogsController extends ChangeNotifier {
-  final UserService _userService = UserService();
-  final MonitoringService _monitoringService = MonitoringService();
+  final UserService userService = UserService();
+  final MonitoringService monitoringService = MonitoringService();
 
   bool isLoading = true;
   String? errorMessage;
-
   UserProfile? profile;
 
-  String selectedTab = 'Sensor logs'; // 'Sensor logs' | 'Calibration logs'
+  String selectedTab = 'Sensor logs'; // 'Sensor logs' | 'Calibration logs' | 'Reports logs'
   String selectedRange = 'Daily'; // 'Daily' | 'Weekly' | 'Monthly'
-
   DateTime selectedDate = manilaNow();
   DateTimeRange? selectedWeekRange;
 
   List<String> columns = [];
   List<HistoryLogEntry> rows = [];
 
+  // Admin selection state
+  bool isSelectionMode = false;
+  final Set<int> selectedRowIndices = {};
+
   HistoryLogsController() {
-    _initWeekRange();
+    initWeekRange();
     loadData();
   }
 
-  void _initWeekRange() {
+  void initWeekRange() {
     final start =
         DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
     final end = start.add(const Duration(days: 6));
@@ -40,7 +42,7 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   String get activeRangeLabel {
-    final months = [
+    const months = [
       'January',
       'February',
       'March',
@@ -74,29 +76,54 @@ class HistoryLogsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      profile = await _userService.getProfile(
+      profile = await userService.getProfile(
         supabaseClient?.auth.currentUser?.id ??
             appProfile.value?.id ??
             'mock-user-id',
       );
-      await _loadSelectedLogs();
+      await loadSelectedLogs();
     } catch (e) {
       errorMessage = 'Failed to load history logs';
+      isLoading = false;
+      notifyListeners();
     }
+  }
 
-    isLoading = false;
+  void toggleSelectionMode() {
+    isSelectionMode = !isSelectionMode;
+    selectedRowIndices.clear();
+    notifyListeners();
+  }
+
+  void toggleSelectAll(bool? select) {
+    if (select == true) {
+      selectedRowIndices.addAll(List.generate(rows.length, (i) => i));
+    } else {
+      selectedRowIndices.clear();
+    }
+    notifyListeners();
+  }
+
+  void toggleRowSelection(int index) {
+    if (selectedRowIndices.contains(index)) {
+      selectedRowIndices.remove(index);
+    } else {
+      selectedRowIndices.add(index);
+    }
     notifyListeners();
   }
 
   void selectTab(String tab) {
     if (selectedTab == tab) return;
     selectedTab = tab;
-    _loadSelectedLogs();
+    isSelectionMode = false;
+    selectedRowIndices.clear();
+    loadSelectedLogs();
   }
 
   void selectRange(String range) {
     selectedRange = range;
-    _loadSelectedLogs();
+    loadSelectedLogs();
   }
 
   void updateDate(DateTime date, DateTimeRange? weekRange) {
@@ -104,15 +131,32 @@ class HistoryLogsController extends ChangeNotifier {
     if (weekRange != null) {
       selectedWeekRange = weekRange;
     } else {
-      _initWeekRange();
+      initWeekRange();
     }
-    _loadSelectedLogs();
+    loadSelectedLogs();
   }
 
-  Future<void> _loadSelectedLogs() async {
+  Future<void> loadSelectedLogs() async {
+    selectedRowIndices.clear();
     if (selectedTab == 'Calibration logs') {
       columns = const ['Time', 'Sensor', 'Action', 'Status'];
       rows = const [];
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    if (selectedTab == 'Reports logs') {
+      columns = const [
+        'Date',
+        'Time',
+        'Average pH',
+        'Average EC',
+        'Average Temp',
+        'Critical Alerts'
+      ];
+      rows = const [];
+      isLoading = false;
       notifyListeners();
       return;
     }
@@ -120,6 +164,7 @@ class HistoryLogsController extends ChangeNotifier {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
+
     try {
       final range = _selectedDateRange();
       columns = const [
@@ -130,7 +175,8 @@ class HistoryLogsController extends ChangeNotifier {
         'Average Temp',
         'Status'
       ];
-      rows = await _monitoringService.getSensorHistory(
+
+      rows = await monitoringService.getSensorHistory(
         start: range.start,
         end: range.end,
         aggregation: switch (selectedRange) {
@@ -143,6 +189,47 @@ class HistoryLogsController extends ChangeNotifier {
       errorMessage = 'Failed to load sensor history from Supabase';
     } finally {
       isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteSingleRow(int index) async {
+    if (index >= 0 && index < rows.length) {
+      rows.removeAt(index);
+      selectedRowIndices.remove(index);
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteSelectedRows() async {
+    final sortedIndices = selectedRowIndices.toList()
+      ..sort((a, b) => b.compareTo(a));
+    for (final idx in sortedIndices) {
+      if (idx >= 0 && idx < rows.length) {
+        rows.removeAt(idx);
+      }
+    }
+    selectedRowIndices.clear();
+    isSelectionMode = false;
+    notifyListeners();
+  }
+
+  Future<void> updateRowValues(
+      int index, double newPh, double newEc, double newTemp) async {
+    if (index >= 0 && index < rows.length) {
+      final oldEntry = rows[index];
+      final newValues = List<String>.from(oldEntry.values);
+
+      if (newValues.length >= 6) {
+        newValues[2] = newPh.toStringAsFixed(2);
+        newValues[3] = '${newEc.toStringAsFixed(2)} mS/cm';
+        newValues[4] = '${newTemp.toStringAsFixed(1)} °C';
+      }
+
+      rows[index] = HistoryLogEntry(
+        newValues,
+        ranges: oldEntry.ranges,
+      );
       notifyListeners();
     }
   }
@@ -165,6 +252,9 @@ class HistoryLogsController extends ChangeNotifier {
     }
     final start =
         DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    return DateTimeRange(start: start, end: start.add(const Duration(days: 1)));
+    return DateTimeRange(
+      start: start,
+      end: start.add(const Duration(days: 1)),
+    );
   }
 }

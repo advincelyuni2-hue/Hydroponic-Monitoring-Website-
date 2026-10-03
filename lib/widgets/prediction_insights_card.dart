@@ -5,17 +5,14 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import 'apply_fix_dialog.dart';
 
-/// Visual style for each severity. Colors are kept here so the card is
-/// self-contained; move them into AppColors if you want them app-wide.
-/// Text colors are the darker shades so they pass WCAG AA on the tints.
-class _SeverityStyle {
-  final Color accent; // strip + borders
-  final Color tint; // soft background fill
-  final Color text; // dark, readable text/icon color
+class SeverityStyle {
+  final Color accent;
+  final Color tint;
+  final Color text;
   final Color badgeFill;
   final IconData icon;
 
-  const _SeverityStyle({
+  const SeverityStyle({
     required this.accent,
     required this.tint,
     required this.text,
@@ -25,7 +22,7 @@ class _SeverityStyle {
 
   bool get isAlert => icon != Icons.check_circle_rounded;
 
-  static const critical = _SeverityStyle(
+  static const critical = SeverityStyle(
     accent: Color(0xFFDC2626),
     tint: Color(0xFFFEF2F2),
     text: Color(0xFFB91C1C),
@@ -33,7 +30,7 @@ class _SeverityStyle {
     icon: Icons.error_rounded,
   );
 
-  static const warning = _SeverityStyle(
+  static const warning = SeverityStyle(
     accent: Color(0xFFD97706),
     tint: Color(0xFFFFFBEB),
     text: Color(0xFFB45309),
@@ -41,7 +38,7 @@ class _SeverityStyle {
     icon: Icons.warning_amber_rounded,
   );
 
-  static const normal = _SeverityStyle(
+  static const normal = SeverityStyle(
     accent: Color(0xFF16A34A),
     tint: Color(0xFFF0FDF4),
     text: Color(0xFF15803D),
@@ -49,13 +46,14 @@ class _SeverityStyle {
     icon: Icons.check_circle_rounded,
   );
 
-  static _SeverityStyle fromBadge(String badge) {
-    switch (badge) {
-      case 'Critical':
+  static SeverityStyle fromBadge(String badge) {
+    switch (badge.toLowerCase()) {
+      case 'critical':
         return critical;
-      case 'Normal':
+      case 'normal':
+      case 'stable':
         return normal;
-      case 'Warning':
+      case 'warning':
       default:
         return warning;
     }
@@ -66,17 +64,21 @@ class PredictionInsightsCard extends StatelessWidget {
   final PredictionInsightDetail detail;
   final Future<void> Function() onApplyFix;
   final Future<void> Function() onDismiss;
+  final bool showParamSelector;
+  final String? selectedInsightParam;
+  final ValueChanged<String>? onInsightParamChanged;
 
   const PredictionInsightsCard({
     super.key,
     required this.detail,
     required this.onApplyFix,
     required this.onDismiss,
+    this.showParamSelector = false,
+    this.selectedInsightParam,
+    this.onInsightParamChanged,
   });
 
-  /// Bolds and colors [highlight] inside [text] (if present).
-  /// Falls back to plain text when the value isn't found.
-  List<InlineSpan> _highlightSpans(
+  List<InlineSpan> highlightSpans(
     String text,
     String highlight,
     TextStyle base,
@@ -100,18 +102,17 @@ class PredictionInsightsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final severity = _SeverityStyle.fromBadge(detail.statusBadge);
-
+    final severity = SeverityStyle.fromBadge(detail.statusBadge);
     bool isPhTab = detail.statusLabel.contains('pH');
     String mainUnit = isPhTab ? '' : ' mS/cm';
-
-    bool isNoRecommendation = detail.suggestedFixes.length == 1 &&
-        detail.suggestedFixes.first.contains('No recommendation');
+    bool isNoRecommendation = detail.suggestedFixes.isEmpty ||
+        (detail.suggestedFixes.length == 1 &&
+            (detail.suggestedFixes.first.contains('No recommendation') ||
+                detail.suggestedFixes.first.contains('No fix')));
 
     String secondaryLabel = isPhTab ? 'EC Level:' : 'pH Level:';
     IconData secondaryIcon = isPhTab ? Icons.bolt : Icons.science;
 
-    // Direction of the current value relative to target (not a time trend).
     const tolerance = 0.05;
     final delta = detail.currentPh - detail.targetPh;
     final IconData? directionIcon = delta > tolerance
@@ -136,12 +137,17 @@ class PredictionInsightsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Prediction Insights', style: AppTextStyles.sectionTitle),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Prediction Insights', style: AppTextStyles.sectionTitle),
+              if (showParamSelector && onInsightParamChanged != null)
+                _buildParamPill(),
+            ],
+          ),
           const SizedBox(height: 12),
           Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
-
-          // Header Status: accent strip + soft tint
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: IntrinsicHeight(
@@ -205,8 +211,6 @@ class PredictionInsightsCard extends StatelessWidget {
           const SizedBox(height: 12),
           Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
-
-          // Contributing Factors
           Text('Contributing factors',
               style: AppTextStyles.bodyBold.copyWith(fontSize: 15)),
           const SizedBox(height: 10),
@@ -239,8 +243,6 @@ class PredictionInsightsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Callout stays neutral; only the key number is emphasized.
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -250,7 +252,7 @@ class PredictionInsightsCard extends StatelessWidget {
             ),
             child: Text.rich(
               TextSpan(
-                children: _highlightSpans(
+                children: highlightSpans(
                   detail.calloutText,
                   detail.temperature,
                   calloutBase,
@@ -262,8 +264,6 @@ class PredictionInsightsCard extends StatelessWidget {
           const SizedBox(height: 16),
           Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 16),
-
-          // Baseline vs Target
           Container(
             decoration: BoxDecoration(
               color: const Color(0xFFF4F6F4),
@@ -276,7 +276,6 @@ class PredictionInsightsCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Current value: filled with severity tint when not normal
                     Expanded(
                       child: Container(
                         color: severity.isAlert ? severity.tint : null,
@@ -357,8 +356,6 @@ class PredictionInsightsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // DSS Suggested Fixes
           Text('Suggested fix',
               style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
           const SizedBox(height: 6),
@@ -392,8 +389,6 @@ class PredictionInsightsCard extends StatelessWidget {
                 ),
               ),
           const SizedBox(height: 20),
-
-          // Action Buttons (unchanged, disabled if No Recommendation)
           Row(
             children: [
               Expanded(
@@ -413,8 +408,10 @@ class PredictionInsightsCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: Text('Apply fix',
-                        style: AppTextStyles.button.copyWith(fontSize: 14)),
+                    child: Text(
+                      'Apply fix',
+                      style: AppTextStyles.button.copyWith(fontSize: 14),
+                    ),
                   ),
                 ),
               ),
@@ -448,6 +445,43 @@ class PredictionInsightsCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildParamPill() {
+    final options = ['pH', 'EC'];
+    final activeParam = selectedInsightParam ?? 'pH';
+
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E2E2),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: options.map((p) {
+          final isSelected = activeParam == p;
+          return GestureDetector(
+            onTap: () => onInsightParamChanged?.call(p),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                p,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.black87,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
