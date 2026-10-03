@@ -4,20 +4,23 @@ class ReportsService {
   /// Fetch summary card metrics
   Future<ReportSummaryData> getSummaryData() async {
     await Future.delayed(const Duration(milliseconds: 300));
-    return ReportSummaryData(
+    return const ReportSummaryData(
       avgPh: 6.2,
       phStatus: 'In range',
       avgEc: 5.7,
       ecStatus: 'Stable',
+      avgTemp: 24.5,
+      tempStatus: 'In range',
       criticalAlertsCount: 3,
       alertsPeriod: 'This month',
     );
   }
 
   /// Fetch graph points matching trend curve
-  Future<List<AnalyticsPoint>> getTrendData(String parameter, String timeframe) async {
+  Future<List<AnalyticsPoint>> getTrendData(
+      String parameter, String timeframe) async {
     await Future.delayed(const Duration(milliseconds: 400));
-    return [
+    return const [
       AnalyticsPoint(label: 'Jul 1', value: 6.4),
       AnalyticsPoint(label: 'Jul 5', value: 6.6),
       AnalyticsPoint(label: 'Jul 9', value: 6.9),
@@ -30,17 +33,26 @@ class ReportsService {
   }
 
   /// Fetch actual vs predicted values for model evaluation
-  Future<List<PredictedAnalyticsPoint>> getPredictionData(String parameter) async {
+  Future<List<PredictedAnalyticsPoint>> getPredictionData(
+      String parameter) async {
     await Future.delayed(const Duration(milliseconds: 300));
-    return [
-      PredictedAnalyticsPoint(label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
-      PredictedAnalyticsPoint(label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
-      PredictedAnalyticsPoint(label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
-      PredictedAnalyticsPoint(label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
-      PredictedAnalyticsPoint(label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
-      PredictedAnalyticsPoint(label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
-      PredictedAnalyticsPoint(label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
-      PredictedAnalyticsPoint(label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
+    return const [
+      PredictedAnalyticsPoint(
+          label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
+      PredictedAnalyticsPoint(
+          label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
+      PredictedAnalyticsPoint(
+          label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
+      PredictedAnalyticsPoint(
+          label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
+      PredictedAnalyticsPoint(
+          label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
+      PredictedAnalyticsPoint(
+          label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
+      PredictedAnalyticsPoint(
+          label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
+      PredictedAnalyticsPoint(
+          label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
     ];
   }
 

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
-import '../services/reports_service.dart';
-import '../services/user_service.dart';
-import '../services/pdf_report_service.dart';
 import '../services/app_state.dart';
+import '../services/pdf_report_service.dart';
+import '../services/reports_service.dart';
 import '../services/supabase_client.dart';
+import '../services/user_service.dart';
 
 class ReportsController extends ChangeNotifier {
   final ReportsService _reportsService = ReportsService();
@@ -13,14 +13,18 @@ class ReportsController extends ChangeNotifier {
 
   bool isLoading = false;
   String? errorMessage;
-
   UserProfile? profile;
 
-  ReportSummaryData summary = ReportSummaryData(
+  // Formatted timestamp string for UI cards
+  String lastUpdatedTimestamp = 'Oct 3, 2026, 6:22 PM';
+
+  ReportSummaryData summary = const ReportSummaryData(
     avgPh: 6.2,
     phStatus: 'In range',
     avgEc: 5.7,
     ecStatus: 'Stable',
+    avgTemp: 24.5,
+    tempStatus: 'In range',
     criticalAlertsCount: 3,
     alertsPeriod: 'This month',
   );
@@ -94,7 +98,7 @@ class ReportsController extends ChangeNotifier {
 
   String selectedParameter = 'pH'; // 'pH' or 'EC'
   String selectedTimeframe = '7d'; // '7d', '30d', '90d'
-  String selectedDistributionParam = 'pH';
+  String selectedDistributionParam = 'pH'; // 'pH', 'EC', 'Temp'
 
   RangeValues phRange = const RangeValues(5.5, 6.5);
   RangeValues ecRange = const RangeValues(5.0, 6.0);
@@ -104,6 +108,7 @@ class ReportsController extends ChangeNotifier {
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
   bool includeAllAnalytics = false;
+
   bool recommendationApplied = false;
   bool recommendationDismissed = false;
 

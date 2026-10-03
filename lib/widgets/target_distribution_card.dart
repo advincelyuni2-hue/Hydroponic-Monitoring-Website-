@@ -30,16 +30,18 @@ class TargetDistributionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // STACKED HEADER TO PREVENT HORIZONTAL OVERFLOW
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
-                  'Target Distribution',
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
-                  overflow: TextOverflow.ellipsis,
+                  'Frequency Distribution',
+                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
                 ),
               ),
+              const SizedBox(width: 8),
               _buildParamPill(),
             ],
           ),
@@ -89,25 +91,37 @@ class TargetDistributionCard extends StatelessWidget {
                     ),
                   )
                 : Center(
-                    child: Text('No data available',
-                        style: AppTextStyles.cardMeta)),
+                    child: Text(
+                      'No data available',
+                      style: AppTextStyles.cardMeta,
+                    ),
+                  ),
           ),
           const SizedBox(height: 16),
-          _legendRow('Optimal (In Target)', AppColors.primaryButton,
-              '${data.optimalPercentage.toInt()}%'),
+          _legendRow(
+            'Optimal (In Target)',
+            AppColors.primaryButton,
+            '${data.optimalPercentage.toInt()}%',
+          ),
           const SizedBox(height: 6),
-          _legendRow('Warning Zone', const Color(0xFFF39C12),
-              '${data.warningPercentage.toInt()}%'),
+          _legendRow(
+            'Warning Zone',
+            const Color(0xFFF39C12),
+            '${data.warningPercentage.toInt()}%',
+          ),
           const SizedBox(height: 6),
-          _legendRow('Critical Bounds', AppColors.alertBorder,
-              '${data.criticalPercentage.toInt()}%'),
+          _legendRow(
+            'Critical Bounds',
+            AppColors.alertBorder,
+            '${data.criticalPercentage.toInt()}%',
+          ),
         ],
       ),
     );
   }
 
   Widget _buildParamPill() {
-    final options = ['pH', 'EC', 'Air'];
+    final options = ['pH', 'EC', 'Temp'];
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
@@ -121,16 +135,15 @@ class TargetDistributionCard extends StatelessWidget {
           return GestureDetector(
             onTap: () => onParamChanged(p),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color:
-                    isSelected ? AppColors.primaryButton : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
+                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 p,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: isSelected ? Colors.white : Colors.black87,
                 ),
@@ -157,8 +170,7 @@ class TargetDistributionCard extends StatelessWidget {
             Text(label, style: AppTextStyles.cardMeta.copyWith(fontSize: 12)),
           ],
         ),
-        Text(percent,
-            style: AppTextStyles.bodyBold.copyWith(fontSize: 12)),
+        Text(percent, style: AppTextStyles.bodyBold.copyWith(fontSize: 12)),
       ],
     );
   }

@@ -58,7 +58,10 @@ class ReportsScreenState extends State<ReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppHeader(title: 'Reports', profile: _controller.profile),
+                  AppHeader(
+                    title: 'Reports',
+                    profile: _controller.profile,
+                  ),
                   const SizedBox(height: 24),
                   if (isMobile)
                     _buildMobileLayout()
@@ -74,10 +77,11 @@ class ReportsScreenState extends State<ReportsScreen> {
   }
 
   /// Desktop Layout:
-  /// Left Sidebar Column (320px): Metrics -> Sensor Health -> Target Distribution -> Alert Frequency
-  /// Right Main Column: Trend Analytics -> Forecast Chart -> Generate Report Card
+  /// Left Sidebar (320px): Telemetry Last Updated -> Metric Cards -> Critical Alert Frequency -> Frequency Distribution
+  /// Right Main Column: Trend Analytics -> Forecast Chart -> Sensor Calibration -> Generate Report Card
   Widget _buildDesktopLayout() {
     final summary = _controller.summary;
+    final lastUpdated = _controller.lastUpdatedTimestamp;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +90,11 @@ class ReportsScreenState extends State<ReportsScreen> {
         SizedBox(
           width: 320,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // TELEMETRY TIMESTAMP AT TOP OF LEFT SIDEBAR
+              _buildTelemetryStatusCard(lastUpdated),
+              const SizedBox(height: 12),
               _buildMetricCard(
                 title: 'AVG PH',
                 value: summary.avgPh.toStringAsFixed(1),
@@ -102,29 +110,32 @@ class ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 12),
               _buildMetricCard(
+                title: 'AVG TEMP',
+                value: '${summary.avgTemp.toStringAsFixed(1)} °C',
+                status: summary.tempStatus,
+                isWarning: summary.tempStatus.toLowerCase() != 'in range',
+              ),
+              const SizedBox(height: 12),
+              _buildMetricCard(
                 title: 'CRITICAL ALERTS',
                 value: '${summary.criticalAlertsCount}',
                 status: summary.alertsPeriod,
                 isWarning: summary.criticalAlertsCount > 0,
               ),
               const SizedBox(height: 20),
-              SensorHealthCard(sensors: _controller.sensorHealthList),
+              AlertFrequencyCard(
+                alerts: _controller.alertFrequency,
+                activeCount: _controller.activeAlertsCount,
+              ),
               const SizedBox(height: 20),
               TargetDistributionCard(
                 data: _controller.targetDistribution,
                 selectedParam: _controller.selectedDistributionParam,
                 onParamChanged: _controller.setDistributionParam,
               ),
-              const SizedBox(height: 20),
-              AlertFrequencyCard(
-                alerts: _controller.alertFrequency,
-                fixedCount: _controller.fixedAlertsCount,
-                activeCount: _controller.activeAlertsCount,
-              ),
             ],
           ),
         ),
-
         const SizedBox(width: 20),
 
         // RIGHT MAIN COLUMN
@@ -151,6 +162,11 @@ class ReportsScreenState extends State<ReportsScreen> {
                 accuracyText: '95.8% Accuracy',
               ),
               const SizedBox(height: 20),
+              SensorHealthCard(
+                sensors: _controller.sensorHealthList,
+              ),
+              const SizedBox(height: 20),
+              // GENERATE REPORT CARD AT VERY BOTTOM
               GenerateReportCard(
                 onGenerateReport: _navigateToGenerateReport,
               ),
@@ -161,12 +177,15 @@ class ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// Mobile Layout: Vertical stacked sequence
+  /// Mobile Layout
   Widget _buildMobileLayout() {
     final summary = _controller.summary;
+    final lastUpdated = _controller.lastUpdatedTimestamp;
 
     return Column(
       children: [
+        _buildTelemetryStatusCard(lastUpdated),
+        const SizedBox(height: 12),
         _buildMetricCard(
           title: 'AVG PH',
           value: summary.avgPh.toStringAsFixed(1),
@@ -179,6 +198,13 @@ class ReportsScreenState extends State<ReportsScreen> {
           value: '${summary.avgEc.toStringAsFixed(1)} mS/cm',
           status: summary.ecStatus,
           isWarning: summary.ecStatus.toLowerCase() != 'stable',
+        ),
+        const SizedBox(height: 12),
+        _buildMetricCard(
+          title: 'AVG TEMP',
+          value: '${summary.avgTemp.toStringAsFixed(1)} °C',
+          status: summary.tempStatus,
+          isWarning: summary.tempStatus.toLowerCase() != 'in range',
         ),
         const SizedBox(height: 12),
         _buildMetricCard(
@@ -208,22 +234,23 @@ class ReportsScreenState extends State<ReportsScreen> {
           accuracyText: '95.8% Accuracy',
         ),
         const SizedBox(height: 16),
+        SensorHealthCard(
+          sensors: _controller.sensorHealthList,
+        ),
+        const SizedBox(height: 16),
         GenerateReportCard(
           onGenerateReport: _navigateToGenerateReport,
         ),
         const SizedBox(height: 16),
-        SensorHealthCard(sensors: _controller.sensorHealthList),
+        AlertFrequencyCard(
+          alerts: _controller.alertFrequency,
+          activeCount: _controller.activeAlertsCount,
+        ),
         const SizedBox(height: 16),
         TargetDistributionCard(
           data: _controller.targetDistribution,
           selectedParam: _controller.selectedDistributionParam,
           onParamChanged: _controller.setDistributionParam,
-        ),
-        const SizedBox(height: 16),
-        AlertFrequencyCard(
-          alerts: _controller.alertFrequency,
-          fixedCount: _controller.fixedAlertsCount,
-          activeCount: _controller.activeAlertsCount,
         ),
       ],
     );
@@ -274,13 +301,59 @@ class ReportsScreenState extends State<ReportsScreen> {
                 child: Text(
                   status,
                   style: AppTextStyles.cardMeta.copyWith(
-                    color: isWarning ? AppColors.alertText : AppColors.textPrimary,
+                    color: isWarning
+                        ? AppColors.alertText
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTelemetryStatusCard(String timestamp) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: AppDecorations.card(),
+      child: Row(
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E6B13),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Telemetry Last Updated',
+                  style: AppTextStyles.cardMeta.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  timestamp,
+                  style: AppTextStyles.bodyBold.copyWith(
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -5,7 +5,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
-import 'date_picker_button.dart';
 
 class ReportsAnalyticsCard extends StatefulWidget {
   final String selectedParameter;
@@ -15,7 +14,6 @@ class ReportsAnalyticsCard extends StatefulWidget {
   final double maxThreshold;
   final ValueChanged<String> onParameterChanged;
   final ValueChanged<String> onTimeframeChanged;
-  final VoidCallback? onDatePickerTap;
 
   const ReportsAnalyticsCard({
     super.key,
@@ -26,14 +24,13 @@ class ReportsAnalyticsCard extends StatefulWidget {
     required this.maxThreshold,
     required this.onParameterChanged,
     required this.onTimeframeChanged,
-    this.onDatePickerTap,
   });
 
   @override
-  State<ReportsAnalyticsCard> createState() => _ReportsAnalyticsCardState();
+  State<ReportsAnalyticsCard> createState() => ReportsAnalyticsCardState();
 }
 
-class _ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
+class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
   static const phColor = AppColors.primaryButton;
   static const ecColor = Color(0xFF1599A8);
 
@@ -73,7 +70,7 @@ class _ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         const Icon(Icons.show_chart, color: AppColors.primaryButton),
-        Text('Visual Analytics', style: AppTextStyles.sectionTitle),
+        Text('Historical Telemetry Trends', style: AppTextStyles.sectionTitle),
       ],
     );
 
@@ -93,14 +90,6 @@ class _ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           selected: widget.selectedTimeframe,
           label: (val) => val,
           onSelected: widget.onTimeframeChanged,
-        ),
-        DatePickerButton(
-          onTap: widget.onDatePickerTap ??
-              () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Date picker selection')),
-                );
-              },
         ),
       ],
     );
@@ -172,6 +161,7 @@ class _ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
         widget.selectedParameter == 'pH' ? phColor : ecColor;
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 9,
@@ -201,7 +191,9 @@ class _ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
     return LineChartData(
       minX: 0,
-      maxX: widget.points.isNotEmpty ? (widget.points.length - 1).toDouble() : 5,
+      maxX: widget.points.isNotEmpty
+          ? (widget.points.length - 1).toDouble()
+          : 5,
       minY: widget.selectedParameter == 'pH' ? 5.0 : 0.0,
       maxY: widget.selectedParameter == 'pH' ? 7.5 : 3.0,
       gridData: FlGridData(

@@ -1,64 +1,39 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../models/monitoring_models.dart';
 import 'history_log_value.dart';
 
 class HistoryLogTable extends StatelessWidget {
   final List<String> columns;
   final List<HistoryLogEntry> rows;
 
-  const HistoryLogTable({super.key, required this.columns, required this.rows});
+  const HistoryLogTable({
+    super.key,
+    required this.columns,
+    required this.rows,
+  });
 
   int get _statusColumnIndex => columns.indexOf('Status');
-  bool get _isSensorTable => columns.length == 6;
-
-  Widget _header(int index) {
-    final range = rows.isEmpty ? null : rows.first.ranges[index];
-    final parameter = switch (index) {
-      2 => 'pH',
-      3 => 'EC',
-      4 => 'Temp',
-      _ => '',
-    };
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          columns[index],
-          style: AppTextStyles.cardLabel,
-          textAlign: TextAlign.center,
-        ),
-        if (range != null)
-          Text(
-            'Ideal $parameter Range: ${range.label}',
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-      ],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tableWidth = math.max(
-          _isSensorTable ? 1200.0 : 620.0,
-          constraints.maxWidth,
-        );
+        // Dynamically compute comfortable table width based on column count
+        final minCalculatedWidth = math.max(620.0, columns.length * 180.0);
+        final tableWidth = math.max(minCalculatedWidth, constraints.maxWidth);
+
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           child: SizedBox(
             width: tableWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header Row
                 Container(
                   height: 64,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -76,12 +51,15 @@ class HistoryLogTable extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 if (rows.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(
-                      child:
-                          Text('No logs yet.', style: AppTextStyles.cardMeta),
+                      child: Text(
+                        'No logs yet.',
+                        style: AppTextStyles.cardMeta,
+                      ),
                     ),
                   )
                 else
@@ -132,6 +110,36 @@ class HistoryLogTable extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _header(int index) {
+    final range = rows.isEmpty ? null : rows.first.ranges[index];
+    final parameter = switch (index) {
+      2 => 'pH',
+      3 => 'EC',
+      4 => 'Temp',
+      _ => '',
+    };
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          columns[index],
+          style: AppTextStyles.cardLabel,
+          textAlign: TextAlign.center,
+        ),
+        if (range != null)
+          Text(
+            'Ideal $parameter Range: ${range.label}',
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
     );
   }
 }

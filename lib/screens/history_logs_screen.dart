@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
 import '../controllers/history_logs_controller.dart';
-import '../widgets/app_header.dart';
-import '../widgets/app_drawer.dart';
-import '../widgets/history_log_table.dart';
-import '../widgets/history_log_cards.dart';
-import '../widgets/custom_calendar_popup.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_decorations.dart';
+import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/app_header.dart';
+import '../widgets/custom_calendar_popup.dart';
+import '../widgets/history_log_cards.dart';
+import '../widgets/history_log_table.dart';
 
 class HistoryLogsScreen extends StatefulWidget {
   const HistoryLogsScreen({super.key});
 
   @override
-  State<HistoryLogsScreen> createState() => _HistoryLogsScreenState();
+  State<HistoryLogsScreen> createState() => HistoryLogsScreenState();
 }
 
-class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
+class HistoryLogsScreenState extends State<HistoryLogsScreen> {
   final HistoryLogsController _controller = HistoryLogsController();
 
   @override
@@ -28,7 +28,6 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
 
   void _openCalendarPopup(String range) {
     _controller.selectRange(range);
-
     CalendarMode mode = CalendarMode.daily;
     if (range == 'Weekly') mode = CalendarMode.weekly;
     if (range == 'Monthly') mode = CalendarMode.monthly;
@@ -81,7 +80,10 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppHeader(title: 'History logs', profile: _controller.profile),
+                  AppHeader(
+                    title: 'History logs',
+                    profile: _controller.profile,
+                  ),
                   const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
@@ -166,13 +168,10 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
   }
 
   Widget _buildTabs(bool isMobile) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _tab('Sensor logs', isMobile),
-        SizedBox(width: isMobile ? 16 : 24),
-        _tab('Calibration logs', isMobile),
-      ],
+    final tabOptions = ['Sensor logs', 'Calibration logs', 'Reports logs'];
+    return Wrap(
+      spacing: isMobile ? 12 : 24,
+      children: tabOptions.map((title) => _tab(title, isMobile)).toList(),
     );
   }
 
@@ -180,36 +179,37 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
     final isActive = _controller.selectedTab == title;
     return GestureDetector(
       onTap: () => _controller.selectTab(title),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppTextStyles.sectionTitle.copyWith(
-              fontSize: isMobile ? 16 : 20,
-              color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: AppTextStyles.sectionTitle.copyWith(
+                fontSize: isMobile ? 15 : 18,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            height: 3,
-            width: isActive ? (isMobile ? 70 : 85) : 0,
-            decoration: BoxDecoration(
-              color: AppColors.primaryButton,
-              borderRadius: BorderRadius.circular(2),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              decoration: BoxDecoration(
+                color: isActive ? AppColors.primaryButton : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRangeFilters() {
     final options = ['Daily', 'Weekly', 'Monthly'];
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: options.map((range) {
@@ -221,7 +221,9 @@ class _HistoryLogsScreenState extends State<HistoryLogsScreen> {
             margin: const EdgeInsets.only(left: 6),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primaryButton : const Color(0xFFE2E2E2),
+              color: isSelected
+                  ? AppColors.primaryButton
+                  : const Color(0xFFE2E2E2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(

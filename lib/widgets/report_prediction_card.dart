@@ -19,14 +19,12 @@ class ReportPredictionCard extends StatefulWidget {
   });
 
   @override
-  State<ReportPredictionCard> createState() => _ReportPredictionCardState();
+  State<ReportPredictionCard> createState() => ReportPredictionCardState();
 }
 
-class _ReportPredictionCardState extends State<ReportPredictionCard> {
+class ReportPredictionCardState extends State<ReportPredictionCard> {
   late String _activeParam;
-
   static const phColor = AppColors.primaryButton;
-  static const ecColor = Color(0xFF1599A8);
 
   @override
   void initState() {
@@ -70,7 +68,7 @@ class _ReportPredictionCardState extends State<ReportPredictionCard> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         const Icon(Icons.show_chart, color: AppColors.primaryButton),
-        Text('Visual Analytics', style: AppTextStyles.sectionTitle),
+        Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
         if (widget.accuracyText != null) ...[
           const SizedBox(width: 4),
           Container(
@@ -202,7 +200,9 @@ class _ReportPredictionCardState extends State<ReportPredictionCard> {
 
     return LineChartData(
       minX: 0,
-      maxX: widget.points.isNotEmpty ? (widget.points.length - 1).toDouble() : 5,
+      maxX: widget.points.isNotEmpty
+          ? (widget.points.length - 1).toDouble()
+          : 5,
       minY: 5.0,
       maxY: 7.5,
       gridData: FlGridData(
@@ -278,6 +278,7 @@ class _ReportPredictionCardState extends State<ReportPredictionCard> {
             final isActual = spot.barIndex == 0;
             final label = isActual ? 'Actual' : 'Predicted';
             final color = isActual ? phColor : const Color(0xFFD97706);
+
             return LineTooltipItem(
               '$label ${spot.y.toStringAsFixed(2)}',
               AppTextStyles.bodyBold.copyWith(color: color),

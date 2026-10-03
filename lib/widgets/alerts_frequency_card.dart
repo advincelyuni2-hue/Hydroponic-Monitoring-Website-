@@ -7,13 +7,11 @@ import '../theme/app_text_styles.dart';
 
 class AlertFrequencyCard extends StatelessWidget {
   final List<AlertFrequencyData> alerts;
-  final int fixedCount;
   final int activeCount;
 
   const AlertFrequencyCard({
     super.key,
     required this.alerts,
-    required this.fixedCount,
     required this.activeCount,
   });
 
@@ -31,31 +29,10 @@ class AlertFrequencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  'Alert Frequency',
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.statusCardGreen,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$fixedCount Fixed',
-                  style: AppTextStyles.cardMeta.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryButton,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Critical Alert Frequency',
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -67,11 +44,14 @@ class AlertFrequencyCard extends StatelessWidget {
                       maxY: chartMaxY,
                       titlesData: FlTitlesData(
                         topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         leftTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -111,8 +91,11 @@ class AlertFrequencyCard extends StatelessWidget {
                     ),
                   )
                 : Center(
-                    child: Text('No alerts recorded',
-                        style: AppTextStyles.cardMeta)),
+                    child: Text(
+                      'No alerts recorded',
+                      style: AppTextStyles.cardMeta,
+                    ),
+                  ),
           ),
           const SizedBox(height: 12),
           Text(

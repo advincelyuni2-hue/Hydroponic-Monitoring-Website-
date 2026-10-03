@@ -9,10 +9,10 @@ class GenerateReportScreen extends StatefulWidget {
   const GenerateReportScreen({super.key});
 
   @override
-  State<GenerateReportScreen> createState() => _GenerateReportScreenState();
+  State<GenerateReportScreen> createState() => GenerateReportScreenState();
 }
 
-class _GenerateReportScreenState extends State<GenerateReportScreen> {
+class GenerateReportScreenState extends State<GenerateReportScreen> {
   // Checklist Options
   bool includeSensorLogs = true;
   bool includeCalibrationLogs = false;
@@ -22,16 +22,16 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
 
   bool isGenerating = false;
 
-  void _onGeneratePdf() async {
+  void onGeneratePdf() async {
     setState(() => isGenerating = true);
-
     // Simulate PDF generation/download pipeline
     await Future.delayed(const Duration(seconds: 2));
-
     if (mounted) {
       setState(() => isGenerating = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF Report generated successfully!')),
+        const SnackBar(
+          content: Text('PDF Report generated successfully!'),
+        ),
       );
     }
   }
@@ -48,32 +48,12 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with Back Arrow Button
-              Row(
-                children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.primaryButton,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: AppHeader(
-                      title: 'Generate report',
-                      profile: null,
-                    ),
-                  ),
-                ],
+              // Header without manual Back Arrow
+              const AppHeader(
+                title: 'Generate report',
+                profile: null,
               ),
               const SizedBox(height: 24),
-
               if (isMobile)
                 Column(
                   children: [
@@ -94,8 +74,7 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
                         child: _buildPdfPreviewArea(isMobile),
                       ),
                       const SizedBox(width: 24),
-
-                      // RIGHT SIDE: Checklist Options & Export Button Panel
+                      // RIGHT SIDE: Checklist Options & Action Buttons
                       SizedBox(
                         width: 380,
                         child: _buildConfigSidebar(isMobile),
@@ -127,7 +106,8 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.statusCardGreen,
                   borderRadius: BorderRadius.circular(12),
@@ -144,7 +124,6 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
           // Simulated Page Thumbnail Frame
           Expanded(
             child: Center(
@@ -191,21 +170,23 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
                     const SizedBox(height: 12),
                     const Divider(height: 1),
                     const SizedBox(height: 12),
-
                     // Content Lines / Blocks
                     if (includeSensorLogs)
-                      _previewBlock('Sensor History Logs', AppColors.primaryButton),
+                      _previewBlock(
+                          'Sensor History Logs', AppColors.primaryButton),
                     if (includeCalibrationLogs)
-                      _previewBlock('Calibration Logs', AppColors.textSecondary),
+                      _previewBlock(
+                          'Calibration Logs', AppColors.textSecondary),
                     if (includePhOptimization)
-                      _previewBlock('pH Optimization Results', const Color(0xFF1599A8)),
+                      _previewBlock('pH Optimization Results',
+                          const Color(0xFF1599A8)),
                     if (includeEcOptimization)
-                      _previewBlock('EC Optimization Results', const Color(0xFFF39C12)),
+                      _previewBlock('EC Optimization Results',
+                          const Color(0xFFF39C12)),
                     if (includeAllAnalytics)
-                      _previewBlock('Visual Analytics Charts', AppColors.primaryButton),
-
+                      _previewBlock(
+                          'Visual Analytics Charts', AppColors.primaryButton),
                     const Spacer(),
-
                     // Page Footer
                     Center(
                       child: Container(
@@ -238,7 +219,10 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
               Container(
                 width: 6,
                 height: 6,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 6),
               Text(
@@ -265,7 +249,7 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
     );
   }
 
-  /// Right Config Panel (Stretched vertically to align with Document Preview)
+  /// Right Config Panel
   Widget _buildConfigSidebar(bool isMobile) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -283,7 +267,6 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
             style: AppTextStyles.cardMeta,
           ),
           const SizedBox(height: 20),
-
           // Checklist items
           _checkboxTile(
             title: 'Sensor history logs',
@@ -315,38 +298,68 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
                 setState(() => includeAllAnalytics = val ?? false),
           ),
 
-          // Spacer pushes export button cleanly to bottom edge
           const Spacer(),
 
-          // Action Button (Full Width Export PDF Button)
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: isGenerating ? null : _onGeneratePdf,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryButton,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                elevation: 0,
-              ),
-              icon: isGenerating
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+          // Action Buttons: Export PDF on Left, Cancel on Right
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: isGenerating ? null : onGeneratePdf,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryButton,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    )
-                  : const Icon(Icons.picture_as_pdf, size: 20),
-              label: Text(
-                isGenerating ? 'Generating...' : 'Export PDF',
-                style: AppTextStyles.button.copyWith(color: Colors.white),
+                      elevation: 0,
+                    ),
+                    icon: isGenerating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.picture_as_pdf, size: 20),
+                    label: Text(
+                      isGenerating ? 'Generating...' : 'Export PDF',
+                      style: AppTextStyles.button.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: AppColors.primaryButton,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: AppTextStyles.button.copyWith(
+                        color: AppColors.primaryButton,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
