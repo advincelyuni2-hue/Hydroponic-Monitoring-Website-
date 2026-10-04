@@ -85,6 +85,7 @@ class PredictionInsightDetail {
 class HistoryLogEntry {
   final List<String> values;
   final Map<int, HistoryValueRange> ranges;
+<<<<<<< HEAD
   final DateTime? recordStart;
   final Duration? recordDuration;
 
@@ -94,6 +95,10 @@ class HistoryLogEntry {
     this.recordStart,
     this.recordDuration,
   });
+=======
+
+  const HistoryLogEntry(this.values, {this.ranges = const {}});
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 }
 
 class HistoryValueRange {

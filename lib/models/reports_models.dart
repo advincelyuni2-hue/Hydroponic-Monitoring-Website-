@@ -23,12 +23,18 @@ class ReportSummaryData {
 class AnalyticsPoint {
   final String label; // e.g. "Jul 1"
   final double value; // e.g. 6.4
+<<<<<<< HEAD
   final String? parameter;
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
   const AnalyticsPoint({
     required this.label,
     required this.value,
+<<<<<<< HEAD
     this.parameter,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   });
 }
 
@@ -80,4 +86,8 @@ class SensorHealthItem {
     required this.healthPercentage,
     required this.statusLabel,
   });
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

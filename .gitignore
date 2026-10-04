@@ -33,6 +33,13 @@ migrate_working_dir/
 /build/
 /coverage/
 
+<<<<<<< HEAD
+=======
+# Local Supabase build-time configuration
+supabase.json
+backend/.env
+
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 # Symbolication related
 app.*.symbols
 
@@ -43,3 +50,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+<<<<<<< HEAD
+=======
+
+# Python backend
+backend/.venv/
+backend/__pycache__/
+*.py[cod]
+backend/.env
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

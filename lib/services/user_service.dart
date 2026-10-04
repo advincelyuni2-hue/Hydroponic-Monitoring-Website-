@@ -50,6 +50,16 @@ class UserService {
       await client.auth.updateUser(
         UserAttributes(data: {'full_name': profile.name}),
       );
+<<<<<<< HEAD
+=======
+      try {
+        await client
+            .from('profiles')
+            .update({'full_name': profile.name}).eq('id', profile.id);
+      } on PostgrestException {
+        // Keep profile editing usable until the RBAC migration is installed.
+      }
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     } else {
       await Future.delayed(const Duration(milliseconds: 500));
     }

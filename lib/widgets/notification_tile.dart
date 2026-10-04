@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+<<<<<<< HEAD
 import '../services/notification_service.dart';
 
 class NotificationTile extends StatelessWidget {
   final AppNotification notification;
+=======
+import '../models/notification_models.dart';
+
+class NotificationTile extends StatelessWidget {
+  final AppNotificationItem notification;
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -58,7 +65,11 @@ class NotificationTile extends StatelessWidget {
                     ),
                     Row(
                       children: [
+<<<<<<< HEAD
                         Text(notification.timeAgo,
+=======
+                        Text(notification.timestamp,
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                             style: AppTextStyles.cardMeta),
                         if (onDelete != null)
                           IconButton(
@@ -71,7 +82,19 @@ class NotificationTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
+<<<<<<< HEAD
                 Text(notification.detail, style: AppTextStyles.body),
+=======
+                Text(notification.subtitle, style: AppTextStyles.body),
+                if (notification.currentValue != 'Not recorded' ||
+                    notification.idealRange != 'Not recorded') ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '${notification.currentStatus} • ${notification.currentValue} • Ideal: ${notification.idealRange}',
+                    style: AppTextStyles.cardMeta,
+                  ),
+                ],
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               ],
             ),
           ),

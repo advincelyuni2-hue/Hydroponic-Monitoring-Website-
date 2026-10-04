@@ -4,6 +4,28 @@ A Flutter login and signup frontend for the hydroponic monitoring application.
 Authentication is wired for Supabase, including email OTP verification during
 new account registration.
 
+<<<<<<< HEAD
+=======
+## Realtime monitoring and history
+
+The dashboard reads the latest `is_average = false` rows from `ph_readings`,
+`ec_readings`, and `temp_readings`, and refreshes when the ESP32 inserts its
+five-minute readings. History Logs uses `is_average = true`: daily views keep
+each ten-minute summary, weekly views aggregate into eight-hour windows, and
+monthly views aggregate by calendar day.
+
+Copy `supabase.example.json` to the ignored `supabase.json`, fill in the project
+URL and publishable key, then run both `supabase/realtime_setup.sql` and
+`supabase/rbac_setup.sql` once in Supabase. The first script enables the sensor
+tables used by the realtime dashboard and history views; the second adds user
+profiles, roles, notifications, calibration logs, and administrator-managed
+parameter ranges. Then launch with:
+
+```powershell
+flutter run -d chrome --dart-define-from-file=supabase.json
+```
+
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 ## Folder structure
 
 ```

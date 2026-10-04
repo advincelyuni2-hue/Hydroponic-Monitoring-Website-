@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
+<<<<<<< HEAD
+=======
+import '../services/auth_service.dart';
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/custom_text_field.dart';
@@ -32,7 +36,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final user = client?.auth.currentUser;
     if (user == null || !mounted) return;
 
+<<<<<<< HEAD
     await UserService().getProfile(user.id);
+=======
+    final profile = await UserService().getProfile(user.id);
+    if (!profile.isActive) {
+      await AuthService().logout();
+      return;
+    }
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const DashboardScreen()),

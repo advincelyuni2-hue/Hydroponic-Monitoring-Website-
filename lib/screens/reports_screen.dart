@@ -53,6 +53,7 @@ class ReportsScreenState extends State<ReportsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
+<<<<<<< HEAD
             if (_controller.errorMessage != null) {
               return Center(
                 child: Padding(
@@ -76,6 +77,8 @@ class ReportsScreenState extends State<ReportsScreen> {
               );
             }
 
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             return SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
               child: Column(
@@ -86,7 +89,14 @@ class ReportsScreenState extends State<ReportsScreen> {
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
+<<<<<<< HEAD
                   if (isMobile) _buildMobileLayout() else _buildDesktopLayout(),
+=======
+                  if (isMobile)
+                    _buildMobileLayout()
+                  else
+                    _buildDesktopLayout(),
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 ],
               ),
             );
@@ -145,7 +155,10 @@ class ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 20),
               AlertFrequencyCard(
                 alerts: _controller.alertFrequency,
+<<<<<<< HEAD
                 fixedCount: _controller.fixedAlertsCount,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 activeCount: _controller.activeAlertsCount,
               ),
               const SizedBox(height: 20),
@@ -153,8 +166,11 @@ class ReportsScreenState extends State<ReportsScreen> {
                 data: _controller.targetDistribution,
                 selectedParam: _controller.selectedDistributionParam,
                 onParamChanged: _controller.setDistributionParam,
+<<<<<<< HEAD
                 isLoading: _controller.isDistributionLoading,
                 errorMessage: _controller.distributionError,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               ),
             ],
           ),
@@ -175,19 +191,28 @@ class ReportsScreenState extends State<ReportsScreen> {
                 maxThreshold: _controller.selectedParameter == 'pH'
                     ? _controller.phRange.end
                     : _controller.ecRange.end,
+<<<<<<< HEAD
                 isLoading: _controller.isTrendLoading,
                 errorMessage: _controller.trendError,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 onParameterChanged: _controller.setParameter,
                 onTimeframeChanged: _controller.setTimeframe,
               ),
               const SizedBox(height: 20),
               ReportPredictionCard(
+<<<<<<< HEAD
                 phPoints: _controller.phTrendPoints,
                 ecPoints: _controller.ecTrendPoints,
                 selectedParameter: _controller.selectedPredictionParameter,
                 isLoading: _controller.isTrendLoading,
                 errorMessage: _controller.trendError,
                 onParameterChanged: _controller.setPredictionParameter,
+=======
+                points: _controller.predictionPoints,
+                selectedParameter: _controller.selectedParameter,
+                accuracyText: '95.8% Accuracy',
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               ),
               const SizedBox(height: 20),
               SensorHealthCard(
@@ -252,19 +277,28 @@ class ReportsScreenState extends State<ReportsScreen> {
           maxThreshold: _controller.selectedParameter == 'pH'
               ? _controller.phRange.end
               : _controller.ecRange.end,
+<<<<<<< HEAD
           isLoading: _controller.isTrendLoading,
           errorMessage: _controller.trendError,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           onParameterChanged: _controller.setParameter,
           onTimeframeChanged: _controller.setTimeframe,
         ),
         const SizedBox(height: 16),
         ReportPredictionCard(
+<<<<<<< HEAD
           phPoints: _controller.phTrendPoints,
           ecPoints: _controller.ecTrendPoints,
           selectedParameter: _controller.selectedPredictionParameter,
           isLoading: _controller.isTrendLoading,
           errorMessage: _controller.trendError,
           onParameterChanged: _controller.setPredictionParameter,
+=======
+          points: _controller.predictionPoints,
+          selectedParameter: _controller.selectedParameter,
+          accuracyText: '95.8% Accuracy',
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
         ),
         const SizedBox(height: 16),
         SensorHealthCard(
@@ -277,7 +311,10 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 16),
         AlertFrequencyCard(
           alerts: _controller.alertFrequency,
+<<<<<<< HEAD
           fixedCount: _controller.fixedAlertsCount,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           activeCount: _controller.activeAlertsCount,
         ),
         const SizedBox(height: 16),
@@ -285,8 +322,11 @@ class ReportsScreenState extends State<ReportsScreen> {
           data: _controller.targetDistribution,
           selectedParam: _controller.selectedDistributionParam,
           onParamChanged: _controller.setDistributionParam,
+<<<<<<< HEAD
           isLoading: _controller.isDistributionLoading,
           errorMessage: _controller.distributionError,
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
         ),
       ],
     );
@@ -327,8 +367,12 @@ class ReportsScreenState extends State<ReportsScreen> {
                 ),
               ),
               Container(
+<<<<<<< HEAD
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+=======
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 decoration: BoxDecoration(
                   color: isWarning
                       ? AppColors.alertBackground
@@ -338,8 +382,14 @@ class ReportsScreenState extends State<ReportsScreen> {
                 child: Text(
                   status,
                   style: AppTextStyles.cardMeta.copyWith(
+<<<<<<< HEAD
                     color:
                         isWarning ? AppColors.alertText : AppColors.textPrimary,
+=======
+                    color: isWarning
+                        ? AppColors.alertText
+                        : AppColors.textPrimary,
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),
@@ -395,4 +445,8 @@ class ReportsScreenState extends State<ReportsScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

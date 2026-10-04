@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import '../controllers/reports_controller.dart';
+=======
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -14,6 +17,7 @@ class GenerateReportScreen extends StatefulWidget {
 }
 
 class GenerateReportScreenState extends State<GenerateReportScreen> {
+<<<<<<< HEAD
   final ReportsController _controller = ReportsController();
   bool _isGenerating = false;
 
@@ -39,11 +43,34 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       );
     } finally {
       if (mounted) setState(() => _isGenerating = false);
+=======
+  // Checklist Options
+  bool includeSensorLogs = true;
+  bool includeCalibrationLogs = false;
+  bool includePhOptimization = true;
+  bool includeEcOptimization = false;
+  bool includeAllAnalytics = false;
+
+  bool isGenerating = false;
+
+  void onGeneratePdf() async {
+    setState(() => isGenerating = true);
+    // Simulate PDF generation/download pipeline
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() => isGenerating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PDF Report generated successfully!'),
+        ),
+      );
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     }
   }
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) {
@@ -92,6 +119,56 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           ),
         );
       },
+=======
+    final isMobile = Responsive.isMobile(context);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header without manual Back Arrow
+              const AppHeader(
+                title: 'Generate report',
+                profile: null,
+              ),
+              const SizedBox(height: 24),
+              if (isMobile)
+                Column(
+                  children: [
+                    _buildPdfPreviewArea(isMobile),
+                    const SizedBox(height: 20),
+                    _buildConfigSidebar(isMobile),
+                  ],
+                )
+              else
+                // IntrinsicHeight forces both cards to stretch to equal height
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // LEFT SIDE: PDF Document Preview Area
+                      Expanded(
+                        flex: 3,
+                        child: _buildPdfPreviewArea(isMobile),
+                      ),
+                      const SizedBox(width: 24),
+                      // RIGHT SIDE: Checklist Options & Action Buttons
+                      SizedBox(
+                        width: 380,
+                        child: _buildConfigSidebar(isMobile),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     );
   }
 
@@ -119,7 +196,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
+<<<<<<< HEAD
                   'PDF report',
+=======
+                  '1 Page • PDF',
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   style: AppTextStyles.cardMeta.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryButton,
@@ -141,7 +222,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
+<<<<<<< HEAD
                       color: Colors.black.withValues(alpha: 0.08),
+=======
+                      color: Colors.black.withOpacity(0.08),
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -177,6 +262,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                     const Divider(height: 1),
                     const SizedBox(height: 12),
                     // Content Lines / Blocks
+<<<<<<< HEAD
                     if (_controller.includeSensorLogs)
                       _previewBlock(
                           'Sensor History Logs', AppColors.primaryButton),
@@ -190,6 +276,21 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                       _previewBlock(
                           'EC Optimization Results', const Color(0xFFF39C12)),
                     if (_controller.includeAllAnalytics)
+=======
+                    if (includeSensorLogs)
+                      _previewBlock(
+                          'Sensor History Logs', AppColors.primaryButton),
+                    if (includeCalibrationLogs)
+                      _previewBlock(
+                          'Calibration Logs', AppColors.textSecondary),
+                    if (includePhOptimization)
+                      _previewBlock('pH Optimization Results',
+                          const Color(0xFF1599A8)),
+                    if (includeEcOptimization)
+                      _previewBlock('EC Optimization Results',
+                          const Color(0xFFF39C12)),
+                    if (includeAllAnalytics)
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                       _previewBlock(
                           'Visual Analytics Charts', AppColors.primaryButton),
                     const Spacer(),
@@ -246,7 +347,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             width: double.infinity,
             height: 16,
             decoration: BoxDecoration(
+<<<<<<< HEAD
               color: color.withValues(alpha: 0.08),
+=======
+              color: color.withOpacity(0.08),
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -276,6 +381,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           // Checklist items
           _checkboxTile(
             title: 'Sensor history logs',
+<<<<<<< HEAD
             value: _controller.includeSensorLogs,
             onChanged: _controller.toggleSensorLogs,
           ),
@@ -370,6 +476,100 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             color: AppColors.primaryButton,
           ),
         ),
+=======
+            value: includeSensorLogs,
+            onChanged: (val) => setState(() => includeSensorLogs = val ?? false),
+          ),
+          _checkboxTile(
+            title: 'Calibration history logs',
+            value: includeCalibrationLogs,
+            onChanged: (val) =>
+                setState(() => includeCalibrationLogs = val ?? false),
+          ),
+          _checkboxTile(
+            title: 'pH optimization results',
+            value: includePhOptimization,
+            onChanged: (val) =>
+                setState(() => includePhOptimization = val ?? false),
+          ),
+          _checkboxTile(
+            title: 'EC optimization results',
+            value: includeEcOptimization,
+            onChanged: (val) =>
+                setState(() => includeEcOptimization = val ?? false),
+          ),
+          _checkboxTile(
+            title: 'All analytics and graphs',
+            value: includeAllAnalytics,
+            onChanged: (val) =>
+                setState(() => includeAllAnalytics = val ?? false),
+          ),
+
+          const Spacer(),
+
+          // Action Buttons: Export PDF on Left, Cancel on Right
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: isGenerating ? null : onGeneratePdf,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryButton,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: isGenerating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.picture_as_pdf, size: 20),
+                    label: Text(
+                      isGenerating ? 'Generating...' : 'Export PDF',
+                      style: AppTextStyles.button.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: AppColors.primaryButton,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: AppTextStyles.button.copyWith(
+                        color: AppColors.primaryButton,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       ),
     );
   }
@@ -395,4 +595,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       ),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
