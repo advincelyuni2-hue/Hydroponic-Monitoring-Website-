@@ -157,8 +157,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
   }
 
   Widget _buildLegend() {
-    final currentColor =
-        widget.selectedParameter == 'pH' ? phColor : ecColor;
+    final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -186,16 +185,31 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       spots.add(FlSpot(i.toDouble(), widget.points[i].value));
     }
 
-    final currentColor =
-        widget.selectedParameter == 'pH' ? phColor : ecColor;
+    final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
+    var dataMin = widget.minThreshold;
+    var dataMax = widget.maxThreshold;
+    for (final point in widget.points) {
+      if (!point.value.isFinite) continue;
+      if (point.value < dataMin) dataMin = point.value;
+      if (point.value > dataMax) dataMax = point.value;
+    }
+    final dataRange = dataMax - dataMin;
+    final padding = (dataRange * 0.1).clamp(0.1, double.infinity).toDouble();
+    final minY = dataMin - padding;
+    final maxY = dataMax + padding;
+    final titleInterval = (maxY - minY) / 5;
+    final labelIntervals = isMobile ? 5 : 6;
+    final xInterval = widget.points.length > 1
+        ? ((widget.points.length - 2 + labelIntervals) ~/ labelIntervals)
+        : 1;
 
     return LineChartData(
       minX: 0,
-      maxX: widget.points.isNotEmpty
-          ? (widget.points.length - 1).toDouble()
-          : 5,
-      minY: widget.selectedParameter == 'pH' ? 5.0 : 0.0,
-      maxY: widget.selectedParameter == 'pH' ? 7.5 : 3.0,
+      maxX:
+          widget.points.isNotEmpty ? (widget.points.length - 1).toDouble() : 5,
+      minY: minY,
+      maxY: maxY,
+      clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
@@ -214,24 +228,15 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       ),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: AxisTitles(
-          axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
-          sideTitles: SideTitles(
-            showTitles: true,
-            reservedSize: isMobile ? 33 : 42,
-            interval: 0.5,
-            getTitlesWidget: (val, _) => Text(
-              val.toStringAsFixed(1),
-              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
-            ),
-          ),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
         ),
         leftTitles: AxisTitles(
           axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: isMobile ? 33 : 42,
-            interval: 0.5,
+            interval: titleInterval,
             getTitlesWidget: (val, _) => Text(
               val.toStringAsFixed(1),
               style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
@@ -241,22 +246,31 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 30,
-            interval: 1,
+            reservedSize: 42,
+            interval: xInterval.toDouble(),
             getTitlesWidget: (val, _) {
               final idx = val.toInt();
-              if (idx >= 0 && idx < widget.points.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    widget.points[idx].label,
-                    style: AppTextStyles.cardMeta.copyWith(
-                      fontSize: isMobile ? 10 : null,
-                    ),
-                  ),
-                );
+              if (idx < 0 ||
+                  idx >= widget.points.length ||
+                  (val - idx).abs() > 0.001 ||
+                  idx % xInterval != 0) {
+                return const SizedBox.shrink();
               }
-              return const SizedBox.shrink();
+              final label = widget.points[idx].label;
+              final previousIdx = idx - xInterval;
+              if (previousIdx >= 0 &&
+                  widget.points[previousIdx].label == label) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  label,
+                  style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              );
             },
           ),
         ),
@@ -294,6 +308,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
         LineChartBarData(
           spots: spots,
           isCurved: true,
+          curveSmoothness: 0.15,
+          preventCurveOverShooting: true,
           color: currentColor,
           barWidth: 2.5,
           dotData: const FlDotData(show: false),
