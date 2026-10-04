@@ -9,36 +9,30 @@ import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 
 class ReportPredictionCard extends StatelessWidget {
-  final List<AnalyticsPoint> phPoints;
-  final List<AnalyticsPoint> ecPoints;
-  final String selectedParameter;
+  final ModelEvaluation evaluation;
+  final String selectedParameter; // 'Both', 'pH' or 'EC'
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<String> onParameterChanged;
-  final String? accuracyText;
 
   const ReportPredictionCard({
     super.key,
-    required this.phPoints,
-    required this.ecPoints,
+    required this.evaluation,
     required this.selectedParameter,
     required this.isLoading,
     required this.errorMessage,
     required this.onParameterChanged,
-    this.accuracyText,
   });
 
   static Color get _phColor => AppColors.accentGreen;
   static Color get _ecColor => AppColors.accentTeal;
 
+  bool get _showPh => selectedParameter != 'EC';
+  bool get _showEc => selectedParameter != 'pH';
+
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
-    final noData = selectedParameter == 'Both'
-        ? phPoints.isEmpty && ecPoints.isEmpty
-        : selectedParameter == 'pH'
-            ? phPoints.isEmpty
-            : ecPoints.isEmpty;
 
     return Container(
       width: double.infinity,
@@ -50,62 +44,15 @@ class ReportPredictionCard extends StatelessWidget {
           _buildHeader(isMobile),
           const SizedBox(height: 5),
           Text(
-            'Recorded sensor readings from Supabase. Historical model '
-            'predictions are not currently stored for comparison.',
+            'Compares what ${evaluation.modelName} predicted '
+            '${evaluation.horizonHours} hours ahead with what the sensors '
+            'actually measured. Dashed lines are predictions.',
             style: AppTextStyles.cardMeta,
           ),
           SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
             height: isMobile ? 230 : 350,
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : errorMessage != null
-                    ? Center(
-                        child: Text(
-                          errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.cardMeta,
-                        ),
-                      )
-                    : noData
-                        ? Center(
-                            child: Text(
-                              'No readings available for this selection.',
-                              style: AppTextStyles.cardMeta,
-                            ),
-                          )
-                        : selectedParameter == 'Both'
-                            ? Column(
-                                children: [
-                                  Expanded(
-                                    child: _seriesChart(
-                                      phPoints,
-                                      'pH',
-                                      _phColor,
-                                      isMobile,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: _seriesChart(
-                                      ecPoints,
-                                      'EC',
-                                      _ecColor,
-                                      isMobile,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : _seriesChart(
-                                selectedParameter == 'pH'
-                                    ? phPoints
-                                    : ecPoints,
-                                selectedParameter,
-                                selectedParameter == 'pH'
-                                    ? _phColor
-                                    : _ecColor,
-                                isMobile,
-                              ),
+            child: _buildBody(isMobile),
           ),
           const SizedBox(height: 12),
           _buildLegend(),
@@ -114,7 +61,39 @@ class ReportPredictionCard extends StatelessWidget {
     );
   }
 
+  Widget _buildBody(bool isMobile) {
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 12),
+            Text(
+              'Comparing model predictions with sensor readings...',
+              style: AppTextStyles.cardMeta,
+            ),
+          ],
+        ),
+      );
+    }
+    if (evaluation.samples.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            errorMessage ?? 'No model predictions are available yet.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.cardMeta,
+          ),
+        ),
+      );
+    }
+    return _buildChart(isMobile);
+  }
+
   Widget _buildHeader(bool isMobile) {
+    final accuracy = evaluation.accuracyFor(selectedParameter);
     final title = Wrap(
       spacing: 8,
       runSpacing: 4,
@@ -122,8 +101,7 @@ class ReportPredictionCard extends StatelessWidget {
       children: [
         Icon(Icons.show_chart, color: AppColors.accentGreen),
         Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
-        if (accuracyText != null) ...[
-          const SizedBox(width: 4),
+        if (accuracy != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -131,7 +109,7 @@ class ReportPredictionCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              accuracyText!,
+              '${accuracy.toStringAsFixed(1)}% accuracy',
               style: AppTextStyles.cardMeta.copyWith(
                 fontWeight: FontWeight.w700,
                 color: AppColors.accentGreen,
@@ -139,7 +117,6 @@ class ReportPredictionCard extends StatelessWidget {
               ),
             ),
           ),
-        ],
       ],
     );
     final controls = _selector(
@@ -154,12 +131,7 @@ class ReportPredictionCard extends StatelessWidget {
         children: [title, const SizedBox(height: 12), controls],
       );
     }
-    return Row(
-      children: [
-        Expanded(child: title),
-        controls,
-      ],
-    );
+    return Row(children: [Expanded(child: title), controls]);
   }
 
   Widget _selector(
@@ -206,44 +178,65 @@ class ReportPredictionCard extends StatelessWidget {
     );
   }
 
-  Widget _seriesChart(
-    List<AnalyticsPoint> points,
-    String parameter,
-    Color color,
-    bool isMobile,
-  ) {
-    if (points.isEmpty) {
+  List<_Series> _series() {
+    final samples = evaluation.samples;
+    List<FlSpot> spots(double? Function(EvaluationSample) pick) => [
+          for (var i = 0; i < samples.length; i++)
+            if (pick(samples[i]) != null)
+              FlSpot(i.toDouble(), pick(samples[i])!),
+        ];
+
+    final list = <_Series>[
+      if (_showPh) ...[
+        _Series('pH measured', _phColor, false, spots((s) => s.phActual)),
+        _Series('pH predicted', _phColor, true, spots((s) => s.phPredicted)),
+      ],
+      if (_showEc) ...[
+        _Series('EC measured', _ecColor, false, spots((s) => s.ecActual)),
+        _Series('EC predicted', _ecColor, true, spots((s) => s.ecPredicted)),
+      ],
+    ];
+    return list.where((s) => s.spots.isNotEmpty).toList();
+  }
+
+  Widget _buildChart(bool isMobile) {
+    final samples = evaluation.samples;
+    final series = _series();
+    if (series.isEmpty) {
       return Center(
-        child: Text(
-          'No $parameter readings available for this period.',
-          style: AppTextStyles.cardMeta,
-        ),
+        child: Text('No readings for this selection.',
+            style: AppTextStyles.cardMeta),
       );
     }
 
-    final spots = [
-      for (var i = 0; i < points.length; i++)
-        FlSpot(i.toDouble(), points[i].value),
-    ];
-    final values = points.map((point) => point.value);
-    var minY = values.reduce(math.min);
-    var maxY = values.reduce(math.max);
-    final span = maxY - minY;
-    final padding = span == 0 ? math.max(maxY.abs() * 0.1, 0.1) : span * 0.15;
-    minY = math.max(0, minY - padding);
-    maxY += padding;
-    if (maxY <= minY) maxY = minY + 0.5;
-    final interval = math.max((maxY - minY) / 4, 0.1);
-    final labelInterval = math.max(1, (points.length / 5).ceil());
+    var maxValue = 0.0;
+    for (final s in series) {
+      for (final spot in s.spots) {
+        maxValue = math.max(maxValue, spot.y);
+      }
+    }
+    final maxY = math.max(1.0, ((maxValue * 1.15) / 0.5).ceilToDouble() * 0.5);
+    final labelInterval =
+        math.max(1, (samples.length / (isMobile ? 3 : 4)).ceil());
 
     return LineChart(
       LineChartData(
         minX: 0,
-        maxX: math.max(points.length - 1, 1).toDouble(),
-        minY: minY,
+        maxX: math.max(samples.length - 1, 1).toDouble(),
+        minY: 0,
         maxY: maxY,
         clipData: const FlClipData.all(),
-        gridData: const FlGridData(show: true),
+        gridData: FlGridData(
+          show: true,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: AppColors.chartGrid.withValues(alpha: 0.65),
+            strokeWidth: 1,
+          ),
+          getDrawingVerticalLine: (_) => FlLine(
+            color: AppColors.chartGrid.withValues(alpha: 0.35),
+            strokeWidth: 1,
+          ),
+        ),
         borderData: FlBorderData(
           show: true,
           border: Border.all(color: AppColors.chartGrid),
@@ -254,35 +247,35 @@ class ReportPredictionCard extends StatelessWidget {
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
-            axisNameWidget: Text(
-              parameter == 'EC' ? 'mS/cm' : 'pH',
-              style: AppTextStyles.cardMeta,
-            ),
+            axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: isMobile ? 38 : 48,
-              interval: interval,
+              reservedSize: isMobile ? 33 : 42,
+              interval: maxY / 4,
               getTitlesWidget: (value, _) => Text(
                 value.toStringAsFixed(1),
-                style: AppTextStyles.cardMeta.copyWith(fontSize: 9),
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
               ),
             ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 24,
+              reservedSize: 28,
               interval: labelInterval.toDouble(),
               getTitlesWidget: (value, _) {
                 final index = value.toInt();
-                if (index < 0 || index >= points.length) {
+                if (index < 0 ||
+                    index >= samples.length ||
+                    (value - index).abs() > 0.001 ||
+                    index % labelInterval != 0) {
                   return const SizedBox.shrink();
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    points[index].label,
-                    style: AppTextStyles.cardMeta.copyWith(fontSize: 8),
+                    samples[index].label,
+                    style: AppTextStyles.cardMeta.copyWith(fontSize: 9),
                   ),
                 );
               },
@@ -293,64 +286,90 @@ class ReportPredictionCard extends StatelessWidget {
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => AppColors.cardBackground,
             tooltipRoundedRadius: 8,
-            getTooltipItems: (items) => items
-                .map(
-                  (spot) => LineTooltipItem(
-                    '${spot.y.toStringAsFixed(2)}'
-                    '${parameter == 'EC' ? ' mS/cm' : ''}',
-                    AppTextStyles.bodyBold.copyWith(color: color),
+            getTooltipItems: (touched) => [
+              for (var i = 0; i < touched.length; i++)
+                LineTooltipItem(
+                  '${i == 0 ? '${samples[touched[i].x.toInt()].label}\n' : ''}'
+                  '${series[touched[i].barIndex].name}: '
+                  '${touched[i].y.toStringAsFixed(2)}'
+                  '${series[touched[i].barIndex].name.startsWith('EC') ? ' mS/cm' : ''}',
+                  AppTextStyles.bodyBold.copyWith(
+                    color: series[touched[i].barIndex].color,
+                    fontSize: 12,
                   ),
-                )
-                .toList(),
+                ),
+            ],
           ),
         ),
         lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            color: color,
-            barWidth: 2.5,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: color.withValues(alpha: 0.10),
+          for (final s in series)
+            LineChartBarData(
+              spots: s.spots,
+              isCurved: false,
+              color: s.color,
+              barWidth: 2.5,
+              dashArray: s.predicted ? [6, 4] : null,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, bar, index) =>
+                    FlDotCirclePainter(
+                  radius: 3,
+                  color: s.color,
+                  strokeWidth: 1.5,
+                  strokeColor: AppColors.cardBackground,
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: !s.predicted,
+                color: s.color.withValues(alpha: 0.08),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildLegend() {
-    final items = selectedParameter == 'Both'
-        ? [('pH measured values', _phColor), ('EC measured values', _ecColor)]
-        : [
-            (
-              '$selectedParameter measured values',
-              selectedParameter == 'pH' ? _phColor : _ecColor,
-            ),
-          ];
+    final items = _series();
     return Wrap(
       spacing: 18,
       runSpacing: 8,
       children: [
-        for (final item in items)
+        for (final s in items)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 10,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: item.$2,
-                  borderRadius: BorderRadius.circular(2),
+              if (s.predicted)
+                Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      Container(width: 4, height: 3, color: s.color),
+                      if (i < 2) const SizedBox(width: 2),
+                    ],
+                  ],
+                )
+              else
+                Container(
+                  width: 14,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: s.color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
               const SizedBox(width: 6),
-              Text(item.$1, style: AppTextStyles.cardMeta),
+              Text(s.name, style: AppTextStyles.cardMeta),
             ],
           ),
       ],
     );
   }
+}
+
+class _Series {
+  final String name;
+  final Color color;
+  final bool predicted;
+  final List<FlSpot> spots;
+  const _Series(this.name, this.color, this.predicted, this.spots);
 }

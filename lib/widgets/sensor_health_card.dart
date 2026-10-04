@@ -32,7 +32,7 @@ class SensorHealthCard extends StatelessWidget {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
               ),
               Text(
-                '3 Active Probes',
+                '${sensors.length} sensors',
                 style: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
@@ -89,7 +89,7 @@ class SensorHealthCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: (item.healthPercentage / 100).clamp(0.0, 1.0),
               minHeight: 8,
-              backgroundColor: const Color(0xFFE2E2E2),
+              backgroundColor: AppColors.pillBackground,
               valueColor: AlwaysStoppedAnimation<Color>(
                 item.healthPercentage > 70
                     ? AppColors.primaryButton
@@ -101,9 +101,11 @@ class SensorHealthCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            item.daysSinceCalibration == 0
-                ? 'Auto / Factory calibrated'
-                : 'Last cal: ${item.daysSinceCalibration}d ago',
+            item.daysSinceCalibration < 0
+                ? 'No calibration recorded'
+                : item.daysSinceCalibration == 0
+                  ? 'Calibrated today'
+                  : 'Last cal: ${item.daysSinceCalibration}d ago',
             style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
           ),
         ],

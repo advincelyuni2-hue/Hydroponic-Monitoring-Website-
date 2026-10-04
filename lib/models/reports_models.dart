@@ -81,3 +81,76 @@ class SensorHealthItem {
     required this.statusLabel,
   });
 }
+
+class AlertStats {
+  final int criticalCount;
+  final int activeCount;
+  final int resolvedCount;
+  final List<AlertFrequencyData> byCategory;
+
+  const AlertStats({
+    required this.criticalCount,
+    required this.activeCount,
+    required this.resolvedCount,
+    required this.byCategory,
+  });
+
+  static const empty = AlertStats(
+    criticalCount: 0,
+    activeCount: 0,
+    resolvedCount: 0,
+    byCategory: [],
+  );
+}
+
+class EvaluationSample {
+  final String label;
+  final double? phActual;
+  final double? phPredicted;
+  final double? ecActual;
+  final double? ecPredicted;
+
+  const EvaluationSample({
+    required this.label,
+    this.phActual,
+    this.phPredicted,
+    this.ecActual,
+    this.ecPredicted,
+  });
+}
+
+class ModelEvaluation {
+  final List<EvaluationSample> samples;
+  final int horizonHours;
+  final String modelName;
+
+  const ModelEvaluation({
+    required this.samples,
+    required this.horizonHours,
+    required this.modelName,
+  });
+
+  static const empty = ModelEvaluation(
+    samples: [],
+    horizonHours: 12,
+    modelName: 'Forecast model',
+  );
+
+  /// 100 minus the mean absolute percentage error, for 'pH', 'EC' or 'Both'.
+  double? accuracyFor(String parameter) {
+    final errors = <double>[];
+    for (final s in samples) {
+      if (parameter != 'EC') _addError(errors, s.phActual, s.phPredicted);
+      if (parameter != 'pH') _addError(errors, s.ecActual, s.ecPredicted);
+    }
+    if (errors.isEmpty) return null;
+    final mape = errors.reduce((a, b) => a + b) / errors.length;
+    return (100 - mape).clamp(0, 100).toDouble();
+  }
+
+  static void _addError(
+      List<double> errors, double? actual, double? predicted) {
+    if (actual == null || predicted == null || actual == 0) return;
+    errors.add((actual - predicted).abs() / actual.abs() * 100);
+  }
+}

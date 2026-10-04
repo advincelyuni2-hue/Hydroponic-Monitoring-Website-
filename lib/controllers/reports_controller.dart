@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
+import 'dart:async';
+import '../services/model_evaluation_service.dart';
 import '../services/app_state.dart';
 import '../services/monitoring_service.dart';
 import '../services/pdf_report_service.dart';
@@ -15,6 +17,19 @@ class ReportsController extends ChangeNotifier {
   final UserService _userService = UserService();
   final MonitoringService _monitoringService = MonitoringService();
   final PdfReportService _pdfReportService = PdfReportService();
+  final ModelEvaluationService _evaluationService = ModelEvaluationService();
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
 
   bool isLoading = false;
   bool isDistributionLoading = false;
@@ -62,36 +77,14 @@ class ReportsController extends ChangeNotifier {
     criticalPercentage: 0,
   );
 
-  List<AlertFrequencyData> alertFrequency = const [
-    AlertFrequencyData(category: 'pH Drift', count: 5),
-    AlertFrequencyData(category: 'EC Spike', count: 2),
-    AlertFrequencyData(category: 'Humidity', count: 1),
-    AlertFrequencyData(category: 'Offline', count: 1),
-  ];
+  List<AlertFrequencyData> alertFrequency = const [];
+  int fixedAlertsCount = 0;
+  int activeAlertsCount = 0;
+  List<SensorHealthItem> sensorHealthList = const [];
 
-  int fixedAlertsCount = 8;
-  int activeAlertsCount = 1;
-
-  List<SensorHealthItem> sensorHealthList = const [
-    SensorHealthItem(
-      sensorName: 'pH Probe',
-      daysSinceCalibration: 5,
-      healthPercentage: 92,
-      statusLabel: 'Good',
-    ),
-    SensorHealthItem(
-      sensorName: 'EC Sensor',
-      daysSinceCalibration: 26,
-      healthPercentage: 45,
-      statusLabel: 'Cal Due Soon',
-    ),
-    SensorHealthItem(
-      sensorName: 'Air Humidity',
-      daysSinceCalibration: 0,
-      healthPercentage: 100,
-      statusLabel: 'Factory Cal',
-    ),
-  ];
+  ModelEvaluation modelEvaluation = ModelEvaluation.empty;
+  bool isEvaluationLoading = false;
+  String? evaluationError;
 
   String selectedParameter = 'pH'; // 'pH' or 'EC'
   String selectedTimeframe = '7d'; // '7d', '30d', '90d'
@@ -295,6 +288,49 @@ class ReportsController extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadAlerts() async {
+    try {
+      final stats = await _reportsService.getAlertStats();
+      alertFrequency = stats.byCategory;
+      activeAlertsCount = stats.activeCount;
+      fixedAlertsCount = stats.resolvedCount;
+    } catch (error) {
+      debugPrint('Alert stats failed: $error');
+      alertFrequency = const [];
+      activeAlertsCount = 0;
+      fixedAlertsCount = 0;
+    }
+  }
+
+  Future<void> _loadSensorHealth() async {
+    try {
+      sensorHealthList = await _reportsService.getSensorHealth();
+    } catch (error) {
+      debugPrint('Sensor health failed: $error');
+      sensorHealthList = const [];
+    }
+  }
+
+  Future<void> loadModelEvaluation() async {
+    isEvaluationLoading = true;
+    evaluationError = null;
+    notifyListeners();
+    try {
+      modelEvaluation = await _evaluationService.evaluate();
+      if (modelEvaluation.samples.isEmpty) {
+        evaluationError = 'No model predictions could be compared yet. Make '
+            'sure the forecast model service is running (FORECAST_API_URL) '
+            'and that there are at least 12 hours of sensor readings.';
+      }
+    } catch (error) {
+      modelEvaluation = ModelEvaluation.empty;
+      evaluationError = 'Could not evaluate the forecast model: $error';
+    } finally {
+      isEvaluationLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> loadData() async {
     isLoading = true;
     errorMessage = null;
@@ -326,6 +362,8 @@ class ReportsController extends ChangeNotifier {
 
     await loadTrendData();
 
+    await Future.wait([_loadAlerts(), _loadSensorHealth()]);
+
     try {
       final collectionRange = await _reportsService.getCollectionDateRange();
       lastUpdatedTimestamp = collectionRange == null
@@ -337,5 +375,8 @@ class ReportsController extends ChangeNotifier {
 
     isLoading = false;
     notifyListeners();
+
+    // Runs in the background so the page doesn't wait for the model.
+    unawaited(loadModelEvaluation());
   }
 }

@@ -159,21 +159,38 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
   Widget _buildLegend() {
     final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 18,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(
-            color: currentColor,
-            shape: BoxShape.circle,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration:
+                  BoxDecoration(color: currentColor, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text('${widget.selectedParameter} measured values',
+                style: AppTextStyles.cardMeta),
+          ],
         ),
-        const SizedBox(width: 6),
-        Text(
-          '${widget.selectedParameter} measured values',
-          style: AppTextStyles.cardMeta,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                  color: AppColors.alertBorder, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text('Out of range (hover for details)',
+                style: AppTextStyles.cardMeta),
+          ],
         ),
       ],
     );
@@ -186,6 +203,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
     }
 
     final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
+    bool isOut(double value) =>
+      value < widget.minThreshold || value > widget.maxThreshold;
     var dataMin = widget.minThreshold;
     var dataMax = widget.maxThreshold;
     for (final point in widget.points) {
@@ -294,14 +313,68 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
         ],
       ),
       lineTouchData: LineTouchData(
+        getTouchedSpotIndicator: (barData, indexes) => indexes
+            .map(
+              (i) => TouchedSpotIndicatorData(
+                FlLine(
+                  color: currentColor.withValues(alpha: 0.4),
+                  strokeWidth: 1,
+                  dashArray: [4, 4],
+                ),
+                FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, bar, index) =>
+                      FlDotCirclePainter(
+                    radius: 6,
+                    color: isOut(spot.y) ? AppColors.alertBorder : currentColor,
+                    strokeWidth: 2,
+                    strokeColor: Colors.white,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => AppColors.cardBackground,
           tooltipRoundedRadius: 8,
           getTooltipItems: (spots) => spots.map((spot) {
+            final idx = spot.x.toInt();
+            final label = idx >= 0 && idx < widget.points.length
+                ? widget.points[idx].label
+                : '';
             final unit = widget.selectedParameter == 'pH' ? '' : ' mS/cm';
+            final range =
+                '${widget.minThreshold.toStringAsFixed(1)} - '
+                '${widget.maxThreshold.toStringAsFixed(1)}';
+            final String verdict;
+            final Color verdictColor;
+            if (spot.y > widget.maxThreshold) {
+              verdict = 'Out of range (above $range)';
+              verdictColor = AppColors.alertBorder;
+            } else if (spot.y < widget.minThreshold) {
+              verdict = 'Out of range (below $range)';
+              verdictColor = AppColors.alertBorder;
+            } else {
+              verdict = 'Within range ($range)';
+              verdictColor = AppColors.accentGreen;
+            }
             return LineTooltipItem(
-              '${widget.selectedParameter} ${spot.y.toStringAsFixed(2)}$unit',
-              AppTextStyles.bodyBold.copyWith(color: currentColor),
+              '$label\n',
+              AppTextStyles.cardMeta,
+              children: [
+                TextSpan(
+                  text:
+                      '${widget.selectedParameter} ${spot.y.toStringAsFixed(2)}$unit\n',
+                  style: AppTextStyles.bodyBold.copyWith(color: currentColor),
+                ),
+                TextSpan(
+                  text: verdict,
+                  style: AppTextStyles.cardMeta.copyWith(
+                    color: verdictColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             );
           }).toList(),
         ),
@@ -314,7 +387,16 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           preventCurveOverShooting: true,
           color: currentColor,
           barWidth: 2.5,
-          dotData: const FlDotData(show: false),
+          dotData: FlDotData(
+            show: true,
+            checkToShowDot: (spot, _) => isOut(spot.y),
+            getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+              radius: 4.5,
+              color: AppColors.alertBorder,
+              strokeWidth: 2,
+              strokeColor: Colors.white,
+            ),
+          ),
           belowBarData: BarAreaData(
             show: true,
             color: currentColor.withValues(alpha: 0.10),

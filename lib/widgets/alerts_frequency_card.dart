@@ -17,7 +17,7 @@ class AlertFrequencyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasData = alerts.isNotEmpty;
+    final hasData = alerts.any((a) => a.count > 0);
     final highestCount = hasData
         ? alerts.map((a) => a.count).reduce((a, b) => a > b ? a : b)
         : 0;
@@ -61,7 +61,7 @@ class AlertFrequencyCard extends StatelessWidget {
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 6),
                                   child: Text(
-                                    alerts[idx].category,
+                                    '${alerts[idx].category} (${alerts[idx].count})',
                                     style: AppTextStyles.cardMeta
                                         .copyWith(fontSize: 10),
                                   ),

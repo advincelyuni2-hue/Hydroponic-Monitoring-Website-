@@ -152,13 +152,11 @@ class ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 20),
               ReportPredictionCard(
-                phPoints: _controller.phTrendPoints,
-                ecPoints: _controller.ecTrendPoints,
+                evaluation: _controller.modelEvaluation,
                 selectedParameter: _controller.selectedPredictionParameter,
-                isLoading: _controller.isTrendLoading,
-                errorMessage: _controller.trendError,
+                isLoading: _controller.isEvaluationLoading,
+                errorMessage: _controller.evaluationError,
                 onParameterChanged: _controller.setPredictionParameter,
-                accuracyText: '95.8% Accuracy',
               ),
               const SizedBox(height: 20),
               SensorHealthCard(
@@ -226,13 +224,11 @@ class ReportsScreenState extends State<ReportsScreen> {
         ),
         const SizedBox(height: 16),
         ReportPredictionCard(
-          phPoints: _controller.phTrendPoints,
-          ecPoints: _controller.ecTrendPoints,
+          evaluation: _controller.modelEvaluation,
           selectedParameter: _controller.selectedPredictionParameter,
-          isLoading: _controller.isTrendLoading,
-          errorMessage: _controller.trendError,
+          isLoading: _controller.isEvaluationLoading,
+          errorMessage: _controller.evaluationError,
           onParameterChanged: _controller.setPredictionParameter,
-          accuracyText: '95.8% Accuracy',
         ),
         const SizedBox(height: 16),
         SensorHealthCard(

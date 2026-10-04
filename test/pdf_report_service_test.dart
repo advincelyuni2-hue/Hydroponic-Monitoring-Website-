@@ -8,14 +8,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('generates a PDF containing the selected report sections', () async {
+    var outputCalled = false;
     final service = PdfReportService(
       output: (bytes, filename) async {
+        outputCalled = true;
         expect(bytes, isNotEmpty);
         expect(filename, 'hydroponic-monitoring-report.pdf');
       },
     );
 
-    await service.generateAndShare(
+    final bytes = await service.buildReport(
       summary: const ReportSummaryData(
         avgPh: 6.2,
         phStatus: 'In range',
@@ -26,9 +28,11 @@ void main() {
         criticalAlertsCount: 1,
         alertsPeriod: 'This month',
       ),
-      trendPoints: const [
+      phTrendPoints: const [
         AnalyticsPoint(label: 'Oct 1', value: 6.2, parameter: 'pH'),
         AnalyticsPoint(label: 'Oct 2', value: 6.3, parameter: 'pH'),
+      ],
+      ecTrendPoints: const [
         AnalyticsPoint(label: 'Oct 1', value: 1.5, parameter: 'EC'),
         AnalyticsPoint(label: 'Oct 2', value: 1.6, parameter: 'EC'),
       ],
@@ -61,12 +65,16 @@ void main() {
       ],
       phRange: const RangeValues(5.5, 6.5),
       ecRange: const RangeValues(1.2, 1.8),
-      selectedParameter: 'pH',
       includeSensorLogs: true,
       includeCalibrationLogs: true,
       includePhOptimization: true,
       includeEcOptimization: true,
       includeAllAnalytics: true,
     );
+
+    expect(bytes, isNotEmpty);
+
+    await service.downloadPdf(bytes);
+    expect(outputCalled, isTrue);
   });
 }

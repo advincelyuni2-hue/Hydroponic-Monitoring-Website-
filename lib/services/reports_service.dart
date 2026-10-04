@@ -112,6 +112,13 @@ class ReportsService {
     final ecValues = _values(logs, 3);
     final tempValues = _values(logs, 4);
 
+    var criticalAlerts = 0;
+    try {
+      criticalAlerts = (await getAlertStats()).criticalCount;
+    } catch (e) {
+      debugPrint('Critical alert count failed: $e');
+    }
+
     return ReportSummaryData(
       avgPh: _average(phValues),
       phStatus: _status(_average(phValues), _firstRange(logs, 2)),
@@ -119,7 +126,7 @@ class ReportsService {
       ecStatus: _status(_average(ecValues), _firstRange(logs, 3)),
       avgTemp: _average(tempValues),
       tempStatus: _status(_average(tempValues), _firstRange(logs, 4)),
-      criticalAlertsCount: 0,
+      criticalAlertsCount: criticalAlerts,
       alertsPeriod: 'Last 30 days',
     );
   }
@@ -172,6 +179,127 @@ class ReportsService {
       optimalPercentage: optimal * 100 / total,
       warningPercentage: warning * 100 / total,
       criticalPercentage: critical * 100 / total,
+    );
+  }
+    /// Critical alerts from the notifications table (last [days] days).
+  Future<AlertStats> getAlertStats({int days = 30}) async {
+    final since = DateTime.now()
+        .toUtc()
+        .subtract(Duration(days: days))
+        .toIso8601String();
+    final rows = await supabase
+        .from('notifications')
+        .select()
+        .gte('created_at', since)
+        .order('created_at', ascending: false)
+        .limit(1000);
+
+    final counts = <String, int>{'pH': 0, 'EC': 0, 'Temperature': 0, 'Other': 0};
+    var critical = 0;
+    var active = 0;
+    var resolved = 0;
+
+    for (final row in rows) {
+      final type = (row['type'] ?? '').toString().toLowerCase();
+      final text = '${row['title'] ?? ''} ${row['message'] ?? ''}'.toLowerCase();
+      if (type != 'critical' && !text.contains('critical')) continue;
+
+      critical++;
+      if (row['is_resolved'] == true) {
+        resolved++;
+      } else {
+        active++;
+      }
+      final category = _alertCategory(row['parameter']) ??
+          _alertCategory(row['title']) ??
+          _alertCategory(row['message']) ??
+          'Other';
+      counts[category] = (counts[category] ?? 0) + 1;
+    }
+
+    return AlertStats(
+      criticalCount: critical,
+      activeCount: active,
+      resolvedCount: resolved,
+      byCategory: [
+        for (final entry in counts.entries)
+          if (entry.key != 'Other' || entry.value > 0)
+            AlertFrequencyData(category: entry.key, count: entry.value),
+      ],
+    );
+  }
+
+  String? _alertCategory(dynamic value) {
+    final text = (value ?? '').toString().toLowerCase();
+    if (text.trim().isEmpty) return null;
+    if (RegExp(r'\bp\s*h\b').hasMatch(text)) return 'pH';
+    if (RegExp(r'\bec\b').hasMatch(text)) return 'EC';
+    if (text.contains('temperature') || RegExp(r'\btemp\b').hasMatch(text)) {
+      return 'Temperature';
+    }
+    return null;
+  }
+
+  /// Sensor calibration status from the calibration_logs table.
+  Future<List<SensorHealthItem>> getSensorHealth() async {
+    final rows = await supabase
+        .from('calibration_logs')
+        .select('recorded_at, parameter, status')
+        .order('recorded_at', ascending: false)
+        .limit(500);
+    final now = DateTime.now().toUtc();
+    return [
+      _healthFor('pH Probe', 'ph', rows, now),
+      _healthFor('EC Sensor', 'ec', rows, now),
+      _healthFor('Temperature Sensor', 'temp', rows, now),
+    ];
+  }
+
+  SensorHealthItem _healthFor(
+    String name,
+    String key,
+    List<Map<String, dynamic>> rows,
+    DateTime now,
+  ) {
+    Map<String, dynamic>? latest;
+    for (final row in rows) {
+      final parameter = (row['parameter'] ?? '').toString().toLowerCase();
+      final matches = switch (key) {
+        'temp' => parameter.contains('temp'),
+        'ec' => parameter.contains('ec') || parameter.contains('conductiv'),
+        _ => parameter.contains('ph'),
+      };
+      if (matches) {
+        latest = row; // rows are newest first
+        break;
+      }
+    }
+
+    final when = latest == null
+        ? null
+        : DateTime.tryParse('${latest['recorded_at']}')?.toUtc();
+    if (latest == null || when == null) {
+      return SensorHealthItem(
+        sensorName: name,
+        daysSinceCalibration: -1,
+        healthPercentage: 0,
+        statusLabel: 'No records',
+      );
+    }
+
+    final days = now.difference(when).inDays;
+    var health = (100 - days * 100 / 30).round().clamp(0, 100);
+    var label = days <= 14 ? 'Good' : (days <= 30 ? 'Due soon' : 'Overdue');
+    final status = (latest['status'] ?? '').toString().toLowerCase();
+    if (status.contains('fail')) {
+      health = health > 40 ? 40 : health;
+      label = 'Last cal failed';
+    }
+    return SensorHealthItem(
+      sensorName: name,
+      daysSinceCalibration: days,
+      healthPercentage: health,
+      statusLabel: label,
     );
   }
 
