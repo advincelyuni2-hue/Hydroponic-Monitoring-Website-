@@ -109,19 +109,11 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                       show: true,
                       drawVerticalLine: true,
                       getDrawingHorizontalLine: (_) => FlLine(
-<<<<<<< HEAD
                         color: AppColors.chartGrid.withValues(alpha: 0.65),
                         strokeWidth: 1,
                       ),
                       getDrawingVerticalLine: (_) => FlLine(
                         color: AppColors.chartGrid.withValues(alpha: 0.35),
-=======
-                        color: AppColors.chartGrid.withOpacity(0.65),
-                        strokeWidth: 1,
-                      ),
-                      getDrawingVerticalLine: (_) => FlLine(
-                        color: AppColors.chartGrid.withOpacity(0.35),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                         strokeWidth: 1,
                       ),
                     ),
@@ -215,11 +207,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                         dotData: const FlDotData(show: false),
                         belowBarData: BarAreaData(
                           show: true,
-<<<<<<< HEAD
                           color: chartLineColor.withValues(alpha: 0.10),
-=======
-                          color: chartLineColor.withOpacity(0.10),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                         ),
                       ),
                       LineChartBarData(
@@ -231,11 +219,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                         dotData: const FlDotData(show: true),
                         belowBarData: BarAreaData(
                           show: true,
-<<<<<<< HEAD
                           color: chartLineColor.withValues(alpha: 0.05),
-=======
-                          color: chartLineColor.withOpacity(0.05),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                         ),
                       ),
                     ],

@@ -187,10 +187,7 @@ class AuthService {
     if (supabaseClient != null) await supabaseClient!.auth.signOut();
     appProfile.value = null;
   }
-<<<<<<< HEAD
   // Append this method inside your AuthService class in auth_service.dart
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
   Future<AuthResult> resetPassword({required String email}) async {
     if (email.trim().isEmpty) {

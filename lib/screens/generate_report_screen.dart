@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
 import '../controllers/reports_controller.dart';
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -17,33 +14,8 @@ class GenerateReportScreen extends StatefulWidget {
 }
 
 class GenerateReportScreenState extends State<GenerateReportScreen> {
-<<<<<<< HEAD
   final ReportsController _controller = ReportsController();
-  bool _isGenerating = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _generatePdf() async {
-    if (_isGenerating) return;
-    setState(() => _isGenerating = true);
-    try {
-      await _controller.generatePdfReport();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF report downloaded.')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate report: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => _isGenerating = false);
-=======
   // Checklist Options
   bool includeSensorLogs = true;
   bool includeCalibrationLogs = false;
@@ -53,73 +25,35 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
 
   bool isGenerating = false;
 
-  void onGeneratePdf() async {
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> onGeneratePdf() async {
+    if (isGenerating) return;
     setState(() => isGenerating = true);
-    // Simulate PDF generation/download pipeline
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() => isGenerating = false);
+    try {
+      await _controller.generatePdfReport();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('PDF Report generated successfully!'),
+          content: Text('PDF report downloaded.'),
         ),
       );
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not generate report: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => isGenerating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-    return ListenableBuilder(
-      listenable: _controller,
-      builder: (context, _) {
-        final isMobile = Responsive.isMobile(context);
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const AppHeader(
-                    title: 'Generate report',
-                    profile: null,
-                  ),
-                  const SizedBox(height: 24),
-                  if (isMobile)
-                    Column(
-                      children: [
-                        _buildPdfPreviewArea(isMobile),
-                        const SizedBox(height: 20),
-                        _buildConfigSidebar(isMobile),
-                      ],
-                    )
-                  else
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: _buildPdfPreviewArea(isMobile),
-                          ),
-                          const SizedBox(width: 24),
-                          SizedBox(
-                            width: 380,
-                            child: _buildConfigSidebar(isMobile),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-=======
     final isMobile = Responsive.isMobile(context);
 
     return Scaffold(
@@ -168,7 +102,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           ),
         ),
       ),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     );
   }
 
@@ -196,11 +129,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-<<<<<<< HEAD
                   'PDF report',
-=======
-                  '1 Page • PDF',
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   style: AppTextStyles.cardMeta.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryButton,
@@ -222,11 +151,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-<<<<<<< HEAD
                       color: Colors.black.withValues(alpha: 0.08),
-=======
-                      color: Colors.black.withOpacity(0.08),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -262,21 +187,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                     const Divider(height: 1),
                     const SizedBox(height: 12),
                     // Content Lines / Blocks
-<<<<<<< HEAD
-                    if (_controller.includeSensorLogs)
-                      _previewBlock(
-                          'Sensor History Logs', AppColors.primaryButton),
-                    if (_controller.includeCalibrationLogs)
-                      _previewBlock(
-                          'Calibration Logs', AppColors.textSecondary),
-                    if (_controller.includePhOptimization)
-                      _previewBlock(
-                          'pH Optimization Results', const Color(0xFF1599A8)),
-                    if (_controller.includeEcOptimization)
-                      _previewBlock(
-                          'EC Optimization Results', const Color(0xFFF39C12)),
-                    if (_controller.includeAllAnalytics)
-=======
                     if (includeSensorLogs)
                       _previewBlock(
                           'Sensor History Logs', AppColors.primaryButton),
@@ -290,7 +200,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                       _previewBlock('EC Optimization Results',
                           const Color(0xFFF39C12)),
                     if (includeAllAnalytics)
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                       _previewBlock(
                           'Visual Analytics Charts', AppColors.primaryButton),
                     const Spacer(),
@@ -347,11 +256,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             width: double.infinity,
             height: 16,
             decoration: BoxDecoration(
-<<<<<<< HEAD
               color: color.withValues(alpha: 0.08),
-=======
-              color: color.withOpacity(0.08),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -381,128 +286,43 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           // Checklist items
           _checkboxTile(
             title: 'Sensor history logs',
-<<<<<<< HEAD
-            value: _controller.includeSensorLogs,
-            onChanged: _controller.toggleSensorLogs,
-          ),
-          _checkboxTile(
-            title: 'Calibration history logs',
-            value: _controller.includeCalibrationLogs,
-            onChanged: _controller.toggleCalibrationLogs,
-          ),
-          _checkboxTile(
-            title: 'pH optimization results',
-            value: _controller.includePhOptimization,
-            onChanged: _controller.togglePhOptimization,
-          ),
-          _checkboxTile(
-            title: 'EC optimization results',
-            value: _controller.includeEcOptimization,
-            onChanged: _controller.toggleEcOptimization,
-          ),
-          _checkboxTile(
-            title: 'All analytics and graphs',
-            value: _controller.includeAllAnalytics,
-            onChanged: _controller.toggleAllAnalytics,
-          ),
-          if (isMobile) ...[
-            const SizedBox(height: 24),
-            SizedBox(width: double.infinity, child: _buildExportButton()),
-            const SizedBox(height: 12),
-            SizedBox(width: double.infinity, child: _buildCancelButton()),
-          ] else ...[
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(flex: 2, child: _buildExportButton()),
-                const SizedBox(width: 12),
-                Expanded(child: _buildCancelButton()),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExportButton() {
-    return SizedBox(
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: _isGenerating ? null : _generatePdf,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryButton,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          elevation: 0,
-        ),
-        icon: _isGenerating
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.picture_as_pdf, size: 20),
-        label: Text(
-          _isGenerating ? 'Generating...' : 'Export PDF',
-          style: AppTextStyles.button.copyWith(color: Colors.white),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCancelButton() {
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton(
-        onPressed: _isGenerating ? null : () => Navigator.of(context).pop(),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(
-            color: AppColors.primaryButton,
-            width: 1.5,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-        child: Text(
-          'Cancel',
-          style: AppTextStyles.button.copyWith(
-            color: AppColors.primaryButton,
-          ),
-        ),
-=======
             value: includeSensorLogs,
-            onChanged: (val) => setState(() => includeSensorLogs = val ?? false),
+            onChanged: (val) {
+              setState(() => includeSensorLogs = val ?? false);
+              _controller.toggleSensorLogs(val);
+            },
           ),
           _checkboxTile(
             title: 'Calibration history logs',
             value: includeCalibrationLogs,
-            onChanged: (val) =>
-                setState(() => includeCalibrationLogs = val ?? false),
+            onChanged: (val) {
+              setState(() => includeCalibrationLogs = val ?? false);
+              _controller.toggleCalibrationLogs(val);
+            },
           ),
           _checkboxTile(
             title: 'pH optimization results',
             value: includePhOptimization,
-            onChanged: (val) =>
-                setState(() => includePhOptimization = val ?? false),
+            onChanged: (val) {
+              setState(() => includePhOptimization = val ?? false);
+              _controller.togglePhOptimization(val);
+            },
           ),
           _checkboxTile(
             title: 'EC optimization results',
             value: includeEcOptimization,
-            onChanged: (val) =>
-                setState(() => includeEcOptimization = val ?? false),
+            onChanged: (val) {
+              setState(() => includeEcOptimization = val ?? false);
+              _controller.toggleEcOptimization(val);
+            },
           ),
           _checkboxTile(
             title: 'All analytics and graphs',
             value: includeAllAnalytics,
-            onChanged: (val) =>
-                setState(() => includeAllAnalytics = val ?? false),
+            onChanged: (val) {
+              setState(() => includeAllAnalytics = val ?? false);
+              _controller.toggleAllAnalytics(val);
+            },
           ),
 
           const Spacer(),
@@ -569,7 +389,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             ],
           ),
         ],
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       ),
     );
   }
@@ -595,8 +414,4 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       ),
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

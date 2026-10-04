@@ -138,39 +138,12 @@ class HistoryLogsController extends ChangeNotifier {
 
   Future<void> loadSelectedLogs() async {
     selectedRowIndices.clear();
-<<<<<<< HEAD
-=======
-    if (selectedTab == 'Calibration logs') {
-      columns = const ['Time', 'Sensor', 'Action', 'Status'];
-      rows = const [];
-      isLoading = false;
-      notifyListeners();
-      return;
-    }
-
-    if (selectedTab == 'Reports logs') {
-      columns = const [
-        'Date',
-        'Time',
-        'Average pH',
-        'Average EC',
-        'Average Temp',
-        'Critical Alerts'
-      ];
-      rows = const [];
-      isLoading = false;
-      notifyListeners();
-      return;
-    }
-
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
       final range = _selectedDateRange();
-<<<<<<< HEAD
       if (selectedTab == 'Calibration logs') {
         columns = MonitoringService.calibrationLogColumns;
         rows = await monitoringService.getCalibrationHistory(
@@ -208,28 +181,6 @@ class HistoryLogsController extends ChangeNotifier {
       }
     } catch (_) {
       errorMessage = 'Failed to load $selectedTab from Supabase';
-=======
-      columns = const [
-        'Date',
-        'Time',
-        'Average pH',
-        'Average EC',
-        'Average Temp',
-        'Status'
-      ];
-
-      rows = await monitoringService.getSensorHistory(
-        start: range.start,
-        end: range.end,
-        aggregation: switch (selectedRange) {
-          'Weekly' => HistoryAggregation.eightHours,
-          'Monthly' => HistoryAggregation.daily,
-          _ => HistoryAggregation.tenMinutes,
-        },
-      );
-    } catch (_) {
-      errorMessage = 'Failed to load sensor history from Supabase';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     } finally {
       isLoading = false;
       notifyListeners();
@@ -237,35 +188,21 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   Future<void> deleteSingleRow(int index) async {
-<<<<<<< HEAD
     if (index < 0 || index >= rows.length) return;
     await _deleteEntry(rows[index]);
     rows.removeAt(index);
     selectedRowIndices.remove(index);
     notifyListeners();
-=======
-    if (index >= 0 && index < rows.length) {
-      rows.removeAt(index);
-      selectedRowIndices.remove(index);
-      notifyListeners();
-    }
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 
   Future<void> deleteSelectedRows() async {
     final sortedIndices = selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
     for (final idx in sortedIndices) {
-<<<<<<< HEAD
       if (idx >= 0 && idx < rows.length) await _deleteEntry(rows[idx]);
     }
     for (final idx in sortedIndices) {
       if (idx >= 0 && idx < rows.length) rows.removeAt(idx);
-=======
-      if (idx >= 0 && idx < rows.length) {
-        rows.removeAt(idx);
-      }
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     }
     selectedRowIndices.clear();
     isSelectionMode = false;
@@ -274,7 +211,6 @@ class HistoryLogsController extends ChangeNotifier {
 
   Future<void> updateRowValues(
       int index, double newPh, double newEc, double newTemp) async {
-<<<<<<< HEAD
     if (index < 0 || index >= rows.length) return;
     final entry = rows[index];
     final start = entry.recordStart;
@@ -315,24 +251,6 @@ class HistoryLogsController extends ChangeNotifier {
       start: start,
       end: start.add(duration),
     );
-=======
-    if (index >= 0 && index < rows.length) {
-      final oldEntry = rows[index];
-      final newValues = List<String>.from(oldEntry.values);
-
-      if (newValues.length >= 6) {
-        newValues[2] = newPh.toStringAsFixed(2);
-        newValues[3] = '${newEc.toStringAsFixed(2)} mS/cm';
-        newValues[4] = '${newTemp.toStringAsFixed(1)} °C';
-      }
-
-      rows[index] = HistoryLogEntry(
-        newValues,
-        ranges: oldEntry.ranges,
-      );
-      notifyListeners();
-    }
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 
   DateTimeRange _selectedDateRange() {

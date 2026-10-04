@@ -136,7 +136,9 @@ class NotificationOverlayWidget extends StatelessWidget {
                               Icons.info_outline,
                               size: 18,
                               color:
-                                  AppColors.textSecondary.withOpacity(0.7),
+                                  AppColors.textSecondary.withValues(
+                                    alpha: 0.7,
+                                  ),
                             ),
                           ],
                         ),

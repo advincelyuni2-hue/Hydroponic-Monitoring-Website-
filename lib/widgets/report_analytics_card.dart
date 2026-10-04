@@ -12,11 +12,6 @@ class ReportsAnalyticsCard extends StatefulWidget {
   final List<AnalyticsPoint> points;
   final double minThreshold;
   final double maxThreshold;
-<<<<<<< HEAD
-  final bool isLoading;
-  final String? errorMessage;
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   final ValueChanged<String> onParameterChanged;
   final ValueChanged<String> onTimeframeChanged;
 
@@ -27,11 +22,6 @@ class ReportsAnalyticsCard extends StatefulWidget {
     required this.points,
     required this.minThreshold,
     required this.maxThreshold,
-<<<<<<< HEAD
-    this.isLoading = false,
-    this.errorMessage,
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     required this.onParameterChanged,
     required this.onTimeframeChanged,
   });
@@ -64,28 +54,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
             height: isMobile ? 230 : 350,
-<<<<<<< HEAD
-            child: widget.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : widget.errorMessage != null
-                    ? Center(
-                        child: Text(
-                          widget.errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.cardMeta,
-                        ),
-                      )
-                    : widget.points.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No sensor readings available for this period.',
-                              style: AppTextStyles.cardMeta,
-                            ),
-                          )
-                        : LineChart(_buildTrendChartData(isMobile)),
-=======
             child: LineChart(_buildTrendChartData(isMobile)),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           ),
           const SizedBox(height: 12),
           _buildLegend(),
@@ -219,25 +188,6 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
     final currentColor =
         widget.selectedParameter == 'pH' ? phColor : ecColor;
-<<<<<<< HEAD
-    final values = widget.points.map((point) => point.value).toList();
-    var minY = values.reduce((a, b) => a < b ? a : b);
-    var maxY = values.reduce((a, b) => a > b ? a : b);
-    minY = minY < widget.minThreshold ? minY : widget.minThreshold;
-    maxY = maxY > widget.maxThreshold ? maxY : widget.maxThreshold;
-    final span = maxY - minY;
-    final padding = span == 0 ? (maxY.abs() * 0.1).clamp(0.1, 1.0) : span * 0.12;
-    minY -= padding;
-    maxY += padding;
-    final interval = (maxY - minY) / 5;
-    final titleInterval = (widget.points.length / 6).ceil().clamp(1, 1000);
-
-    return LineChartData(
-      minX: 0,
-      maxX: (widget.points.length - 1).clamp(1, 100000).toDouble(),
-      minY: minY,
-      maxY: maxY,
-=======
 
     return LineChartData(
       minX: 0,
@@ -246,24 +196,15 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           : 5,
       minY: widget.selectedParameter == 'pH' ? 5.0 : 0.0,
       maxY: widget.selectedParameter == 'pH' ? 7.5 : 3.0,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
         getDrawingHorizontalLine: (_) => FlLine(
-<<<<<<< HEAD
           color: AppColors.chartGrid.withValues(alpha: 0.65),
           strokeWidth: 1,
         ),
         getDrawingVerticalLine: (_) => FlLine(
           color: AppColors.chartGrid.withValues(alpha: 0.35),
-=======
-          color: AppColors.chartGrid.withOpacity(0.65),
-          strokeWidth: 1,
-        ),
-        getDrawingVerticalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withOpacity(0.35),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           strokeWidth: 1,
         ),
       ),
@@ -278,11 +219,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: isMobile ? 33 : 42,
-<<<<<<< HEAD
-            interval: interval,
-=======
             interval: 0.5,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             getTitlesWidget: (val, _) => Text(
               val.toStringAsFixed(1),
               style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
@@ -294,11 +231,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: isMobile ? 33 : 42,
-<<<<<<< HEAD
-            interval: interval,
-=======
             interval: 0.5,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             getTitlesWidget: (val, _) => Text(
               val.toStringAsFixed(1),
               style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
@@ -309,11 +242,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 30,
-<<<<<<< HEAD
-            interval: titleInterval.toDouble(),
-=======
             interval: 1,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             getTitlesWidget: (val, _) {
               final idx = val.toInt();
               if (idx >= 0 && idx < widget.points.length) {
@@ -370,11 +299,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
-<<<<<<< HEAD
             color: currentColor.withValues(alpha: 0.10),
-=======
-            color: currentColor.withOpacity(0.10),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           ),
         ),
       ],

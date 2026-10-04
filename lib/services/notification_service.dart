@@ -1,10 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-<<<<<<< HEAD
 import 'app_state.dart';
-import 'supabase_client.dart';
-
-class NotificationService {
-=======
 import '../models/notification_models.dart';
 import '../utils/manila_time.dart';
 import 'supabase_client.dart';
@@ -348,27 +343,34 @@ class NotificationService {
     }
   }
 
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   RealtimeChannel? subscribeToAdminAlerts({
     required void Function() onAlert,
   }) {
     final client = supabaseClient;
-<<<<<<< HEAD
     if (client == null || appProfile.value?.isAdmin != true) return null;
     return client
         .channel('admin-alerts')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
-=======
-    if (client == null || client.auth.currentUser == null) return null;
-    return client
-        .channel('admin-alerts')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           schema: 'public',
           table: 'notifications',
           callback: (_) => onAlert(),
+        )
+        .subscribe();
+  }
+
+  RealtimeChannel? subscribeToNotifications({
+    required void Function() onNotification,
+  }) {
+    final client = supabaseClient;
+    if (client == null || client.auth.currentUser == null) return null;
+    return client
+        .channel('notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'notifications',
+          callback: (_) => onNotification(),
         )
         .subscribe();
   }
@@ -381,26 +383,38 @@ class NotificationService {
     }
     await client.from('notifications').insert({
       'employee_id': user.id,
-<<<<<<< HEAD
-      'message': message,
-=======
       'source': 'manual',
       'title': 'Employee alert',
       'message': message,
       'type': 'info',
       'recommendation': message,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       'status': 'unread',
     });
   }
 
   Future<int> unreadAdminAlertCount() async {
     final client = supabaseClient;
-<<<<<<< HEAD
     if (client == null || appProfile.value?.isAdmin != true) return 0;
     final rows =
         await client.from('notifications').select('id').eq('status', 'unread');
     return rows.length;
+  }
+
+  Future<int> unreadNotificationCount() async {
+    final client = supabaseClient;
+    if (client == null || client.auth.currentUser == null) return 0;
+    final rows = await client
+        .from('notifications')
+        .select('id, status, is_read, is_resolved');
+    return (rows as List)
+        .cast<Map<String, dynamic>>()
+        .where(
+          (row) =>
+              row['status'] != 'read' &&
+              row['is_read'] != true &&
+              row['is_resolved'] != true,
+        )
+        .length;
   }
 
   Future<List<AppNotification>> getNotifications() async {
@@ -443,18 +457,6 @@ class NotificationService {
     if (difference.inDays < 1) return '${difference.inHours}h ago';
     return '${difference.inDays}d ago';
   }
-
-=======
-    if (client == null || client.auth.currentUser == null) return 0;
-    final rows = await client
-        .from('notifications')
-        .select('id')
-        .eq('is_read', false)
-        .eq('is_resolved', false);
-    return rows.length;
-  }
-
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   Future<bool> markAsRead(String notificationId) async {
     final client = supabaseClient;
     if (client == null) return false;
@@ -472,7 +474,6 @@ class NotificationService {
   }
 }
 
-<<<<<<< HEAD
 /// A single notification/alert shown in the dashboard.
 class AppNotification {
   final String id;
@@ -489,7 +490,9 @@ class AppNotification {
     required this.timeAgo,
     required this.isCritical,
     this.databaseId,
-=======
+  });
+}
+
 class _LiveNotificationDetail {
   final String statusLabel;
   final String currentValue;
@@ -503,6 +506,5 @@ class _LiveNotificationDetail {
     required this.idealRange,
     required this.recommendation,
     required this.summary,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   });
 }

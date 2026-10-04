@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
+import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-<<<<<<< HEAD
-import '../services/notification_service.dart';
-
-class NotificationTile extends StatelessWidget {
-  final AppNotification notification;
-=======
 import '../models/notification_models.dart';
 
 class NotificationTile extends StatelessWidget {
-  final AppNotificationItem notification;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
+  final Object notification;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -24,16 +18,37 @@ class NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final notification = this.notification;
+    late final String title;
+    late final String detail;
+    late final String timestamp;
+    late final bool isCritical;
+
+    if (notification is AppNotificationItem) {
+      title = notification.title;
+      detail = notification.subtitle;
+      timestamp = notification.timestamp;
+      isCritical = notification.isCritical;
+    } else if (notification is AppNotification) {
+      title = notification.title;
+      detail = notification.detail;
+      timestamp = notification.timeAgo;
+      isCritical = notification.isCritical;
+    } else {
+      throw ArgumentError.value(
+        notification,
+        'notification',
+        'Expected an AppNotification or AppNotificationItem.',
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isCritical
-            ? AppColors.alertBackground
-            : AppColors.cardBackground,
+        color:
+            isCritical ? AppColors.alertBackground : AppColors.cardBackground,
         border: Border.all(
-          color: notification.isCritical
-              ? AppColors.alertBorder
-              : AppColors.cardBorder,
+          color: isCritical ? AppColors.alertBorder : AppColors.cardBorder,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
@@ -58,19 +73,14 @@ class NotificationTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      notification.title,
-                      style: notification.isCritical
+                      title,
+                      style: isCritical
                           ? AppTextStyles.alert
                           : AppTextStyles.bodyBold,
                     ),
                     Row(
                       children: [
-<<<<<<< HEAD
-                        Text(notification.timeAgo,
-=======
-                        Text(notification.timestamp,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-                            style: AppTextStyles.cardMeta),
+                        Text(timestamp, style: AppTextStyles.cardMeta),
                         if (onDelete != null)
                           IconButton(
                             tooltip: 'Delete notification',
@@ -82,19 +92,16 @@ class NotificationTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-<<<<<<< HEAD
-                Text(notification.detail, style: AppTextStyles.body),
-=======
-                Text(notification.subtitle, style: AppTextStyles.body),
-                if (notification.currentValue != 'Not recorded' ||
-                    notification.idealRange != 'Not recorded') ...[
+                Text(detail, style: AppTextStyles.body),
+                if (notification is AppNotificationItem &&
+                    (notification.currentValue != 'Not recorded' ||
+                        notification.idealRange != 'Not recorded')) ...[
                   const SizedBox(height: 6),
                   Text(
                     '${notification.currentStatus} • ${notification.currentValue} • Ideal: ${notification.idealRange}',
                     style: AppTextStyles.cardMeta,
                   ),
                 ],
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               ],
             ),
           ),

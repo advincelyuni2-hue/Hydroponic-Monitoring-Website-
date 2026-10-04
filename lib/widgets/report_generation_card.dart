@@ -44,13 +44,6 @@ class ReportGenerationCard extends StatelessWidget {
           Text('Report generation', style: AppTextStyles.sectionTitle),
           const SizedBox(height: 12),
 
-<<<<<<< HEAD
-          _checkboxTile('Sensor history logs', includeSensorLogs, onToggleSensorLogs),
-          _checkboxTile('Calibration history logs', includeCalibrationLogs, onToggleCalibrationLogs),
-          _checkboxTile('pH optimization results', includePhOptimization, onTogglePhOptimization),
-          _checkboxTile('EC optimization results', includeEcOptimization, onToggleEcOptimization),
-          _checkboxTile('All analytics and graphs', includeAllAnalytics, onToggleAllAnalytics),
-=======
           _checkboxTile(
               'Sensor history logs', includeSensorLogs, onToggleSensorLogs),
           _checkboxTile('Calibration history logs', includeCalibrationLogs,
@@ -61,7 +54,6 @@ class ReportGenerationCard extends StatelessWidget {
               onToggleEcOptimization),
           _checkboxTile('All analytics and graphs', includeAllAnalytics,
               onToggleAllAnalytics),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           const SizedBox(height: 20),
 
           // Green Pill "Generate report" Button
@@ -70,14 +62,6 @@ class ReportGenerationCard extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onGenerate,
-<<<<<<< HEAD
-                  icon: const Icon(Icons.description, color: Colors.white, size: 20),
-                  label: Text('Generate report', style: AppTextStyles.button.copyWith(fontSize: 15)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-=======
                   icon: const Icon(Icons.description,
                       color: Colors.white, size: 20),
                   label: Text('Generate report',
@@ -87,17 +71,12 @@ class ReportGenerationCard extends StatelessWidget {
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30)),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   ),
                 ),
               ),
               const SizedBox(width: 10),
-<<<<<<< HEAD
-              OutlinedButton(onPressed: onDismiss, child: const Text('Dismiss')),
-=======
               OutlinedButton(
                   onPressed: onDismiss, child: const Text('Dismiss')),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             ],
           ),
         ],
@@ -130,8 +109,4 @@ class ReportGenerationCard extends StatelessWidget {
       ),
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

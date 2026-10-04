@@ -18,24 +18,12 @@ class AppDrawer extends StatelessWidget {
   });
 
   void _navigateTo(BuildContext context, int index) {
-<<<<<<< HEAD
-    if (index == selectedIndex) return; 
-
-
-    final navigator = Navigator.of(context);
-
-
-    Navigator.pop(context);
-
-
-=======
     if (index == selectedIndex) return;
 
     final navigator = Navigator.of(context);
 
     Navigator.pop(context);
 
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     switch (index) {
       case 0: // Dashboard
         navigator.pushReplacement(

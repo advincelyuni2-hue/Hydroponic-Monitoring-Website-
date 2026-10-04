@@ -1,19 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-<<<<<<< HEAD
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_decorations.dart';
-import '../services/user_service.dart';
-import '../utils/responsive.dart';
-import '../widgets/live_pulse_dot.dart';
-import '../services/app_state.dart';
-import '../services/auth_service.dart';
-import '../screens/login_screen.dart';
-import '../services/notification_service.dart';
-import '../services/supabase_client.dart';
-=======
-import '../models/notification_models.dart';
 import '../screens/login_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/settings_screen.dart';
@@ -28,7 +14,6 @@ import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'notification_overlay_widget.dart';
 import '../screens/add_log_screen.dart';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
 class AppHeader extends StatelessWidget {
   final String title;
@@ -46,8 +31,6 @@ class AppHeader extends StatelessWidget {
     this.onProfileTap,
   });
 
-<<<<<<< HEAD
-=======
   void _showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
     final renderBox = bellKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) {
@@ -117,24 +100,16 @@ class AppHeader extends StatelessWidget {
   }
 }
 
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
     final iconSize = isMobile ? 35.0 : 40.0;
     final iconGap = isMobile ? 6.0 : 12.0;
-<<<<<<< HEAD
-
-    return Row(
-      children: [
-        // Hamburger — the only way the side nav ever opens.
-=======
     final GlobalKey bellKey = GlobalKey();
 
     return Row(
       children: [
         // Hamburger Menu Button
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
         GestureDetector(
           onTap: () => Scaffold.of(context).openDrawer(),
           child: Container(
@@ -144,31 +119,15 @@ class AppHeader extends StatelessWidget {
               color: AppColors.iconCircle,
               shape: BoxShape.circle,
             ),
-<<<<<<< HEAD
-            child:
-                Icon(Icons.menu, color: Colors.white, size: isMobile ? 18 : 22),
-=======
             child: Icon(
               Icons.menu,
               color: Colors.white,
               size: isMobile ? 18 : 22,
             ),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           ),
         ),
         SizedBox(width: isMobile ? 8 : 16),
 
-<<<<<<< HEAD
-        // Title
-        Flexible(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.pageHeading.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: isMobile ? 18 : 24,
-=======
         // Page Title
         Flexible(
           child: Text(
@@ -177,44 +136,13 @@ class AppHeader extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: isMobile ? 18 : 24,
               overflow: TextOverflow.ellipsis,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             ),
           ),
         ),
 
-<<<<<<< HEAD
-        SizedBox(width: isMobile ? 8 : 10),
-        Container(
-          padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 8 : 10, vertical: isMobile ? 4 : 5),
-          decoration: BoxDecoration(
-            color: AppColors.statusCardGreen,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LivePulseDot(size: isMobile ? 5 : 6),
-              const SizedBox(width: 6),
-              Text(
-                'Live',
-                style: AppTextStyles.cardMeta.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: isMobile ? 11 : 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const Spacer(),
-
-        // Search Bar (Desktop) or Search Icon (Mobile)
-=======
         const Spacer(),
 
         // Search Control
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
         if (!isMobile) ...[
           Expanded(
             flex: 2,
@@ -224,16 +152,12 @@ class AppHeader extends StatelessWidget {
               decoration: AppDecorations.card(radius: 24),
               child: Row(
                 children: [
-<<<<<<< HEAD
-                  Icon(Icons.search, color: AppColors.textSecondary, size: 20),
-=======
                   // Fixed: Removed const here because AppColors.textSecondary is a dynamic getter
                   Icon(
                     Icons.search,
                     color: AppColors.textSecondary,
                     size: 20,
                   ),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -251,26 +175,6 @@ class AppHeader extends StatelessWidget {
           ),
           const SizedBox(width: 24),
         ] else ...[
-<<<<<<< HEAD
-          _iconCircle(Icons.search, () => _openMobileSearch(context),
-              size: iconSize),
-          SizedBox(width: iconGap),
-        ],
-
-        // Actions & Profile
-        _iconCircle(Icons.add, onAddTap ?? () {}, size: iconSize),
-        SizedBox(width: iconGap),
-        onBellTap != null
-            ? _iconCircle(Icons.notifications_none, onBellTap!, size: iconSize)
-            : AdminAlertBell(
-                size: iconSize,
-                fallback: () => _showNotifications(context),
-              ),
-        if (!isMobile) ...[
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: onProfileTap ?? () => _showProfileMenu(context),
-=======
           _iconCircle(
             Icons.search,
             () => _openMobileSearch(context),
@@ -310,7 +214,6 @@ class AppHeader extends StatelessWidget {
           const SizedBox(width: 12),
           GestureDetector(
             onTap: onProfileTap ?? () => _openSettings(context),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             child: const CircleAvatar(
               radius: 20,
               backgroundColor: AppColors.iconCircle,
@@ -338,11 +241,7 @@ class AppHeader extends StatelessWidget {
         ] else ...[
           SizedBox(width: iconGap),
           GestureDetector(
-<<<<<<< HEAD
-            onTap: onProfileTap ?? () => _showProfileMenu(context),
-=======
             onTap: onProfileTap ?? () => _openSettings(context),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
             child: const CircleAvatar(
               radius: 16,
               backgroundColor: AppColors.iconCircle,
@@ -383,16 +282,11 @@ class AppHeader extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     hintStyle: AppTextStyles.cardMeta,
-<<<<<<< HEAD
-                    prefixIcon:
-                        Icon(Icons.search, color: AppColors.textSecondary),
-=======
                     // Fixed: Removed const here because AppColors.textSecondary is a dynamic getter
                     prefixIcon: Icon(
                       Icons.search,
                       color: AppColors.textSecondary,
                     ),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                     filled: true,
                     fillColor: AppColors.background,
                     border: OutlineInputBorder(
@@ -409,28 +303,9 @@ class AppHeader extends StatelessWidget {
     );
   }
 
-<<<<<<< HEAD
-  void _showNotifications(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notifications'),
-        content: const Text('You have 2 recent notifications to review.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
-  void _showProfileMenu(BuildContext context) {
-=======
   // No longer used by default (the avatar now opens Settings), but kept in
   // case something else still calls it.
   void showProfileMenu(BuildContext context) {
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     final profile = appProfile.value;
     showModalBottomSheet<void>(
       context: context,
@@ -468,13 +343,9 @@ class AppHeader extends StatelessWidget {
         width: size,
         height: size,
         decoration: const BoxDecoration(
-<<<<<<< HEAD
-            color: AppColors.iconCircle, shape: BoxShape.circle),
-=======
           color: AppColors.iconCircle,
           shape: BoxShape.circle,
         ),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
         child: Icon(icon, color: Colors.white, size: size * 0.5),
       ),
     );
@@ -492,15 +363,6 @@ class AdminAlertBell extends StatefulWidget {
   });
 
   @override
-<<<<<<< HEAD
-  State<AdminAlertBell> createState() => _AdminAlertBellState();
-}
-
-class _AdminAlertBellState extends State<AdminAlertBell> {
-  final NotificationService _service = NotificationService();
-  RealtimeChannel? _channel;
-  int _unread = 0;
-=======
   State<AdminAlertBell> createState() => AdminAlertBellState();
 }
 
@@ -508,56 +370,30 @@ class AdminAlertBellState extends State<AdminAlertBell> {
   final NotificationService service = NotificationService();
   RealtimeChannel? channel;
   int unread = 0;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
   @override
   void initState() {
     super.initState();
     _refresh();
-<<<<<<< HEAD
-    if (appProfile.value?.isAdmin == true) {
-      _channel = _service.subscribeToAdminAlerts(onAlert: _handleAlert);
-    }
-  }
-
-  Future<void> _handleAlert() async {
-    await _refresh();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('A new employee alert was received.')),
-    );
-=======
-    channel = service.subscribeToAdminAlerts(onAlert: handleAlert);
+    channel = service.subscribeToNotifications(onNotification: handleAlert);
   }
 
   Future<void> handleAlert() async {
     await _refresh();
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 
   Future<void> _refresh() async {
     try {
-<<<<<<< HEAD
-      final count = await _service.unreadAdminAlertCount();
-      if (mounted) setState(() => _unread = count);
-=======
-      final count = await service.unreadAdminAlertCount();
+      final count = await service.unreadNotificationCount();
       if (mounted) setState(() => unread = count);
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     } catch (_) {}
   }
 
   @override
   void dispose() {
-<<<<<<< HEAD
-    final channel = _channel;
-    if (channel != null && supabaseClient != null) {
-      supabaseClient!.removeChannel(channel);
-=======
     final ch = channel;
     if (ch != null && supabaseClient != null) {
       supabaseClient!.removeChannel(ch);
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
     }
     super.dispose();
   }
@@ -576,13 +412,6 @@ class AdminAlertBellState extends State<AdminAlertBell> {
               color: AppColors.iconCircle,
               shape: BoxShape.circle,
             ),
-<<<<<<< HEAD
-            child: Icon(Icons.notifications_none,
-                color: Colors.white, size: widget.size * 0.5),
-          ),
-        ),
-        if (_unread > 0)
-=======
             child: Icon(
               Icons.notifications_none,
               color: Colors.white,
@@ -591,7 +420,6 @@ class AdminAlertBellState extends State<AdminAlertBell> {
           ),
         ),
         if (unread > 0)
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           Positioned(
             right: -2,
             top: -4,
@@ -599,11 +427,7 @@ class AdminAlertBellState extends State<AdminAlertBell> {
               radius: 9,
               backgroundColor: Colors.red,
               child: Text(
-<<<<<<< HEAD
-                _unread > 9 ? '9+' : '$_unread',
-=======
                 unread > 9 ? '9+' : '$unread',
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 style: const TextStyle(color: Colors.white, fontSize: 9),
               ),
             ),
@@ -611,8 +435,4 @@ class AdminAlertBellState extends State<AdminAlertBell> {
       ],
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

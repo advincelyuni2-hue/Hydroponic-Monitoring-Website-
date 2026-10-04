@@ -1,8 +1,5 @@
 import '../models/monitoring_models.dart';
-<<<<<<< HEAD
 import 'package:flutter/material.dart';
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
 import '../utils/manila_time.dart';
@@ -171,7 +168,6 @@ class MonitoringService {
   Future<void> unsubscribe(RealtimeChannel channel) =>
       supabase.removeChannel(channel);
 
-<<<<<<< HEAD
   Future<DateTimeRange?> getSensorCollectionDateRange() async {
     final boundaries = await Future.wait([
       _getReadingBoundary('ph_readings', ascending: true),
@@ -205,8 +201,6 @@ class MonitoringService {
     );
   }
 
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   Future<List<HistoryLogEntry>> getSensorHistory({
     required DateTime start,
     required DateTime end,
@@ -262,20 +256,16 @@ class MonitoringService {
           3: ecRange,
           4: tempRange,
         },
-<<<<<<< HEAD
         recordStart: summary.recordedAt,
         recordDuration: switch (aggregation) {
           HistoryAggregation.tenMinutes => const Duration(minutes: 1),
           HistoryAggregation.eightHours => const Duration(hours: 8),
           HistoryAggregation.daily => const Duration(days: 1),
         },
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       );
     }).toList();
   }
 
-<<<<<<< HEAD
   Future<List<HistoryLogEntry>> getCalibrationHistory({
     required DateTime start,
     required DateTime end,
@@ -376,8 +366,6 @@ class MonitoringService {
     }
   }
 
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   Future<List<Map<String, dynamic>>> _getAverageReadings(
     String table,
     DateTime start,
@@ -585,7 +573,6 @@ class MonitoringService {
 
   /// Powers the "Sensor logs" tab on the History Logs screen.
   Future<List<HistoryLogEntry>> getSensorLogs() async {
-<<<<<<< HEAD
     final today = manilaNow();
     final end = DateTime(today.year, today.month, today.day)
         .add(const Duration(days: 1));
@@ -595,41 +582,10 @@ class MonitoringService {
       end: end,
       aggregation: HistoryAggregation.daily,
     );
-=======
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // TODO: replace with a real Supabase query against your readings
-    // table, e.g.:
-    //   final response = await supabase
-    //       .from('sensor_readings')
-    //       .select()
-    //       .order('created_at', ascending: false)
-    //       .limit(50);
-    return [
-      const HistoryLogEntry(
-          ['8:00 AM', 'pH', '6.5', 'Stable', 'Add pH up solution']),
-      const HistoryLogEntry(['7:45 AM', 'EC', '5.8 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry(
-          ['7:30 AM', 'Temperature', '24.6 °C', 'Stable', 'None']),
-      const HistoryLogEntry(
-          ['7:15 AM', 'pH', '6.3', 'Warning', 'Monitor closely']),
-      const HistoryLogEntry(['7:00 AM', 'EC', '5.9 mS/cm', 'Stable', 'None']),
-      const HistoryLogEntry([
-        '6:45 AM',
-        'Temperature',
-        '26.8 °C',
-        'Critical',
-        'Alert sent to admin'
-      ]),
-      const HistoryLogEntry(['6:30 AM', 'pH', '6.6', 'Stable', 'None']),
-      const HistoryLogEntry(['6:15 AM', 'EC', '5.7 mS/cm', 'Stable', 'None']),
-    ];
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 
   /// Powers the "Calibration logs" tab on the History Logs screen.
   Future<List<HistoryLogEntry>> getCalibrationLogs() async {
-<<<<<<< HEAD
     final response = await supabase
         .from('calibration_logs')
         .select(
@@ -651,46 +607,6 @@ class MonitoringService {
         row['status'] as String,
       ]);
     }).toList();
-=======
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // TODO: replace with a real Supabase query against your calibration
-    // events table.
-    return [
-      const HistoryLogEntry([
-        '8:00 AM',
-        'pH',
-        '2-Point Calibration',
-        '+0.2',
-        'Auto-system',
-        'Success'
-      ]),
-      const HistoryLogEntry([
-        'Yesterday, 6:00 PM',
-        'EC',
-        '1-Point Calibration',
-        '-0.1 mS/cm',
-        'Alveus',
-        'Success'
-      ]),
-      const HistoryLogEntry([
-        '2 days ago, 8:00 AM',
-        'Temperature',
-        'Sensor Reset',
-        '0.0 °C',
-        'Auto-system',
-        'Success'
-      ]),
-      const HistoryLogEntry([
-        '3 days ago, 8:00 AM',
-        'pH',
-        '2-Point Calibration',
-        '+0.1',
-        'Auto-system',
-        'Failed'
-      ]),
-    ];
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 }
 

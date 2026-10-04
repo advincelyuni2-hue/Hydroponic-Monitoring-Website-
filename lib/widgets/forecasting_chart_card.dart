@@ -56,21 +56,10 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
 
     final ecPointsResolved = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
         ? allFiltered.where((p) => p.value <= 3.0).toList()
-<<<<<<< HEAD
-        : (showEc
-            ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered)
-            : <ForecastPoint>[]);
-
-    final phRange =
-        _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
-    final ecRange =
-        _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
-=======
         : (showEc ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered) : <ForecastPoint>[]);
 
     final phRange = _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
     final ecRange = _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
     late _ChartRange chartRange;
     if (widget.activeTab == 'EC') {
@@ -124,13 +113,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                     scrollDirection: Axis.vertical,
                     physics: const BouncingScrollPhysics(),
                     child: SizedBox(
-<<<<<<< HEAD
-                      height: widget.activeTab == 'Both'
-                          ? 750
-                          : (isDesktop ? 500 : 320),
-=======
                       height: widget.activeTab == 'Both' ? 750 : (isDesktop ? 500 : 320),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                       width: double.infinity,
                       child: LineChart(
                         _buildChartData(
@@ -211,19 +194,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         show: true,
         drawVerticalLine: true,
         getDrawingHorizontalLine: (_) => FlLine(
-<<<<<<< HEAD
           color: AppColors.chartGrid.withValues(alpha: 0.65),
           strokeWidth: 1,
         ),
         getDrawingVerticalLine: (_) => FlLine(
           color: AppColors.chartGrid.withValues(alpha: 0.35),
-=======
-          color: AppColors.chartGrid.withOpacity(0.65),
-          strokeWidth: 1,
-        ),
-        getDrawingVerticalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withOpacity(0.35),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           strokeWidth: 1,
         ),
       ),
@@ -293,14 +268,9 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-<<<<<<< HEAD
-                  color:
-                      isSelected ? AppColors.primaryButton : Colors.transparent,
-=======
                   color: isSelected
                       ? AppColors.primaryButton
                       : Colors.transparent,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   width: 2,
                 ),
               ),
@@ -334,12 +304,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             onTap: () => widget.onHoursChanged(h),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-<<<<<<< HEAD
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-=======
               padding:
                   const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
               decoration: BoxDecoration(
                 color:
                     isSelected ? AppColors.primaryButton : Colors.transparent,
@@ -379,21 +345,12 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   }
 
   FlTitlesData _buildTitlesData(_ChartRange range, bool isMobile) {
-<<<<<<< HEAD
-    final interval =
-        math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
-    final decimals = widget.activeTab == 'EC' ? 2 : 1;
-    final centerTime = widget.generatedAt ?? manilaNow();
-    final horizontalInterval =
-        isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
-=======
     final interval = math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
     final decimals = widget.activeTab == 'EC' ? 2 : 1;
     final centerTime = widget.generatedAt ?? manilaNow();
     final horizontalInterval = isMobile
         ? widget.selectedHours.toDouble()
         : widget.selectedHours / 2;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -535,11 +492,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
-<<<<<<< HEAD
             color: color.withValues(alpha: 0.10),
-=======
-            color: color.withOpacity(0.10),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           ),
         ),
       if (predictedSpots.isNotEmpty)
@@ -552,11 +505,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           dotData: const FlDotData(show: true),
           belowBarData: BarAreaData(
             show: true,
-<<<<<<< HEAD
             color: predictedColor.withValues(alpha: 0.06),
-=======
-            color: predictedColor.withOpacity(0.06),
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           ),
         ),
     ];
@@ -573,18 +522,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       final matching = pts.where((p) => p.isPredicted == predicted).toList();
       if (matching.isEmpty) return null;
       final point = predicted
-<<<<<<< HEAD
-          ? matching.reduce((a, b) => (a.hour - widget.selectedHours).abs() <=
-                  (b.hour - widget.selectedHours).abs()
-              ? a
-              : b)
-=======
           ? matching.reduce((a, b) =>
               (a.hour - widget.selectedHours).abs() <=
                       (b.hour - widget.selectedHours).abs()
                   ? a
                   : b)
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
       return point.value.toStringAsFixed(2);
     }
@@ -626,8 +568,4 @@ class _ChartRange {
   final double minimum;
   final double maximum;
   const _ChartRange(this.minimum, this.maximum);
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

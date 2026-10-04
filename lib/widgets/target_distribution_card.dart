@@ -9,22 +9,12 @@ class TargetDistributionCard extends StatelessWidget {
   final TargetDistributionData data;
   final String selectedParam;
   final ValueChanged<String> onParamChanged;
-<<<<<<< HEAD
-  final bool isLoading;
-  final String? errorMessage;
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
   const TargetDistributionCard({
     super.key,
     required this.data,
     required this.selectedParam,
     required this.onParamChanged,
-<<<<<<< HEAD
-    this.isLoading = false,
-    this.errorMessage,
-=======
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   });
 
   @override
@@ -58,24 +48,7 @@ class TargetDistributionCard extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 160,
-<<<<<<< HEAD
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : errorMessage != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text(
-                            errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.cardMeta,
-                          ),
-                        ),
-                      )
-                    : hasData
-=======
             child: hasData
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                 ? PieChart(
                     PieChartData(
                       sectionsSpace: 3,

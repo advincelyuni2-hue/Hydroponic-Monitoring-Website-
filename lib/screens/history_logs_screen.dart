@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import '../controllers/history_logs_controller.dart';
-<<<<<<< HEAD
-=======
-import '../models/monitoring_models.dart';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 import '../services/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -122,27 +118,11 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-<<<<<<< HEAD
-      try {
-        await _controller.deleteSingleRow(index);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Log entry deleted.')),
-          );
-        }
-      } catch (error) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not delete log entry: $error')),
-          );
-        }
-=======
       await _controller.deleteSingleRow(index);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Log entry deleted.')),
         );
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       }
     }
   }
@@ -218,28 +198,11 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-<<<<<<< HEAD
-      try {
-        await _controller.deleteSelectedRows();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$count log records deleted.')),
-          );
-        }
-      } catch (error) {
-        await _controller.loadData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not delete selected logs: $error')),
-          );
-        }
-=======
       await _controller.deleteSelectedRows();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$count log records deleted.')),
         );
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
       }
     }
   }
@@ -382,38 +345,6 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-<<<<<<< HEAD
-      final newPh = double.tryParse(phController.text);
-      final newEc = double.tryParse(ecController.text);
-      final newTemp = double.tryParse(tempController.text);
-      if (newPh == null || newEc == null || newTemp == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Enter valid numbers for all values.')),
-          );
-        }
-      } else {
-        try {
-          await _controller.updateRowValues(index, newPh, newEc, newTemp);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Log record updated successfully.')),
-            );
-          }
-        } catch (error) {
-          await _controller.loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not update log record: $error')),
-            );
-          }
-        }
-      }
-    }
-    phController.dispose();
-    ecController.dispose();
-    tempController.dispose();
-=======
       final newPh = double.tryParse(phController.text) ?? initialPh;
       final newEc = double.tryParse(ecController.text) ?? initialEc;
       final newTemp = double.tryParse(tempController.text) ?? initialTemp;
@@ -425,7 +356,6 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
         );
       }
     }
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
   }
 
   @override
@@ -496,15 +426,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                                 onSelectAll: _controller.toggleSelectAll,
                                 onToggleRow: _controller.toggleRowSelection,
                                 onDeleteRow: _confirmDeleteSingle,
-<<<<<<< HEAD
-                                onEditRow: _controller.selectedTab ==
-                                            'Sensor logs' &&
-                                        _controller.selectedRange == 'Daily'
-                                    ? _showEditModal
-                                    : null,
-=======
                                 onEditRow: _showEditModal,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                               ),
                       ],
                     ),
@@ -638,11 +560,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-<<<<<<< HEAD
                 const Icon(Icons.calendar_today_rounded,
-=======
-                Icon(Icons.calendar_today_rounded,
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                     size: 14, color: AppColors.primaryButton),
                 const SizedBox(width: 6),
                 Text(
@@ -677,11 +595,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-<<<<<<< HEAD
                 const Icon(
-=======
-                Icon(
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
                   Icons.info_outline_rounded,
                   size: 15,
                   color: AppColors.primaryButton,
