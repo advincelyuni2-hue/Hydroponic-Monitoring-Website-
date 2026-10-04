@@ -1,4 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import '../controllers/reports_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -6,34 +10,47 @@ import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
 
 class GenerateReportScreen extends StatefulWidget {
-  const GenerateReportScreen({super.key});
+  final ReportsController controller;
+
+  const GenerateReportScreen({super.key, required this.controller});
 
   @override
   State<GenerateReportScreen> createState() => GenerateReportScreenState();
 }
 
 class GenerateReportScreenState extends State<GenerateReportScreen> {
-  // Checklist Options
-  bool includeSensorLogs = true;
-  bool includeCalibrationLogs = false;
-  bool includePhOptimization = true;
-  bool includeEcOptimization = false;
-  bool includeAllAnalytics = false;
-
   bool isGenerating = false;
 
-  void onGeneratePdf() async {
+  ReportsController get _c => widget.controller;
+
+  /// Changes whenever a checkbox changes, which rebuilds the preview.
+  String get _previewKey => [
+        _c.includeSensorLogs,
+        _c.includeCalibrationLogs,
+        _c.includePhOptimization,
+        _c.includeEcOptimization,
+        _c.includeAllAnalytics,
+      ].join('-');
+
+  Future<Uint8List> _buildPreview(PdfPageFormat format) => _c.buildPdfBytes();
+
+  Future<void> onGeneratePdf() async {
     setState(() => isGenerating = true);
-    // Simulate PDF generation/download pipeline
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() => isGenerating = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PDF Report generated successfully!'),
-        ),
-      );
+    try {
+      await _c.generatePdfReport();
+      if (!mounted) return;
+      _snack('PDF report generated successfully!');
+    } catch (error) {
+      if (!mounted) return;
+      _snack('Unable to generate the PDF: $error');
+    } finally {
+      if (mounted) setState(() => isGenerating = false);
     }
+  }
+
+  void _snack(String text) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -43,57 +60,52 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(isMobile ? 16 : 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header without manual Back Arrow
-              const AppHeader(
-                title: 'Generate report',
-                profile: null,
+        child: ListenableBuilder(
+          listenable: _c,
+          builder: (context, _) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppHeader(title: 'Generate report', profile: null),
+                  const SizedBox(height: 24),
+                  if (isMobile)
+                    Column(
+                      children: [
+                        SizedBox(height: 480, child: _buildPdfPreviewArea()),
+                        const SizedBox(height: 20),
+                        _buildConfigSidebar(isMobile),
+                      ],
+                    )
+                  else
+                    SizedBox(
+                      height: 640,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 3, child: _buildPdfPreviewArea()),
+                          const SizedBox(width: 24),
+                          SizedBox(
+                            width: 380,
+                            child: _buildConfigSidebar(isMobile),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 24),
-              if (isMobile)
-                Column(
-                  children: [
-                    _buildPdfPreviewArea(isMobile),
-                    const SizedBox(height: 20),
-                    _buildConfigSidebar(isMobile),
-                  ],
-                )
-              else
-                // IntrinsicHeight forces both cards to stretch to equal height
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // LEFT SIDE: PDF Document Preview Area
-                      Expanded(
-                        flex: 3,
-                        child: _buildPdfPreviewArea(isMobile),
-                      ),
-                      const SizedBox(width: 24),
-                      // RIGHT SIDE: Checklist Options & Action Buttons
-                      SizedBox(
-                        width: 380,
-                        child: _buildConfigSidebar(isMobile),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  /// PDF Document Live Preview Card
-  Widget _buildPdfPreviewArea(bool isMobile) {
+  /// Live preview of the real PDF, like a print preview.
+  Widget _buildPdfPreviewArea() {
     return Container(
       width: double.infinity,
-      height: isMobile ? 380 : 580,
       padding: const EdgeInsets.all(24),
       decoration: AppDecorations.card(),
       child: Column(
@@ -113,10 +125,10 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '1 Page • PDF',
+                  'Letter • PDF',
                   style: AppTextStyles.cardMeta.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primaryButton,
+                    color: AppColors.accentGreen,
                     fontSize: 11,
                   ),
                 ),
@@ -124,124 +136,43 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Simulated Page Thumbnail Frame
           Expanded(
-            child: Center(
-              child: Container(
-                width: isMobile ? 220 : 340,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: PdfPreview(
+                key: ValueKey(_previewKey),
+                build: _buildPreview,
+                useActions: false,
+                allowPrinting: false,
+                allowSharing: false,
+                canChangePageFormat: false,
+                canChangeOrientation: false,
+                canDebug: false,
+                maxPageWidth: 560,
+                scrollViewDecoration:
+                    BoxDecoration(color: AppColors.calloutBackground),
+                pdfPreviewPageDecoration: const BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(color: AppColors.inputBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Report Page Header Mockup
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryButton,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        Container(
-                          width: 40,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.inputBorder,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    // Content Lines / Blocks
-                    if (includeSensorLogs)
-                      _previewBlock(
-                          'Sensor History Logs', AppColors.primaryButton),
-                    if (includeCalibrationLogs)
-                      _previewBlock(
-                          'Calibration Logs', AppColors.textSecondary),
-                    if (includePhOptimization)
-                      _previewBlock('pH Optimization Results',
-                          const Color(0xFF1599A8)),
-                    if (includeEcOptimization)
-                      _previewBlock('EC Optimization Results',
-                          const Color(0xFFF39C12)),
-                    if (includeAllAnalytics)
-                      _previewBlock(
-                          'Visual Analytics Charts', AppColors.primaryButton),
-                    const Spacer(),
-                    // Page Footer
-                    Center(
-                      child: Container(
-                        width: 60,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: AppColors.inputBorder,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
+                      color: Color(0x33000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _previewBlock(String title, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
+                loadingWidget: const CircularProgressIndicator(),
+                onError: (context, error) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Unable to build the preview.\n$error',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Container(
-            width: double.infinity,
-            height: 16,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(3),
             ),
           ),
         ],
@@ -267,40 +198,32 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             style: AppTextStyles.cardMeta,
           ),
           const SizedBox(height: 20),
-          // Checklist items
           _checkboxTile(
             title: 'Sensor history logs',
-            value: includeSensorLogs,
-            onChanged: (val) => setState(() => includeSensorLogs = val ?? false),
+            value: _c.includeSensorLogs,
+            onChanged: _c.toggleSensorLogs,
           ),
           _checkboxTile(
             title: 'Calibration history logs',
-            value: includeCalibrationLogs,
-            onChanged: (val) =>
-                setState(() => includeCalibrationLogs = val ?? false),
+            value: _c.includeCalibrationLogs,
+            onChanged: _c.toggleCalibrationLogs,
           ),
           _checkboxTile(
             title: 'pH optimization results',
-            value: includePhOptimization,
-            onChanged: (val) =>
-                setState(() => includePhOptimization = val ?? false),
+            value: _c.includePhOptimization,
+            onChanged: _c.togglePhOptimization,
           ),
           _checkboxTile(
             title: 'EC optimization results',
-            value: includeEcOptimization,
-            onChanged: (val) =>
-                setState(() => includeEcOptimization = val ?? false),
+            value: _c.includeEcOptimization,
+            onChanged: _c.toggleEcOptimization,
           ),
           _checkboxTile(
             title: 'All analytics and graphs',
-            value: includeAllAnalytics,
-            onChanged: (val) =>
-                setState(() => includeAllAnalytics = val ?? false),
+            value: _c.includeAllAnalytics,
+            onChanged: _c.toggleAllAnalytics,
           ),
-
-          const Spacer(),
-
-          // Action Buttons: Export PDF on Left, Cancel on Right
+          if (isMobile) const SizedBox(height: 24) else const Spacer(),
           Row(
             children: [
               Expanded(
@@ -342,8 +265,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(
-                        color: AppColors.primaryButton,
+                      side: BorderSide(
+                        color: AppColors.accentGreen,
                         width: 1.5,
                       ),
                       shape: RoundedRectangleBorder(
@@ -353,7 +276,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                     child: Text(
                       'Cancel',
                       style: AppTextStyles.button.copyWith(
-                        color: AppColors.primaryButton,
+                        color: AppColors.accentGreen,
                       ),
                     ),
                   ),

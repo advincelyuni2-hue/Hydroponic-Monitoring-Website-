@@ -31,8 +31,8 @@ class ReportsAnalyticsCard extends StatefulWidget {
 }
 
 class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
-  static const phColor = AppColors.primaryButton;
-  static const ecColor = Color(0xFF1599A8);
+  static Color get phColor => AppColors.accentGreen;
+  static Color get ecColor => AppColors.accentTeal;
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +69,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        Icon(Icons.show_chart, color: AppColors.accentGreen),
         Text('Historical Telemetry Trends', style: AppTextStyles.sectionTitle),
       ],
     );

@@ -84,8 +84,8 @@ class NotificationOverlayWidget extends StatelessWidget {
                     final isCritical =
                         item.type == NotificationType.critical;
                     final stripeColor = isCritical
-                        ? AppColors.alertBorder
-                        : const Color(0xFFD97706);
+                        ? AppColors.criticalRed
+                        : AppColors.warningYellow;
 
                     return GestureDetector(
                       onTap: () {

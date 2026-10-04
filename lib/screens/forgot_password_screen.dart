@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/email_mask.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../controllers/forgot_password_controller.dart';
@@ -22,21 +23,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _handleResetPassword() async {
-    final success = await _controller.sendResetLink();
-    if (!mounted) return;
+  void _snack(String text, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: color),
+    );
+  }
 
+  Future<void> _handleSendCode() async {
+    final success = await _controller.sendCode();
+    if (!mounted) return;
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_controller.successMessage!),
-          backgroundColor: Colors.green[700],
-        ),
-      );
+      _snack(_controller.successMessage!, color: Colors.green[700]);
     } else if (_controller.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_controller.errorMessage!)),
-      );
+      _snack(_controller.errorMessage!);
+    }
+  }
+
+  Future<void> _handleResetPassword() async {
+    final success = await _controller.resetPassword();
+    if (!mounted) return;
+    if (success) {
+      _snack(_controller.successMessage!, color: Colors.green[700]);
+      Navigator.of(context).pop(); // back to the login screen
+    } else if (_controller.errorMessage != null) {
+      _snack(_controller.errorMessage!);
     }
   }
 
@@ -97,67 +107,123 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       builder: (context, _) {
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-        
-
-              Text(
-                'Forgot Password',
-                style: AppTextStyles.title.copyWith(
-                  fontSize: isMobile ? 26 : 32,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              Text(
-                "Enter your email address and we'll send you instructions to reset your password.",
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-              SizedBox(height: isMobile ? 24 : 32),
-
-              Text('Your email', style: AppTextStyles.label),
-              const SizedBox(height: 8),
-              CustomTextField(
-                controller: _controller.emailController,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              SizedBox(height: isMobile ? 24 : 32),
-
-              CustomButton(
-                text: 'Send Reset Link',
-                backgroundColor: AppColors.primaryButton,
-                textStyle: AppTextStyles.button,
-                isLoading: _controller.isLoading,
-                onPressed: _handleResetPassword,
-              ),
-              const SizedBox(height: 24),
-
-              Center(
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: RichText(
-                    text: TextSpan(
-                      style: AppTextStyles.footer,
-                      children: [
-                        const TextSpan(text: 'Remember your password? '),
-                        TextSpan(
-                          text: 'Log in',
-                          style: AppTextStyles.footerLink,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: _controller.isCodeStep
+              ? _buildCodeForm(isMobile: isMobile)
+              : _buildEmailForm(isMobile: isMobile),
         );
       },
+    );
+  }
+
+  Widget _buildEmailForm({required bool isMobile}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Forgot Password',
+          style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          "Enter your email address and we'll send you a verification code to reset your password.",
+          style: AppTextStyles.bodySmall.copyWith(fontSize: 14, height: 1.4),
+        ),
+        SizedBox(height: isMobile ? 24 : 32),
+        Text('Your email', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: _controller.emailController,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        SizedBox(height: isMobile ? 24 : 32),
+        CustomButton(
+          text: 'Send Verification Code',
+          backgroundColor: AppColors.primaryButton,
+          textStyle: AppTextStyles.button,
+          isLoading: _controller.isLoading,
+          onPressed: _handleSendCode,
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: RichText(
+              text: TextSpan(
+                style: AppTextStyles.footer,
+                children: [
+                  const TextSpan(text: 'Remember your password? '),
+                  TextSpan(text: 'Log in', style: AppTextStyles.footerLink),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCodeForm({required bool isMobile}) {
+    final maskedEmail = maskEmail(_controller.emailController.text.trim());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Reset your password',
+          style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Enter the verification code sent to $maskedEmail and choose a new password.',
+          style: AppTextStyles.bodySmall.copyWith(fontSize: 14, height: 1.4),
+        ),
+        SizedBox(height: isMobile ? 24 : 32),
+        Text('Verification code', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: _controller.codeController,
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 24),
+        Text('New password', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: _controller.newPasswordController,
+          obscureText: _controller.obscurePassword,
+          onToggleObscureText: _controller.togglePasswordVisibility,
+        ),
+        const SizedBox(height: 24),
+        Text('Confirm new password', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        CustomTextField(
+          controller: _controller.confirmPasswordController,
+          obscureText: _controller.obscureConfirmPassword,
+          onToggleObscureText: _controller.toggleConfirmPasswordVisibility,
+        ),
+        const SizedBox(height: 32),
+        CustomButton(
+          text: 'Reset Password',
+          backgroundColor: AppColors.primaryButton,
+          textStyle: AppTextStyles.button,
+          isLoading: _controller.isLoading,
+          onPressed: _handleResetPassword,
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: _controller.isLoading ? null : _handleSendCode,
+            child: Text('Resend code', style: AppTextStyles.footerLink),
+          ),
+        ),
+        Center(
+          child: TextButton(
+            onPressed:
+                _controller.isLoading ? null : _controller.backToEmailStep,
+            child: Text('Use a different email', style: AppTextStyles.bodySmall),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -34,8 +34,8 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   String _parameter = 'Both';
   int _hours = 4;
 
-  static const _phColor = AppColors.primaryButton;
-  static const _ecColor = Color(0xFF1599A8);
+  static Color get _phColor => AppColors.accentGreen;
+  static Color get _ecColor => AppColors.accentTeal;
 
   @override
   Widget build(BuildContext context) {

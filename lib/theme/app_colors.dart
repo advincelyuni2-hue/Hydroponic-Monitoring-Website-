@@ -66,15 +66,27 @@ class AppColors {
   static Color get tableStripe =>
       _isDark ? const Color(0xFF252D25) : const Color.fromARGB(255, 247, 249, 241);
 
-  // Dark-aware helpers
-  static Color get accentGreen =>
-      _isDark ? const Color(0xFF8EC66E) : primaryButton;
   static Color get pillBackground =>
       _isDark ? const Color(0xFF2E382E) : const Color(0xFFE2E2E2);
   static Color get pillText =>
       _isDark ? const Color(0xFFD5DDD5) : Colors.black87;
   static Color get surfaceMuted =>
       _isDark ? const Color(0xFF252D25) : const Color(0xFFF4F6F4);
+  // ---- Dark-mode friendly accents (light mode keeps the old colors) ----
+  /// Green for chart lines, icons and text on cards.
+  static Color get accentGreen =>
+      _isDark ? const Color(0xFF7CE04A) : const Color(0xFF2D6A0D);
 
+  /// Second series (EC).
+  static Color get accentTeal =>
+      _isDark ? const Color(0xFF35D6E8) : const Color(0xFF1599A8);
+
+  /// Forecast / warning color. A true yellow in dark mode (amber looked orange).
+  static Color get warningYellow =>
+      _isDark ? const Color(0xFFFFD43B) : const Color(0xFFD97706);
+
+  /// Critical red that stays readable on dark backgrounds.
+  static Color get criticalRed =>
+      _isDark ? const Color(0xFFFF7A70) : const Color(0xFFD9483C);
   static bool get _isDark => appThemeMode.value == ThemeMode.dark;
 }

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
@@ -217,7 +218,8 @@ class ReportsController extends ChangeNotifier {
     }
   }
 
-  Future<void> generatePdfReport() async {
+  /// Builds the PDF using the currently selected options.
+  Future<Uint8List> buildPdfBytes() async {
     final List<HistoryLogEntry> sensorLogs = includeSensorLogs
         ? await _monitoringService.getSensorLogs()
         : const <HistoryLogEntry>[];
@@ -225,21 +227,27 @@ class ReportsController extends ChangeNotifier {
         ? await _monitoringService.getCalibrationLogs()
         : const <HistoryLogEntry>[];
 
-    await _pdfReportService.generateAndShare(
+    return _pdfReportService.buildReport(
       summary: summary,
-      trendPoints: trendPoints,
+      phTrendPoints: phTrendPoints,
+      ecTrendPoints: ecTrendPoints,
       predictionPoints: predictionPoints,
       sensorLogs: sensorLogs,
       calibrationLogs: calibrationLogs,
       phRange: phRange,
       ecRange: ecRange,
-      selectedParameter: selectedParameter,
       includeSensorLogs: includeSensorLogs,
       includeCalibrationLogs: includeCalibrationLogs,
       includePhOptimization: includePhOptimization,
       includeEcOptimization: includeEcOptimization,
       includeAllAnalytics: includeAllAnalytics,
     );
+  }
+
+  /// Builds the PDF and downloads it.
+  Future<void> generatePdfReport() async {
+    final bytes = await buildPdfBytes();
+    await _pdfReportService.downloadPdf(bytes);
   }
 
   void applyRecommendation() {

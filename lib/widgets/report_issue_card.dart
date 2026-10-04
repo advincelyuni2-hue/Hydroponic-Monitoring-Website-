@@ -34,7 +34,7 @@ class ReportIssueCard extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onAlertAdmin,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primaryButton),
+                side: BorderSide(color: AppColors.accentGreen),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -43,7 +43,7 @@ class ReportIssueCard extends StatelessWidget {
                 'Alert admin',
                 style: AppTextStyles.button.copyWith(
                   fontSize: 13,
-                  color: AppColors.primaryButton,
+                  color: AppColors.accentGreen,
                 ),
               ),
             ),

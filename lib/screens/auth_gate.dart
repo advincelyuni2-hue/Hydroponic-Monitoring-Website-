@@ -5,7 +5,7 @@ import '../services/auth_service.dart';
 import '../services/supabase_client.dart';
 import 'dashboard_screen.dart';
 import 'login_screen.dart';
-import 'reset_password_screen.dart';
+
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -21,13 +21,6 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    _sub = supabaseClient?.auth.onAuthStateChange.listen((data) {
-      if (data.event == AuthChangeEvent.passwordRecovery && mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
-        );
-      }
-    });
     _start();
   }
 

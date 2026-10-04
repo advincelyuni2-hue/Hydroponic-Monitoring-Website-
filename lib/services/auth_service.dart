@@ -69,18 +69,33 @@ class AuthService {
       );
     }
 
+    const duplicateMessage =
+        'An account with this email already exists. Please log in instead.';
+
     try {
       final response = await client.auth.signUp(
         email: email,
         password: password,
         data: {'full_name': name},
       );
+
+      final user = response.user;
+      // Supabase hides duplicates: an already-registered email comes back
+      // as a user with an EMPTY identities list instead of an error.
+      if (user != null && (user.identities?.isEmpty ?? false)) {
+        return AuthResult(success: false, message: duplicateMessage);
+      }
+
       return AuthResult(
-        success: response.user != null,
+        success: user != null,
         message: 'Verification code sent to your email.',
-        requiresOtp: response.user != null,
+        requiresOtp: user != null,
       );
     } on AuthException catch (error) {
+      final text = error.message.toLowerCase();
+      if (text.contains('already') && text.contains('registered')) {
+        return AuthResult(success: false, message: duplicateMessage);
+      }
       return AuthResult(success: false, message: error.message);
     } catch (_) {
       return AuthResult(
@@ -284,14 +299,17 @@ class AuthService {
     if (supabaseClient != null) await supabaseClient!.auth.signOut();
     appProfile.value = null;
   }
-  // Append this method inside your AuthService class in auth_service.dart
 
+  bool _recoveryVerified = false;
+
+  /// Step 1 of "forgot password": emails a one-time code.
   Future<AuthResult> resetPassword({required String email}) async {
-    if (email.trim().isEmpty) {
+    final value = email.trim();
+    if (value.isEmpty) {
       return AuthResult(
           success: false, message: 'Please enter your email address');
     }
-    if (!email.contains('@')) {
+    if (!value.contains('@')) {
       return AuthResult(
           success: false, message: 'Please enter a valid email address');
     }
@@ -299,16 +317,14 @@ class AuthService {
     final client = supabaseClient;
     if (client != null) {
       try {
-        await client.auth.resetPasswordForEmail(
-          email.trim(),
-          redirectTo: kIsWeb ? '${Uri.base.origin}/?reset=1' : null,
-        );
+        // No redirectTo: the email carries a code, not a link.
+        await client.auth.resetPasswordForEmail(value);
       } on AuthException catch (error) {
         return AuthResult(success: false, message: error.message);
       } catch (_) {
         return AuthResult(
           success: false,
-          message: 'Unable to send the reset link right now.',
+          message: 'Unable to send the code right now.',
         );
       }
     } else {
@@ -317,8 +333,71 @@ class AuthService {
 
     return AuthResult(
       success: true,
-      message: 'Password reset link sent! Check your inbox.',
+      message: 'Verification code sent! Check your inbox.',
     );
+  }
+
+  /// Step 2: checks the code, then sets the new password.
+  Future<AuthResult> resetPasswordWithCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return AuthResult(
+          success: true, message: 'Password updated. Please log in.');
+    }
+
+    // The code can only be used once, so skip it if it already worked and
+    // only the password update failed (for example a weak password).
+    if (!_recoveryVerified || client.auth.currentSession == null) {
+      try {
+        await client.auth.verifyOTP(
+          type: OtpType.recovery,
+          email: email.trim(),
+          token: code.trim(),
+        );
+        _recoveryVerified = true;
+      } on AuthException {
+        return AuthResult(
+          success: false,
+          message: 'Invalid or expired code. Please try again.',
+        );
+      } catch (_) {
+        return AuthResult(
+          success: false,
+          message: 'Unable to verify the code right now.',
+        );
+      }
+    }
+
+    try {
+      await client.auth.updateUser(UserAttributes(password: newPassword));
+      await client.auth.signOut();
+      _recoveryVerified = false;
+      appProfile.value = null;
+      return AuthResult(
+        success: true,
+        message: 'Password updated. Please log in with your new password.',
+      );
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to update the password right now.',
+      );
+    }
+  }
+
+  /// Signs out the temporary session if the user leaves mid-reset.
+  Future<void> cancelRecovery() async {
+    if (!_recoveryVerified) return;
+    _recoveryVerified = false;
+    await supabaseClient?.auth.signOut();
+    appProfile.value = null;
   }
 }
 

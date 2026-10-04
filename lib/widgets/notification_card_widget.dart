@@ -44,8 +44,8 @@ class NotificationCardWidget extends StatelessWidget {
 
     // Border color determined dynamically: Red for Critical, Yellow/Amber for Warning
     final Color severityBorderColor = isCritical
-        ? const Color(0xFFDC2626)
-        : (isWarning ? const Color(0xFFD97706) : AppColors.cardBorder);
+        ? AppColors.criticalRed
+        : (isWarning ? AppColors.warningYellow : AppColors.cardBorder);
 
     return GestureDetector(
       onTap: onTap,
@@ -110,7 +110,7 @@ class NotificationCardWidget extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
                       color: isCritical
-                          ? AppColors.alertText
+                          ? AppColors.criticalRed
                           : AppColors.textPrimary,
                     ),
                   ),
@@ -143,8 +143,8 @@ class NotificationCardWidget extends StatelessWidget {
                       text: item.currentStatus,
                       style: TextStyle(
                         color: item.currentStatus == 'Within range'
-                            ? AppColors.primaryButton
-                            : AppColors.alertText,
+                            ? AppColors.accentGreen
+                            : AppColors.criticalRed,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

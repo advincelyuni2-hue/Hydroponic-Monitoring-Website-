@@ -29,7 +29,7 @@ class ForecastChartCard extends StatefulWidget {
 class _ForecastChartCardState extends State<ForecastChartCard> {
   int selectedHours = 8;
 
-  static const chartLineColor = AppColors.chartLine;
+  static Color get chartLineColor => AppColors.accentGreen;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +275,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        Icon(Icons.show_chart, color: AppColors.accentGreen),
         Text(widget.title, style: AppTextStyles.sectionTitle),
       ],
     );
@@ -344,7 +344,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
         Container(
           width: 9,
           height: 9,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: chartLineColor,
             shape: BoxShape.circle,
           ),

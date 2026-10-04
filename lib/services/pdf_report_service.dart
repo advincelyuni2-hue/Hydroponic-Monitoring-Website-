@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
@@ -10,9 +12,14 @@ import 'pdf_report_output.dart';
 
 const _primaryGreen = PdfColor(0.15, 0.39, 0.08);
 const _borderColor = PdfColor(0.72, 0.74, 0.72);
+const _gridColor = PdfColor(0.88, 0.90, 0.87);
 const _mutedText = PdfColor(0.38, 0.42, 0.37);
 const _pHColor = PdfColor(0.15, 0.39, 0.08);
 const _ecColor = PdfColor(0.08, 0.60, 0.66);
+
+/// Tables with more rows than this start on a fresh page, so their heading is
+/// never left alone at the bottom of the previous page.
+const _maxRowsKeptTogether = 14;
 
 class PdfReportService {
   final Future<void> Function(Uint8List bytes, String filename) _outputPdf;
@@ -21,15 +28,15 @@ class PdfReportService {
     Future<void> Function(Uint8List bytes, String filename)? output,
   }) : _outputPdf = output ?? outputPdf;
 
-  Future<void> generateAndShare({
+  Future<Uint8List> buildReport({
     required ReportSummaryData summary,
-    required List<AnalyticsPoint> trendPoints,
+    required List<AnalyticsPoint> phTrendPoints,
+    required List<AnalyticsPoint> ecTrendPoints,
     required List<PredictedAnalyticsPoint> predictionPoints,
     required List<HistoryLogEntry> sensorLogs,
     required List<HistoryLogEntry> calibrationLogs,
     required RangeValues phRange,
     required RangeValues ecRange,
-    required String selectedParameter,
     required bool includeSensorLogs,
     required bool includeCalibrationLogs,
     required bool includePhOptimization,
@@ -47,22 +54,6 @@ class PdfReportService {
             .asUint8List();
     final leftLogo = pw.MemoryImage(leftLogoBytes);
     final rightLogo = pw.MemoryImage(rightLogoBytes);
-    final isPhTrend = selectedParameter.toLowerCase() == 'ph';
-    final hasTaggedTrends = trendPoints.any((point) => point.parameter != null);
-    final phTrendPoints = hasTaggedTrends
-        ? trendPoints
-            .where((point) => point.parameter?.toLowerCase() == 'ph')
-            .toList()
-        : isPhTrend
-            ? trendPoints
-            : const <AnalyticsPoint>[];
-    final ecTrendPoints = hasTaggedTrends
-        ? trendPoints
-            .where((point) => point.parameter?.toLowerCase() == 'ec')
-            .toList()
-        : isPhTrend
-            ? const <AnalyticsPoint>[]
-            : trendPoints;
 
     document.addPage(
       pw.MultiPage(
@@ -80,164 +71,182 @@ class PdfReportService {
         ),
         build: (_) => [
           pw.SizedBox(height: 12),
-          _sectionTitle('Summary Report'),
-          _table(
-            const ['Metric', 'Value', 'Status'],
-            [
-              [
-                'Average pH (30d)',
-                summary.avgPh.toStringAsFixed(1),
-                summary.phStatus,
-              ],
-              [
-                'Average EC (30d)',
-                '${summary.avgEc.toStringAsFixed(1)} mS/cm',
-                summary.ecStatus,
-              ],
-              [
-                'Average temperature (30d)',
-                formatTemperature(summary.avgTemp),
-                summary.tempStatus,
-              ],
-              [
-                'Critical alerts',
-                '${summary.criticalAlertsCount}',
-                summary.alertsPeriod,
-              ],
+          _section(
+            title: 'Summary Report',
+            description:
+                'A quick overview of the last 30 days: the average pH, EC and '
+                'temperature with their status, and the number of critical '
+                'alerts recorded.',
+            children: [
+              _table(
+                const ['Metric', 'Value', 'Status'],
+                [
+                  [
+                    'Average pH (30d)',
+                    summary.avgPh.toStringAsFixed(1),
+                    summary.phStatus,
+                  ],
+                  [
+                    'Average EC (30d)',
+                    '${summary.avgEc.toStringAsFixed(1)} mS/cm',
+                    summary.ecStatus,
+                  ],
+                  [
+                    'Average temperature (30d)',
+                    formatTemperature(summary.avgTemp),
+                    summary.tempStatus,
+                  ],
+                  [
+                    'Critical alerts',
+                    '${summary.criticalAlertsCount}',
+                    summary.alertsPeriod,
+                  ],
+                ],
+              ),
             ],
           ),
-          pw.SizedBox(height: 20),
-          _sectionTitle('Configuration'),
-          _table(
-            const ['Parameter', 'Minimum', 'Maximum'],
-            [
-              [
-                'pH',
-                phRange.start.toStringAsFixed(1),
-                phRange.end.toStringAsFixed(1),
-              ],
-              [
-                'EC (mS/cm)',
-                ecRange.start.toStringAsFixed(1),
-                ecRange.end.toStringAsFixed(1),
-              ],
-              ['Selected trend', selectedParameter, ''],
+          _section(
+            title: 'Configuration',
+            description:
+                'The target ranges used for this report. These are the '
+                'minimum and maximum values set on the Reports screen when '
+                'this report was generated (they start from the ranges saved '
+                'in Admin settings). Readings outside these ranges are marked '
+                'as out of range.',
+            children: [
+              _table(
+                const ['Parameter', 'Minimum', 'Maximum'],
+                [
+                  [
+                    'pH',
+                    phRange.start.toStringAsFixed(1),
+                    phRange.end.toStringAsFixed(1),
+                  ],
+                  [
+                    'EC (mS/cm)',
+                    ecRange.start.toStringAsFixed(1),
+                    ecRange.end.toStringAsFixed(1),
+                  ],
+                ],
+              ),
             ],
           ),
-          pw.SizedBox(height: 20),
-          _sectionTitle('Analytics Snapshot'),
-          if (includeAllAnalytics) ...[
-            pw.SizedBox(height: 10),
-            _trendGraph(
-              title: 'pH Trend',
-              points: phTrendPoints,
-              color: _pHColor,
-            ),
-            pw.SizedBox(height: 10),
-            _trendGraph(
-              title: 'EC Trend (mS/cm)',
-              points: ecTrendPoints,
-              color: _ecColor,
-            ),
-            pw.SizedBox(height: 8),
-            _analyticsLegend(),
-            pw.SizedBox(height: 10),
+          _section(
+            title: 'Analytics Snapshot',
+            description:
+                'pH and EC readings for the timeframe selected on the Reports '
+                'screen, drawn on one shared scale so you can compare how '
+                'both change over time.',
+            children: [
+              if (includeAllAnalytics) ...[
+                _combinedTrendChart(phTrendPoints, ecTrendPoints),
+                pw.SizedBox(height: 8),
+                _analyticsLegend(),
+              ] else
+                _emptySectionMessage(
+                  'Analytics charts and trend data were not included in this '
+                  'report.',
+                ),
+            ],
+          ),
+          if (includeAllAnalytics &&
+              (phTrendPoints.isNotEmpty || ecTrendPoints.isNotEmpty)) ...[
             _table(
               const ['Date', 'pH', 'EC (mS/cm)'],
               _combinedTrendRows(phTrendPoints, ecTrendPoints),
             ),
-          ] else
-            _emptySectionMessage(
-              'Analytics charts and trend data were not included in this report.',
-            ),
-          pw.SizedBox(height: 20),
-          _sectionTitle('Insights and Decision Support'),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 8),
-            child: pw.Text(
-              _recommendation(
-                summary,
-                predictionPoints,
-                selectedParameter,
-                phRange,
-                ecRange,
+            pw.SizedBox(height: 16),
+          ],
+          _section(
+            title: 'Insights and Decision Support',
+            description:
+                'Plain-language advice based on the average pH and EC '
+                'compared with the target ranges above.',
+            children: [
+              pw.Text(
+                '${_recommendation(summary, predictionPoints, 'pH', phRange, ecRange)}\n'
+                '${_recommendation(summary, predictionPoints, 'EC', phRange, ecRange)}',
+                style: const pw.TextStyle(fontSize: 10, lineSpacing: 4),
               ),
-              style: const pw.TextStyle(fontSize: 10, lineSpacing: 3),
-            ),
+            ],
           ),
-          if (includeSensorLogs) ...[
-            pw.SizedBox(height: 20),
-            _sectionTitle('Sensor History Logs'),
-            pw.SizedBox(height: 8),
-            if (sensorLogs.isEmpty)
-              _emptySectionMessage('No sensor history records are available.')
-            else
-              _table(
-                const [
-                  'Date',
-                  'Time',
-                  'Average pH',
-                  'Average EC',
-                  'Average Temp',
-                  'Status',
-                ],
-                  sensorLogs.map((log) {
-                    final row = List<String>.of(log.values);
-                    if (row.length > 4) row[4] = formatTempText(row[4]);
-                    return row;
-                }).toList(),
-              ),
-          ],
-          if (includeCalibrationLogs) ...[
-            pw.SizedBox(height: 20),
-            _sectionTitle('Calibration History Logs'),
-            pw.SizedBox(height: 8),
-            if (calibrationLogs.isEmpty)
-              _emptySectionMessage(
-                'No calibration history records are available.',
-              )
-            else
-              _table(
-                const [
-                  'Time',
-                  'Parameter',
-                  'Calibration',
-                  'Adjustment',
-                  'Performed by',
-                  'Result',
-                ],
-                calibrationLogs.map((log) => log.values).toList(),
-              ),
-          ],
-          if (includePhOptimization) ...[
-            pw.SizedBox(height: 20),
-            _sectionTitle('pH Optimization Results'),
-            pw.SizedBox(height: 8),
-            _optimizationTable(
-              value: summary.avgPh,
-              status: summary.phStatus,
-              range: phRange,
-              unit: '',
+          if (includeSensorLogs)
+            ..._tableSection(
+              title: 'Sensor History Logs',
+              description:
+                  'Daily average sensor readings recorded by the system, with '
+                  'the status of each day (Stable, Warning or Critical).',
+              headers: const [
+                'Date',
+                'Time',
+                'Average pH',
+                'Average EC',
+                'Average Temp',
+                'Status',
+              ],
+              rows: sensorLogs.map((log) {
+                final row = List<String>.of(log.values);
+                if (row.length > 4) row[4] = formatTempText(row[4]);
+                return row;
+              }).toList(),
+              emptyMessage: 'No sensor history records are available.',
             ),
-          ],
-          if (includeEcOptimization) ...[
-            pw.SizedBox(height: 20),
-            _sectionTitle('EC Optimization Results'),
-            pw.SizedBox(height: 8),
-            _optimizationTable(
-              value: summary.avgEc,
-              status: summary.ecStatus,
-              range: ecRange,
-              unit: ' mS/cm',
+          if (includeCalibrationLogs)
+            ..._tableSection(
+              title: 'Calibration History Logs',
+              description:
+                  'A record of sensor calibrations: when they were done, what '
+                  'was adjusted, who performed them and the result.',
+              headers: const [
+                'Time',
+                'Parameter',
+                'Calibration',
+                'Adjustment',
+                'Performed by',
+                'Result',
+              ],
+              rows: calibrationLogs.map((log) => log.values).toList(),
+              emptyMessage: 'No calibration history records are available.',
             ),
-          ],
+          if (includePhOptimization)
+            _section(
+              title: 'pH Optimization Results',
+              description:
+                  'Compares the 30-day average pH with the target range in '
+                  'the Configuration section and shows whether it is in range.',
+              children: [
+                _optimizationTable(
+                  value: summary.avgPh,
+                  status: summary.phStatus,
+                  range: phRange,
+                  unit: '',
+                ),
+              ],
+            ),
+          if (includeEcOptimization)
+            _section(
+              title: 'EC Optimization Results',
+              description:
+                  'Compares the 30-day average EC with the target range in '
+                  'the Configuration section and shows whether it is in range.',
+              children: [
+                _optimizationTable(
+                  value: summary.avgEc,
+                  status: summary.ecStatus,
+                  range: ecRange,
+                  unit: ' mS/cm',
+                ),
+              ],
+            ),
         ],
       ),
     );
-
-    final bytes = await _buildBytes(document);
-    await _outputPdf(bytes, 'hydroponic-monitoring-report.pdf');
+    return _buildBytes(document);
   }
+
+  /// Downloads / shares an already built PDF.
+  Future<void> downloadPdf(Uint8List bytes) =>
+      _outputPdf(bytes, 'hydroponic-monitoring-report.pdf');
 
   pw.Widget _buildReportHeader(
     DateTime generatedAt,
@@ -300,12 +309,81 @@ class PdfReportService {
           title,
           style: const pw.TextStyle(
             fontSize: 12,
-            fontWeight: pw.FontWeight.normal,
+            fontWeight: pw.FontWeight.bold,
           ),
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 3),
       ],
     );
+  }
+
+  pw.Widget _sectionNote(String text) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Text(
+        text,
+        style: const pw.TextStyle(
+          fontSize: 8.5,
+          color: _mutedText,
+          lineSpacing: 2,
+        ),
+      ),
+    );
+  }
+
+  /// Heading + description + content in one block. A block is never split
+  /// across pages, so a heading can no longer be left alone at the bottom.
+  pw.Widget _section({
+    required String title,
+    required String description,
+    required List<pw.Widget> children,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(title),
+        _sectionNote(description),
+        ...children,
+        pw.SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// Section for a table that can be long. Short tables stay together with
+  /// their heading; long tables start on a fresh page and their header row
+  /// repeats on every page.
+  List<pw.Widget> _tableSection({
+    required String title,
+    required String description,
+    required List<String> headers,
+    required List<List<String>> rows,
+    required String emptyMessage,
+  }) {
+    if (rows.isEmpty) {
+      return [
+        _section(
+          title: title,
+          description: description,
+          children: [_emptySectionMessage(emptyMessage)],
+        ),
+      ];
+    }
+    if (rows.length <= _maxRowsKeptTogether) {
+      return [
+        _section(
+          title: title,
+          description: description,
+          children: [_table(headers, rows)],
+        ),
+      ];
+    }
+    return [
+      pw.NewPage(),
+      _sectionTitle(title),
+      _sectionNote(description),
+      _table(headers, rows),
+      pw.SizedBox(height: 16),
+    ];
   }
 
   pw.Widget _table(List<String> headers, List<List<String>> rows) {
@@ -328,31 +406,101 @@ class PdfReportService {
     );
   }
 
-  pw.Widget _trendGraph({
-    required String title,
-    required List<AnalyticsPoint> points,
-    required PdfColor color,
-  }) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(title, style: const pw.TextStyle(fontSize: 9)),
-        pw.SizedBox(height: 4),
-        if (points.isEmpty)
-          pw.Container(
-            height: 90,
-            alignment: pw.Alignment.center,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _borderColor, width: 0.5),
+  /// One chart with both pH and EC on a shared scale (like Forecast Overview).
+  pw.Widget _combinedTrendChart(
+    List<AnalyticsPoint> phPoints,
+    List<AnalyticsPoint> ecPoints,
+  ) {
+    final labels = <String>[];
+    for (final point in [...phPoints, ...ecPoints]) {
+      if (!labels.contains(point.label)) labels.add(point.label);
+    }
+    if (labels.length < 2) {
+      return pw.Container(
+        height: 90,
+        alignment: pw.Alignment.center,
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _borderColor, width: 0.5),
+        ),
+        child: pw.Text(
+          'Not enough trend data to draw a chart (at least 2 days needed).',
+          style: const pw.TextStyle(fontSize: 8, color: _mutedText),
+        ),
+      );
+    }
+
+    final phByLabel = {for (final p in phPoints) p.label: p.value};
+    final ecByLabel = {for (final p in ecPoints) p.label: p.value};
+
+    List<pw.PointChartValue> series(Map<String, double> values) => [
+          for (var i = 0; i < labels.length; i++)
+            if (values.containsKey(labels[i]))
+              pw.PointChartValue(i.toDouble(), values[labels[i]]!),
+        ];
+
+    final phData = series(phByLabel);
+    final ecData = series(ecByLabel);
+
+    final allValues = [...phByLabel.values, ...ecByLabel.values];
+    final maxValue = allValues.reduce((a, b) => a > b ? a : b);
+    final yMax = math.max(2.0, (maxValue / 2).ceil() * 2.0);
+    final yTicks = [for (var i = 0; i <= 4; i++) yMax * i / 4];
+
+    // Show about 7 date labels so they never overlap.
+    final labelStep = (labels.length / 7).ceil();
+    final xLabels = [
+      for (var i = 0; i < labels.length; i++)
+        i % labelStep == 0 ? labels[i] : '',
+    ];
+
+    const axisStyle = pw.TextStyle(fontSize: 7, color: _mutedText);
+
+    return pw.SizedBox(
+      height: 190,
+      child: pw.Chart(
+        grid: pw.CartesianGrid(
+          xAxis: pw.FixedAxis.fromStrings(
+            xLabels,
+            textStyle: axisStyle,
+            marginStart: 14,
+            marginEnd: 14,
+            color: _borderColor,
+            divisions: labels.length <= 14,
+            divisionsColor: _gridColor,
+            ticks: true,
+          ),
+          yAxis: pw.FixedAxis<double>(
+            yTicks,
+            format: (v) => v.toStringAsFixed(1),
+            textStyle: axisStyle,
+            color: _borderColor,
+            divisions: true,
+            divisionsColor: _gridColor,
+          ),
+        ),
+        datasets: [
+          if (phData.isNotEmpty)
+            pw.LineDataSet(
+              legend: 'pH',
+              data: phData,
+              color: _pHColor,
+              lineWidth: 2,
+              pointSize: 2.5,
+              drawSurface: true,
+              surfaceOpacity: 0.12,
             ),
-            child: pw.Text(
-              'No ${title.startsWith('pH') ? 'pH' : 'EC'} trend data available',
-              style: const pw.TextStyle(fontSize: 8, color: _mutedText),
+          if (ecData.isNotEmpty)
+            pw.LineDataSet(
+              legend: 'EC',
+              data: ecData,
+              color: _ecColor,
+              lineWidth: 2,
+              pointSize: 2.5,
+              drawSurface: true,
+              surfaceOpacity: 0.12,
             ),
-          )
-        else
-          pw.SvgImage(svg: _trendChartSvg(points, color)),
-      ],
+        ],
+      ),
     );
   }
 
@@ -369,9 +517,9 @@ class PdfReportService {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.center,
       children: [
-        item('pH trend', _pHColor),
+        item('pH', _pHColor),
         pw.SizedBox(width: 20),
-        item('EC trend', _ecColor),
+        item('EC (mS/cm)', _ecColor),
       ],
     );
   }
@@ -426,54 +574,8 @@ class PdfReportService {
         .toList();
   }
 
-  String _trendChartSvg(List<AnalyticsPoint> points, PdfColor color) {
-    const width = 504.0;
-    const height = 116.0;
-    const left = 30.0;
-    const right = 10.0;
-    const top = 8.0;
-    const bottom = 22.0;
-    final values = points.map((point) => point.value).toList();
-    final minValue = values.reduce((a, b) => a < b ? a : b);
-    final maxValue = values.reduce((a, b) => a > b ? a : b);
-    final valueRange = maxValue - minValue;
-    const chartWidth = width - left - right;
-    const chartHeight = height - top - bottom;
-    final coordinates = points.indexed.map((entry) {
-      final index = entry.$1;
-      final point = entry.$2;
-      final x = left +
-          (points.length == 1
-              ? chartWidth / 2
-              : index * chartWidth / (points.length - 1));
-      final normalizedValue =
-          valueRange == 0 ? 0.5 : (point.value - minValue) / valueRange;
-      final y = top + chartHeight * (1 - normalizedValue);
-      return (x: x, y: y);
-    }).toList();
-    final polyline = coordinates
-        .map((point) =>
-            '${point.x.toStringAsFixed(1)},${point.y.toStringAsFixed(1)}')
-        .join(' ');
-    final colorHex =
-        '#${(color.red * 255).round().toRadixString(16).padLeft(2, '0')}'
-        '${(color.green * 255).round().toRadixString(16).padLeft(2, '0')}'
-        '${(color.blue * 255).round().toRadixString(16).padLeft(2, '0')}';
-
-    return '''
-<svg xmlns="http://www.w3.org/2000/svg" width="$width" height="$height" viewBox="0 0 $width $height">
-  <rect width="$width" height="$height" fill="#ffffff"/>
-  <line x1="$left" y1="$top" x2="$left" y2="${height - bottom}" stroke="#cbd3c6"/>
-  <line x1="$left" y1="${height - bottom}" x2="${width - right}" y2="${height - bottom}" stroke="#cbd3c6"/>
-  <line x1="$left" y1="${top + chartHeight / 2}" x2="${width - right}" y2="${top + chartHeight / 2}" stroke="#e0e5dc"/>
-  <polyline points="$polyline" fill="none" stroke="$colorHex" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-  ${coordinates.map((point) => '<circle cx="${point.x.toStringAsFixed(1)}" cy="${point.y.toStringAsFixed(1)}" r="2.5" fill="$colorHex"/>').join()}
-</svg>
-''';
-  }
-
+  /// The degree sign (°) is kept so temperatures read "32.6 °C".
   String _pdfSafeText(String value) => value
-      .replaceAll('°', ' deg')
       .replaceAll('—', '-')
       .replaceAll('–', '-')
       .replaceAll('’', "'")
@@ -489,12 +591,11 @@ class PdfReportService {
     RangeValues phRange,
     RangeValues ecRange,
   ) {
+    final isPh = selectedParameter.toLowerCase() == 'ph';
     final latest = points.isEmpty
-        ? (selectedParameter.toLowerCase() == 'ph'
-            ? summary.avgPh
-            : summary.avgEc)
+        ? (isPh ? summary.avgPh : summary.avgEc)
         : points.last.predictedValue;
-    final range = selectedParameter.toLowerCase() == 'ph' ? phRange : ecRange;
+    final range = isPh ? phRange : ecRange;
 
     if (latest > range.end) {
       return '$selectedParameter is trending high. Apply a small corrective '

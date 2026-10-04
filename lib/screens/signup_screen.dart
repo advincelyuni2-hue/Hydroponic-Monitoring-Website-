@@ -154,6 +154,7 @@ class _SignupScreenState extends State<SignupScreen> {
               CustomTextField(
                 controller: _controller.passwordController,
                 obscureText: _controller.obscurePassword,
+                onToggleObscureText: _controller.togglePasswordVisibility,
               ),
               const SizedBox(height: 24),
 
@@ -162,6 +163,7 @@ class _SignupScreenState extends State<SignupScreen> {
               CustomTextField(
                 controller: _controller.confirmPasswordController,
                 obscureText: _controller.obscureConfirmPassword,
+                onToggleObscureText: _controller.toggleConfirmPasswordVisibility,
               ),
               const SizedBox(height: 32),
 

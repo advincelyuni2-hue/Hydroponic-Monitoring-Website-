@@ -28,8 +28,8 @@ class ReportPredictionCard extends StatelessWidget {
     this.accuracyText,
   });
 
-  static const _phColor = AppColors.primaryButton;
-  static const _ecColor = Color(0xFF1599A8);
+  static Color get _phColor => AppColors.accentGreen;
+  static Color get _ecColor => AppColors.accentTeal;
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +120,7 @@ class ReportPredictionCard extends StatelessWidget {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        Icon(Icons.show_chart, color: AppColors.accentGreen),
         Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
         if (accuracyText != null) ...[
           const SizedBox(width: 4),
@@ -134,7 +134,7 @@ class ReportPredictionCard extends StatelessWidget {
               accuracyText!,
               style: AppTextStyles.cardMeta.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.primaryButton,
+                color: AppColors.accentGreen,
                 fontSize: 11,
               ),
             ),

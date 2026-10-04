@@ -33,9 +33,9 @@ class ForecastingChartCard extends StatefulWidget {
 }
 
 class ForecastingChartCardState extends State<ForecastingChartCard> {
-  static const phHistoricalColor = AppColors.primaryButton;
-  static const ecHistoricalColor = Color(0xFF1599A8);
-  static const predictedColor = Color(0xFFD97706);
+  static Color get phHistoricalColor => AppColors.accentGreen;
+  static Color get ecHistoricalColor => AppColors.accentTeal;
+  static Color get predictedColor => AppColors.warningYellow;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +163,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                 const TextSpan(text: '  Forecast '),
                 TextSpan(
                   text: forecastLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: predictedColor,
                   ),

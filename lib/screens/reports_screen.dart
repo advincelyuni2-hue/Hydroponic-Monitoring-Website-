@@ -34,7 +34,7 @@ class ReportsScreenState extends State<ReportsScreen> {
   void _navigateToGenerateReport() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const GenerateReportScreen(),
+        builder: (context) => GenerateReportScreen(controller: _controller),
       ),
     );
   }
