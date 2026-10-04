@@ -53,17 +53,23 @@ class AppHeader extends StatelessWidget {
           Positioned(
             top: offset.dy + size.height + 8,
             right: MediaQuery.of(context).size.width - offset.dx - size.width,
-            child: NotificationOverlayWidget(
-              notifications: const [],
-              onNotificationTap: (item) {
-                overlayEntry.remove();
-              },
-              onViewAllTap: () {
-                overlayEntry.remove();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationsScreen(),
-                  ),
+            child: StreamBuilder<List<AppNotificationItem>>(
+              stream: NotificationService().streamNotificationItems(),
+              builder: (context, snapshot) {
+                final notifications = snapshot.data ?? [];
+                return NotificationOverlayWidget(
+                  notifications: notifications,
+                  onNotificationTap: (item) {
+                    overlayEntry.remove();
+                  },
+                  onViewAllTap: () {
+                    overlayEntry.remove();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -89,7 +95,6 @@ class AppHeader extends StatelessWidget {
     final iconSize = isMobile ? 35.0 : 40.0;
     final GlobalKey bellKey = GlobalKey();
 
-    // Dynamically scales title text down if it exceeds available space
     final Widget titleSection = Row(
       children: [
         // Hamburger Menu Button
@@ -136,7 +141,7 @@ class AppHeader extends StatelessWidget {
       children: [
         if (!isMobile)
           SizedBox(
-            width: 340, // Increased to 340px to accommodate longer titles cleanly
+            width: 340,
             child: titleSection,
           )
         else
