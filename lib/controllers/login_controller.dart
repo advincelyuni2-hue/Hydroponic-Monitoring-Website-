@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/remember_me_service.dart';
 
 class LoginController extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -11,6 +12,18 @@ class LoginController extends ChangeNotifier {
   bool isLoading = false;
   bool obscurePassword = true;
   String? errorMessage;
+
+    LoginController() {
+    _loadRemembered();
+  }
+
+  Future<void> _loadRemembered() async {
+    final service = RememberMeService();
+    rememberMe = await service.isEnabled();
+    final email = await service.savedEmail();
+    if (email != null) emailController.text = email;
+    notifyListeners();
+  }
 
   void toggleRememberMe(bool? value) {
     rememberMe = value ?? false;
@@ -35,6 +48,11 @@ class LoginController extends ChangeNotifier {
     isLoading = false;
     if (!result.success) {
       errorMessage = result.message;
+    } else {
+      await RememberMeService().save(
+        remember: rememberMe,
+        email: emailController.text.trim(),
+      );
     }
     notifyListeners();
 

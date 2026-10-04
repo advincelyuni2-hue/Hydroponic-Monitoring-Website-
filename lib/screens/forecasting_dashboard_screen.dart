@@ -9,6 +9,7 @@ import '../widgets/app_header.dart';
 import '../widgets/forecasting_chart_card.dart';
 import '../widgets/prediction_insights_card.dart';
 import '../widgets/report_issue_card.dart';
+import '../widgets/alert_admin_dialog.dart';
 
 class ForecastingDashboardScreen extends StatefulWidget {
   const ForecastingDashboardScreen({super.key});
@@ -111,9 +112,14 @@ class _ForecastingDashboardScreenState
                         onInsightParamChanged:
                             _controller.setBothInsightParam,
                       ),
-                    const SizedBox(height: 16),
-                    ReportIssueCard(onAlertAdmin: () {}),
-                  ] else ...[
+                      const SizedBox(height: 16),
+                      ReportIssueCard(
+                        onAlertAdmin: () => showAlertAdminDialog(
+                          context,
+                          source: 'Forecasting screen',
+                        ),
+                      ),
+                    ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -136,7 +142,12 @@ class _ForecastingDashboardScreenState
                                       _controller.setBothInsightParam,
                                 ),
                               const SizedBox(height: 16),
-                              ReportIssueCard(onAlertAdmin: () {}),
+                              ReportIssueCard(
+                                onAlertAdmin: () => showAlertAdminDialog(
+                                  context,
+                                  source: 'Forecasting screen',
+                                ),
+                              ),
                             ],
                           ),
                         ),

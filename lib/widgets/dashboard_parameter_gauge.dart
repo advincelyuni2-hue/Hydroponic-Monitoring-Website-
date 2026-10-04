@@ -157,15 +157,15 @@ class DashboardParameterGauge extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                data.currentValue,
+                _valueText,
                 style: AppTextStyles.title.copyWith(fontSize: valueFontSize),
               ),
-              if (data.unit.isNotEmpty) ...[
+              if (_unitText.isNotEmpty) ...[
                 const SizedBox(width: 4),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    data.unit,
+                    _unitText,
                     style: AppTextStyles.cardMeta.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

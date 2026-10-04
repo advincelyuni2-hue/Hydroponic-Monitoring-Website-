@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'supabase_client.dart';
 import 'app_state.dart';
 import 'user_service.dart';
+import 'remember_me_service.dart';
 
 class AuthService {
   Future<AuthResult> login({
@@ -163,6 +164,7 @@ class AuthService {
     }
 
     try {
+      await RememberMeService().save(remember: true);
       final started = await client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: kIsWeb ? Uri.base.origin : null,
@@ -257,6 +259,26 @@ class AuthService {
           success: false, message: 'Unable to change email right now.');
     }
   }
+  
+    /// Called on app start. Returns true if the user should skip the login screen.
+  Future<bool> restoreSession() async {
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) return false;
+
+    if (!await RememberMeService().isEnabled()) {
+      await client.auth.signOut();
+      return false;
+    }
+
+    await _setAuthenticatedProfile(user.email ?? '');
+    if (appProfile.value?.isActive == false) {
+      await client.auth.signOut();
+      appProfile.value = null;
+      return false;
+    }
+    return true;
+  }
 
   Future<void> logout() async {
     if (supabaseClient != null) await supabaseClient!.auth.signOut();
@@ -277,9 +299,17 @@ class AuthService {
     final client = supabaseClient;
     if (client != null) {
       try {
-        await client.auth.resetPasswordForEmail(email);
+        await client.auth.resetPasswordForEmail(
+          email.trim(),
+          redirectTo: kIsWeb ? '${Uri.base.origin}/?reset=1' : null,
+        );
       } on AuthException catch (error) {
         return AuthResult(success: false, message: error.message);
+      } catch (_) {
+        return AuthResult(
+          success: false,
+          message: 'Unable to send the reset link right now.',
+        );
       }
     } else {
       await Future.delayed(const Duration(seconds: 1));

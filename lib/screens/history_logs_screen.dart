@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../controllers/history_logs_controller.dart';
-import '../models/monitoring_models.dart';
 import '../services/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';

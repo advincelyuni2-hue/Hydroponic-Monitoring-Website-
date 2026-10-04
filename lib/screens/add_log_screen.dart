@@ -10,7 +10,6 @@ import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import 'notifications_screen.dart';
-import '../services/app_state.dart';
 
 class AddLogScreen extends StatelessWidget {
   final AppNotificationItem? notification;
