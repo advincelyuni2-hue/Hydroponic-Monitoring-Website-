@@ -23,7 +23,8 @@ class AppColors {
   static const Color googleButtonText = Color(0xFF1A1A1A);
 
   // Inputs
-  static const Color inputFill = Color(0xFFFFFFFF);
+  static Color get inputFill =>
+      _isDark ? const Color(0xFF252D25) : const Color(0xFFFFFFFF);
   static const Color inputBorder = Color(0xFFE0E0E0);
 
   // Checkbox
@@ -54,7 +55,8 @@ class AppColors {
 
   // Charts
   static const Color chartLine = Color(0xFF2D6A0D);
-  static const Color chartGrid = Color(0xFFE0E0E0);
+  static Color get chartGrid =>
+      _isDark ? const Color(0xFF3A443A) : const Color(0xFFE0E0E0);
 
   // Prediction Insights callout box
   static Color get calloutBackground =>
@@ -63,6 +65,16 @@ class AppColors {
   //HIstory table
   static Color get tableStripe =>
       _isDark ? const Color(0xFF252D25) : const Color.fromARGB(255, 247, 249, 241);
+
+  // Dark-aware helpers
+  static Color get accentGreen =>
+      _isDark ? const Color(0xFF8EC66E) : primaryButton;
+  static Color get pillBackground =>
+      _isDark ? const Color(0xFF2E382E) : const Color(0xFFE2E2E2);
+  static Color get pillText =>
+      _isDark ? const Color(0xFFD5DDD5) : Colors.black87;
+  static Color get surfaceMuted =>
+      _isDark ? const Color(0xFF252D25) : const Color(0xFFF4F6F4);
 
   static bool get _isDark => appThemeMode.value == ThemeMode.dark;
 }

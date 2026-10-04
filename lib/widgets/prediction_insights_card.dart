@@ -3,46 +3,71 @@ import '../models/forecasting_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/theme_mode_controller.dart';
 import 'apply_fix_dialog.dart';
+
 
 class SeverityStyle {
   final Color accent;
-  final Color tint;
-  final Color text;
-  final Color badgeFill;
+  final Color _lightTint, _darkTint;
+  final Color _lightText, _darkText;
+  final Color _lightBadge, _darkBadge;
   final IconData icon;
 
   const SeverityStyle({
     required this.accent,
-    required this.tint,
-    required this.text,
-    required this.badgeFill,
+    required Color lightTint,
+    required Color darkTint,
+    required Color lightText,
+    required Color darkText,
+    required Color lightBadge,
+    required Color darkBadge,
     required this.icon,
-  });
+  })  : _lightTint = lightTint,
+        _darkTint = darkTint,
+        _lightText = lightText,
+        _darkText = darkText,
+        _lightBadge = lightBadge,
+        _darkBadge = darkBadge;
+
+  static bool get _dark => appThemeMode.value == ThemeMode.dark;
+
+  Color get tint => _dark ? _darkTint : _lightTint;
+  Color get text => _dark ? _darkText : _lightText;
+  Color get badgeFill => _dark ? _darkBadge : _lightBadge;
 
   bool get isAlert => icon != Icons.check_circle_rounded;
 
   static const critical = SeverityStyle(
     accent: Color(0xFFDC2626),
-    tint: Color(0xFFFEF2F2),
-    text: Color(0xFFB91C1C),
-    badgeFill: Color(0xFFFECACA),
+    lightTint: Color(0xFFFEF2F2),
+    darkTint: Color(0xFF3B1F1F),
+    lightText: Color(0xFFB91C1C),
+    darkText: Color(0xFFFCA5A5),
+    lightBadge: Color(0xFFFECACA),
+    darkBadge: Color(0xFF5C2323),
     icon: Icons.error_rounded,
   );
 
   static const warning = SeverityStyle(
     accent: Color(0xFFD97706),
-    tint: Color(0xFFFFFBEB),
-    text: Color(0xFFB45309),
-    badgeFill: Color(0xFFFDE68A),
+    lightTint: Color(0xFFFFFBEB),
+    darkTint: Color(0xFF3A2F14),
+    lightText: Color(0xFFB45309),
+    darkText: Color(0xFFFCD34D),
+    lightBadge: Color(0xFFFDE68A),
+    darkBadge: Color(0xFF5A4410),
     icon: Icons.warning_amber_rounded,
   );
 
   static const normal = SeverityStyle(
     accent: Color(0xFF16A34A),
-    tint: Color(0xFFF0FDF4),
-    text: Color(0xFF15803D),
-    badgeFill: Color(0xFFBBF7D0),
+    lightTint: Color(0xFFF0FDF4),
+    darkTint: Color(0xFF17301F),
+    lightText: Color(0xFF15803D),
+    darkText: Color(0xFF86EFAC),
+    lightBadge: Color(0xFFBBF7D0),
+    darkBadge: Color(0xFF1F4A2B),
     icon: Icons.check_circle_rounded,
   );
 
@@ -271,7 +296,7 @@ class PredictionInsightsCard extends StatelessWidget {
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F6F4),
+              color: AppColors.surfaceMuted,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.cardBorder),
             ),
@@ -347,7 +372,7 @@ class PredictionInsightsCard extends StatelessWidget {
                               '${detail.targetPh.toStringAsFixed(1)}$mainUnit',
                               style: AppTextStyles.sectionTitle.copyWith(
                                 fontSize: 18,
-                                color: AppColors.primaryButton,
+                                color: AppColors.accentGreen,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -428,7 +453,7 @@ class PredictionInsightsCard extends StatelessWidget {
                         onConfirm: onDismiss,
                       ),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryButton),
+                        side: BorderSide(color: AppColors.accentGreen),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -437,7 +462,7 @@ class PredictionInsightsCard extends StatelessWidget {
                         'Dismiss',
                         style: AppTextStyles.button.copyWith(
                           fontSize: 14,
-                          color: AppColors.primaryButton,
+                          color: AppColors.accentGreen,
                         ),
                       ),
                     ),
@@ -458,7 +483,7 @@ class PredictionInsightsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E2E2),
+        color: AppColors.pillBackground,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -480,7 +505,7 @@ class PredictionInsightsCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : Colors.black87,
+                  color: isSelected ? Colors.white : AppColors.pillText,
                 ),
               ),
             ),
