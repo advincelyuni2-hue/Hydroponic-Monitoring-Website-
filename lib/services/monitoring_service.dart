@@ -1,4 +1,5 @@
 import '../models/monitoring_models.dart';
+import 'app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
@@ -65,7 +66,7 @@ class MonitoringService {
     ];
   }
 
-  Future<_ParameterRanges> _getParameterRanges() async {
+    Future<_ParameterRanges> _getParameterRanges() async {
     try {
       final row = await supabase
           .from('parameter_configurations')
@@ -73,12 +74,19 @@ class MonitoringService {
           .eq('id', 1)
           .maybeSingle();
       if (row != null) {
-        return _ParameterRanges(
+        final loaded = _ParameterRanges(
           phMin: (row['ph_min'] as num?)?.toDouble() ?? 5.5,
           phMax: (row['ph_max'] as num?)?.toDouble() ?? 6.5,
           ecMin: (row['ec_min'] as num?)?.toDouble() ?? 1.2,
           ecMax: (row['ec_max'] as num?)?.toDouble() ?? 1.8,
         );
+        appParameterRanges.value = ParameterRangeConfig(
+          phMin: loaded.phMin,
+          phMax: loaded.phMax,
+          ecMin: loaded.ecMin,
+          ecMax: loaded.ecMax,
+        );
+        return loaded;
       }
     } catch (_) {
       // Older deployments may not have the admin configuration table yet.

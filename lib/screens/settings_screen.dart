@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/email_mask.dart';
 import '../screens/login_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -28,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final profile = appProfile.value;
     _nameController = TextEditingController(text: profile?.name ?? 'Alveus');
     _emailController = TextEditingController(
-      text: profile?.email ?? 'placeholder@example.com',
+      text: maskEmail(profile?.email ?? 'placeholder@example.com'),
     );
   }
 
@@ -84,6 +85,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _label('Email address'),
         const SizedBox(height: 8),
         _field(_emailController, enabled: false),
+        const SizedBox(height: 12),
+        if (AuthService().hasPasswordLogin)
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openCredentialDialog(_CredentialMode.email),
+                icon: const Icon(Icons.alternate_email_rounded, size: 16),
+                label: const Text('Change email'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openCredentialDialog(_CredentialMode.password),
+                icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                label: const Text('Change password'),
+              ),
+            ],
+          )
+        else
+          Text(
+            'Signed in with Google. Manage your email and password in your Google account.',
+            style: AppTextStyles.cardMeta,
+          ),
         const SizedBox(height: 20),
         Align(
           alignment: Alignment.centerRight,
@@ -267,13 +292,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
-
+   Future<void> _openCredentialDialog(_CredentialMode mode) async {
+    final message = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ChangeCredentialDialog(mode: mode),
+    );
+    if (message != null && mounted) _showMessage(message);
+  }
   Future<void> _saveProfile() async {
     final existing = appProfile.value ??
         UserProfile(
           id: 'local-user',
           name: 'Alveus',
-          email: _emailController.text,
+          email: '',
           role: 'Employee',
         );
     await UserService().updateProfile(UserProfile(
@@ -411,6 +443,193 @@ class _SettingsCard extends StatelessWidget {
           ],
           ...children,
         ],
+      ),
+    );
+  }
+}
+
+enum _CredentialMode { password, email }
+
+class _ChangeCredentialDialog extends StatefulWidget {
+  final _CredentialMode mode;
+  const _ChangeCredentialDialog({required this.mode});
+
+  @override
+  State<_ChangeCredentialDialog> createState() =>
+      _ChangeCredentialDialogState();
+}
+
+class _ChangeCredentialDialogState extends State<_ChangeCredentialDialog> {
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _busy = false;
+  bool _showPasswords = false;
+  String? _error;
+
+  bool get _isPassword => widget.mode == _CredentialMode.password;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  String? _validate() {
+    final current = _currentController.text;
+    final next =
+        _isPassword ? _newController.text : _newController.text.trim();
+
+    if (current.isEmpty) return 'Enter your current password.';
+    if (_isPassword) {
+      if (next.length < 8) {
+        return 'New password must be at least 8 characters.';
+      }
+      if (next != _confirmController.text) {
+        return 'New passwords do not match.';
+      }
+      if (next == current) {
+        return 'New password must be different from the current one.';
+      }
+    } else {
+      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(next)) {
+        return 'Enter a valid email address.';
+      }
+      if (next.toLowerCase() == appProfile.value?.email.toLowerCase()) {
+        return 'That is already your email address.';
+      }
+    }
+    return null;
+  }
+
+  Future<void> _submit() async {
+    final problem = _validate();
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final auth = AuthService();
+    final result = _isPassword
+        ? await auth.changePassword(
+            currentPassword: _currentController.text,
+            newPassword: _newController.text,
+          )
+        : await auth.changeEmail(
+            currentPassword: _currentController.text,
+            newEmail: _newController.text.trim(),
+          );
+
+    if (!mounted) return;
+    if (result.success) {
+      Navigator.of(context).pop(result.message);
+    } else {
+      setState(() {
+        _busy = false;
+        _error = result.message;
+      });
+    }
+  }
+
+  Widget _input(TextEditingController controller, String label,
+      {bool secret = false, TextInputType? type}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        obscureText: secret && !_showPasswords,
+        keyboardType: type,
+        enabled: !_busy,
+        style: AppTextStyles.input,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.background,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 420),
+        decoration: AppDecorations.card(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _isPassword ? 'Change password' : 'Change email',
+                style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              _input(_currentController, 'Current password', secret: true),
+              if (_isPassword) ...[
+                _input(_newController, 'New password', secret: true),
+                _input(_confirmController, 'Confirm new password',
+                    secret: true),
+              ] else
+                _input(_newController, 'New email address',
+                    type: TextInputType.emailAddress),
+              if (_isPassword)
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: _showPasswords,
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _showPasswords = v ?? false),
+                  title:
+                      Text('Show passwords', style: AppTextStyles.bodySmall),
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 4),
+                Text(_error!,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.alertText)),
+              ],
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _busy ? null : () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _busy ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryButton,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isPassword ? 'Update password' : 'Send link'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -216,11 +216,11 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
         show: true,
         drawVerticalLine: true,
         getDrawingHorizontalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withOpacity(0.65),
+          color: AppColors.chartGrid.withValues(alpha: 0.65),
           strokeWidth: 1,
         ),
         getDrawingVerticalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withOpacity(0.35),
+          color: AppColors.chartGrid.withValues(alpha: 0.35),
           strokeWidth: 1,
         ),
       ),
@@ -317,7 +317,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
-            color: currentColor.withOpacity(0.10),
+            color: currentColor.withValues(alpha: 0.10),
           ),
         ),
       ],

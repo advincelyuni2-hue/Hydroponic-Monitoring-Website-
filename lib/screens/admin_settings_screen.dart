@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/email_mask.dart';
 import '../services/app_state.dart';
 import '../services/supabase_client.dart';
 import '../theme/app_colors.dart';
@@ -93,27 +95,53 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _saveConfiguration() async {
+    Future<void> _saveConfiguration() async {
     final client = supabaseClient;
     if (client == null) return;
 
+    final phMin = double.parse(_phRange.start.toStringAsFixed(1));
+    final phMax = double.parse(_phRange.end.toStringAsFixed(1));
+    final ecMin = double.parse(_ecRange.start.toStringAsFixed(1));
+    final ecMax = double.parse(_ecRange.end.toStringAsFixed(1));
+
+    if (phMin >= phMax || ecMin >= ecMax) {
+      _message('Minimum must be lower than maximum.');
+      return;
+    }
+
     try {
-      await client.from('parameter_configurations').upsert({
+      final saved = await client.from('parameter_configurations').upsert({
         'id': 1,
-        'ph_min': double.parse(_phRange.start.toStringAsFixed(1)),
-        'ph_max': double.parse(_phRange.end.toStringAsFixed(1)),
-        'ec_min': double.parse(_ecRange.start.toStringAsFixed(1)),
-        'ec_max': double.parse(_ecRange.end.toStringAsFixed(1)),
+        'ph_min': phMin,
+        'ph_max': phMax,
+        'ec_min': ecMin,
+        'ec_max': ecMax,
         'updated_by': client.auth.currentUser?.id,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      }).select();
+
+      if (saved.isEmpty) {
+        throw StateError('The database did not save the configuration.');
+      }
 
       _initialPhRange = _phRange;
       _initialEcRange = _ecRange;
 
+      // Tell every other screen right away (see Step 3).
+      appParameterRanges.value = ParameterRangeConfig(
+        phMin: phMin,
+        phMax: phMax,
+        ecMin: ecMin,
+        ecMax: ecMax,
+      );
+
       if (mounted) _message('Parameter configuration saved.');
-    } catch (_) {
-      if (mounted) _message('Unable to save parameter configuration.');
+    } on PostgrestException catch (e) {
+      debugPrint('Save config failed: ${e.code} ${e.message}');
+      if (mounted) _message('Unable to save: ${e.message}');
+    } catch (e) {
+      debugPrint('Save config failed: $e');
+      if (mounted) _message('Unable to save: $e');
     }
   }
 
@@ -143,6 +171,10 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
   Future<void> _toggleUserActive(
       Map<String, dynamic> user, bool active) async {
+        if (_isSelf(user)) {
+      _message('You cannot deactivate your own account.');
+      return;
+    }
     final client = supabaseClient;
     if (client == null) return;
 
@@ -159,7 +191,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
   }
 
   Future<void> _deleteUser(Map<String, dynamic> user) async {
-    final email = user['email'] as String? ?? 'this user';
+    final email = maskEmail(user['email'] as String? ?? 'this user');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => Dialog(
@@ -241,6 +273,11 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
       _message('Unable to delete this user.');
     }
   }
+    bool _isSelf(Map<String, dynamic> user) {
+    final currentId =
+        supabaseClient?.auth.currentUser?.id ?? appProfile.value?.id;
+    return currentId != null && user['id'] == currentId;
+  }
 
   void _message(String text) {
     ScaffoldMessenger.of(context)
@@ -319,7 +356,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user['email'] as String? ?? 'Unknown user',
+                          maskEmail(user['email'] as String? ?? 'Unknown user'),
                           style: AppTextStyles.bodyBold.copyWith(fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -359,23 +396,27 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                         DropdownMenuItem(
                             value: 'employee', child: Text('Employee')),
                       ],
-                      onChanged: (role) {
-                        if (role != null) _changeRole(user, role);
-                      },
+                        onChanged: _isSelf(user)
+                          ? null
+                          : (role) {
+                              if (role != null) _changeRole(user, role);
+                            },
                     ),
                   ),
                   const SizedBox(width: 12),
                   Switch.adaptive(
                     value: user['is_active'] as bool? ?? false,
                     activeColor: AppColors.primaryButton,
-                    onChanged: (active) => _toggleUserActive(user, active),
+                    onChanged: _isSelf(user)
+                        ? null
+                        : (active) => _toggleUserActive(user, active),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Delete user account',
                     icon: const Icon(Icons.delete_outline_rounded,
                         color: AppColors.alertText, size: 20),
-                    onPressed: () => _deleteUser(user),
+                     onPressed: _isSelf(user) ? null : () => _deleteUser(user),
                   ),
                 ],
               ),

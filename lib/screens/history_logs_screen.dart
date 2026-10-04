@@ -561,7 +561,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.calendar_today_rounded,
+                const Icon(Icons.calendar_today_rounded,
                     size: 14, color: AppColors.primaryButton),
                 const SizedBox(width: 6),
                 Text(
@@ -596,7 +596,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.info_outline_rounded,
                   size: 15,
                   color: AppColors.primaryButton,

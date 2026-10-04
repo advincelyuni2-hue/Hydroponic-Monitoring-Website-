@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
+import 'app_state.dart';
 import 'pdf_report_output.dart';
 
 const _primaryGreen = PdfColor(0.15, 0.39, 0.08);
@@ -95,7 +96,7 @@ class PdfReportService {
               ],
               [
                 'Average temperature (30d)',
-                '${summary.avgTemp.toStringAsFixed(1)} deg C',
+                formatTemperature(summary.avgTemp),
                 summary.tempStatus,
               ],
               [
@@ -180,7 +181,11 @@ class PdfReportService {
                   'Average Temp',
                   'Status',
                 ],
-                sensorLogs.map((log) => log.values).toList(),
+                  sensorLogs.map((log) {
+                    final row = List<String>.of(log.values);
+                    if (row.length > 4) row[4] = formatTempText(row[4]);
+                    return row;
+                }).toList(),
               ),
           ],
           if (includeCalibrationLogs) ...[

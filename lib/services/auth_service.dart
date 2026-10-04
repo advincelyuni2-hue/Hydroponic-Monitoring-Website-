@@ -182,6 +182,81 @@ class AuthService {
       );
     }
   }
+    /// False for Google-only accounts, which have no password to change.
+  bool get hasPasswordLogin {
+    final user = supabaseClient?.auth.currentUser;
+    if (user == null) return true;
+    final identities = user.identities;
+    if (identities == null || identities.isEmpty) return true;
+    return identities.any((i) => i.provider == 'email');
+  }
+
+  Future<AuthResult> _reauthenticate(String currentPassword) async {
+    final client = supabaseClient!;
+    final email = client.auth.currentUser?.email;
+    if (email == null) {
+      return AuthResult(success: false, message: 'No signed-in user found.');
+    }
+    try {
+      await client.auth
+          .signInWithPassword(email: email, password: currentPassword);
+      return AuthResult(success: true, message: 'ok');
+    } on AuthException {
+      return AuthResult(
+          success: false, message: 'Current password is incorrect.');
+    }
+  }
+
+  Future<AuthResult> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return AuthResult(success: true, message: 'Password updated.');
+    }
+    try {
+      final check = await _reauthenticate(currentPassword);
+      if (!check.success) return check;
+      await client.auth.updateUser(UserAttributes(password: newPassword));
+      return AuthResult(success: true, message: 'Password updated.');
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+          success: false, message: 'Unable to change password right now.');
+    }
+  }
+
+  Future<AuthResult> changeEmail({
+    required String currentPassword,
+    required String newEmail,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return AuthResult(
+          success: true, message: 'Confirmation sent to $newEmail.');
+    }
+    try {
+      final check = await _reauthenticate(currentPassword);
+      if (!check.success) return check;
+      await client.auth.updateUser(
+        UserAttributes(email: newEmail),
+        emailRedirectTo: kIsWeb ? Uri.base.origin : null,
+      );
+      return AuthResult(
+        success: true,
+        message: 'Confirmation sent. Check your inbox to finish the change.',
+      );
+    } on AuthException catch (error) {
+      return AuthResult(success: false, message: error.message);
+    } catch (_) {
+      return AuthResult(
+          success: false, message: 'Unable to change email right now.');
+    }
+  }
 
   Future<void> logout() async {
     if (supabaseClient != null) await supabaseClient!.auth.signOut();

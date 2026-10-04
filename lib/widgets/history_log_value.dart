@@ -4,6 +4,14 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/status_style.dart';
+import '../services/app_state.dart';
+
+String historyRangeLabel(HistoryValueRange range) {
+  if (range.unit == '°C') {
+    return formatTempRange(range.minimum, range.maximum);
+  }
+  return range.label;
+}
 
 class HistoryLogValue extends StatelessWidget {
   final String value;
@@ -49,7 +57,7 @@ class HistoryLogValue extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                value,
+                range.unit == '°C' ? formatTempText(value) : value,
                 style: AppTextStyles.body,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -64,7 +72,7 @@ class HistoryLogValue extends StatelessWidget {
         if (showRange) ...[
           const SizedBox(height: 2),
           Text(
-            'Ideal: ${range.label}',
+            'Ideal: ${historyRangeLabel(range)}',
             style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
             maxLines: 2,
           ),
@@ -183,7 +191,7 @@ class HistoryLogLegend {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 18, color: color),

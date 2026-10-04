@@ -37,14 +37,14 @@ class ReportsController extends ChangeNotifier {
   );
 
   List<AnalyticsPoint> trendPoints = [
-    AnalyticsPoint(label: 'Jul 1', value: 6.4),
-    AnalyticsPoint(label: 'Jul 5', value: 6.6),
-    AnalyticsPoint(label: 'Jul 9', value: 6.9),
-    AnalyticsPoint(label: 'Jul 13', value: 6.6),
-    AnalyticsPoint(label: 'Jul 17', value: 6.2),
-    AnalyticsPoint(label: 'Jul 21', value: 6.1),
-    AnalyticsPoint(label: 'Jul 25', value: 6.5),
-    AnalyticsPoint(label: 'Jul 29', value: 6.2),
+    const AnalyticsPoint(label: 'Jul 1', value: 6.4),
+    const AnalyticsPoint(label: 'Jul 5', value: 6.6),
+    const AnalyticsPoint(label: 'Jul 9', value: 6.9),
+    const AnalyticsPoint(label: 'Jul 13', value: 6.6),
+    const AnalyticsPoint(label: 'Jul 17', value: 6.2),
+    const AnalyticsPoint(label: 'Jul 21', value: 6.1),
+    const AnalyticsPoint(label: 'Jul 25', value: 6.5),
+    const AnalyticsPoint(label: 'Jul 29', value: 6.2),
   ];
 
   // Kept empty for PDF compatibility; model predictions are not report data.
@@ -181,8 +181,9 @@ class ReportsController extends ChangeNotifier {
   }
 
   void revertRanges() {
-    phRange = const RangeValues(5.5, 6.5);
-    ecRange = const RangeValues(1.2, 1.8);
+    final cfg = appParameterRanges.value;
+    phRange = RangeValues(cfg.phMin, cfg.phMax);
+    ecRange = RangeValues(cfg.ecMin, cfg.ecMax);
     notifyListeners();
   }
 
@@ -308,8 +309,9 @@ class ReportsController extends ChangeNotifier {
       phRange = ranges.ph;
       ecRange = ranges.ec;
     } catch (_) {
-      phRange = const RangeValues(5.5, 6.5);
-      ecRange = const RangeValues(1.2, 1.8);
+      final cfg = appParameterRanges.value;
+      phRange = RangeValues(cfg.phMin, cfg.phMax);
+      ecRange = RangeValues(cfg.ecMin, cfg.ecMax);
     }
 
     await loadTargetDistribution();

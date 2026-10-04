@@ -13,6 +13,7 @@ import '../widgets/report_prediction_card.dart';
 import '../widgets/sensor_health_card.dart';
 import '../widgets/target_distribution_card.dart';
 import 'generate_report_screen.dart';
+import '../services/app_state.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -104,7 +105,7 @@ class ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 12),
               _buildMetricCard(
                 title: 'AVG TEMP',
-                value: '${summary.avgTemp.toStringAsFixed(1)} °C',
+                value: formatTemperature(summary.avgTemp),
                 status: summary.tempStatus,
                 isWarning: summary.tempStatus.toLowerCase() != 'in range',
               ),
@@ -198,7 +199,7 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 12),
         _buildMetricCard(
           title: 'AVG TEMP',
-          value: '${summary.avgTemp.toStringAsFixed(1)} °C',
+          value: formatTemperature(summary.avgTemp),
           status: summary.tempStatus,
           isWarning: summary.tempStatus.toLowerCase() != 'in range',
         ),

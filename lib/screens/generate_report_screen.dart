@@ -135,7 +135,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -240,7 +240,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             width: double.infinity,
             height: 16,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(3),
             ),
           ),

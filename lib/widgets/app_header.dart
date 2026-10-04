@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification_models.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/settings_screen.dart';
-import '../services/app_state.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';

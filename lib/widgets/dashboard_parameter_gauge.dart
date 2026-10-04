@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../services/app_state.dart';
 
 class DashboardParameterGauge extends StatelessWidget {
   final ParameterStatus data;
@@ -18,10 +19,17 @@ class DashboardParameterGauge extends StatelessWidget {
     this.dense = false,
   });
 
-  @override
+    @override
   Widget build(BuildContext context) {
-    final value = double.tryParse(data.currentValue) ?? 0;
-    final scale = _scaleFor(data.label, value);
+    return ValueListenableBuilder<String>(
+      valueListenable: appMeasurementUnits,
+      builder: (context, units, child) => _buildCard(),
+    );
+  }
+
+  Widget _buildCard() {
+    final value = _displayNumber;
+    final scale = _displayScale;
     final status = _displayStatus(data.status);
     final statusColor = _statusColor(data.status);
 
@@ -181,7 +189,7 @@ class DashboardParameterGauge extends StatelessWidget {
         Text('Ideal range', style: AppTextStyles.cardMeta),
         const SizedBox(height: 2),
         Text(
-          '${data.idealRange}${data.unit.isEmpty ? '' : ' ${data.unit}'}',
+          _rangeText,
           style: AppTextStyles.bodyBold.copyWith(
             fontSize: condensed ? 12 : 13,
           ),
@@ -241,6 +249,29 @@ class DashboardParameterGauge extends StatelessWidget {
         Expanded(child: updated),
       ],
     );
+  }
+
+  bool get _isTemp => _shortLabel(data.label) == 'Temperature';
+  double get _rawValue => double.tryParse(data.currentValue) ?? 0;
+  double get _displayNumber => _isTemp ? toDisplayTemp(_rawValue) : _rawValue;
+  String get _valueText =>
+      _isTemp ? toDisplayTemp(_rawValue).toStringAsFixed(1) : data.currentValue;
+  String get _unitText => _isTemp ? tempUnit : data.unit;
+
+  _GaugeScale get _displayScale {
+    final base = _scaleFor(data.label, _rawValue);
+    if (!_isTemp) return base;
+    return _GaugeScale(toDisplayTemp(base.minimum), toDisplayTemp(base.maximum));
+  }
+
+  String get _rangeText {
+    if (_isTemp) {
+      final parts = data.idealRange.split(' - ');
+      final lo = double.tryParse(parts.first);
+      final hi = parts.length > 1 ? double.tryParse(parts[1]) : null;
+      if (lo != null && hi != null) return formatTempRange(lo, hi);
+    }
+    return '${data.idealRange}${data.unit.isEmpty ? '' : ' ${data.unit}'}';
   }
 
   String _shortLabel(String label) {

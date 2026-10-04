@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/email_mask.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/custom_text_field.dart';
@@ -215,7 +216,7 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         SizedBox(height: isMobile ? 24 : 32),
         Text(
-          'Enter the 6-digit code sent to ${_controller.emailController.text.trim()}.',
+          'Enter the 6-digit code sent to ${maskEmail(_controller.emailController.text.trim())}.',
           style: AppTextStyles.bodySmall,
         ),
         const SizedBox(height: 24),

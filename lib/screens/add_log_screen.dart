@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import 'notifications_screen.dart';
+import '../services/app_state.dart';
 
 class AddLogScreen extends StatelessWidget {
   final AppNotificationItem? notification;
@@ -152,7 +153,9 @@ class RecordFixCardState extends State<RecordFixCard> {
     widget.onSubmit(
       FixEntry(
         parameter: parameter!,
-        currentValue: double.parse(_currentValueController.text),
+        currentValue: parameter == 'Temperature'
+          ? fromDisplayTemp(double.parse(_currentValueController.text))
+          : double.parse(_currentValueController.text),
         actionType: actionType ?? 'Other',
         amount: double.tryParse(_amountController.text) ?? 0.0,
         notes: _notesController.text.trim(),
@@ -192,7 +195,7 @@ class RecordFixCardState extends State<RecordFixCard> {
       _textField(
         controller: _currentValueController,
         hint: '7.2',
-        suffix: units[parameter] ?? '',
+        suffix: parameter == 'Temperature' ? tempUnit : (units[parameter] ?? ''),
         numeric: true,
       ),
     );

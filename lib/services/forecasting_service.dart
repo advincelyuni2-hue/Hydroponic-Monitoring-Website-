@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'app_state.dart';
 import 'package:http/http.dart' as http;
 import '../models/forecasting_models.dart';
 import 'supabase_client.dart';
@@ -168,19 +169,20 @@ class ForecastingService {
     required double predictedEc,
   }) {
     bool isPh = parameter == 'ph';
+    final cfg = appParameterRanges.value;
 
     bool isPhCriticalHigh = predictedPh >= 8.0 || currentPh >= 8.0;
     bool isPhCriticalLow = predictedPh <= 5.0 || currentPh <= 5.0;
-    bool isPhWarningHigh = predictedPh > 6.5 && !isPhCriticalHigh;
-    bool isPhWarningLow = predictedPh < 5.5 && !isPhCriticalLow;
+    bool isPhWarningHigh = predictedPh > cfg.phMax && !isPhCriticalHigh;
+    bool isPhWarningLow = predictedPh < cfg.phMin && !isPhCriticalLow;
 
     bool isEcCriticalLow = predictedEc <= 0.8 || currentEc <= 0.8;
     bool isEcCriticalHigh = predictedEc >= 2.2 || currentEc >= 2.2;
-    bool isEcWarningLow = predictedEc < 1.2 && !isEcCriticalLow;
-    bool isEcWarningHigh = predictedEc > 1.8 && !isEcCriticalHigh;
+    bool isEcWarningLow = predictedEc < cfg.ecMin && !isEcCriticalLow;
+    bool isEcWarningHigh = predictedEc > cfg.ecMax && !isEcCriticalHigh;
 
-    double targetPh = 6.5;
-    double targetEc = 1.5;
+    double targetPh = (cfg.phMin + cfg.phMax) / 2;
+    double targetEc = (cfg.ecMin + cfg.ecMax) / 2;
 
     String statusBadge = 'Stable';
     String warningText = '';

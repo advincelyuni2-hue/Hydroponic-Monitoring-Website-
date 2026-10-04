@@ -226,7 +226,7 @@ class NotificationCardWidget extends StatelessWidget {
                 if (item.isResolved && item.resolvedByName != null) ...[
                   const SizedBox(height: 3),
                   Text(
-                    'Resolved by ${item.resolvedByName} ${item.resolvedAt == null ? '' : item.resolvedAt}',
+                    'Resolved by ${item.resolvedByName} ${item.resolvedAt ?? ''}',
                     style: AppTextStyles.cardMeta.copyWith(
                       fontSize: 10.5,
                       color: AppColors.primaryButton,

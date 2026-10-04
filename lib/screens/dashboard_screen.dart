@@ -405,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Text('Contributing factors', style: AppTextStyles.bodyBold),
         const SizedBox(height: 4),
-        _factorRow('Temperature', insight.temperature),
+         _factorRow('Temperature', formatTempText(insight.temperature)),
         const SizedBox(height: 2),
         _factorRow('EC', insight.ecLevel),
       ],
