@@ -398,7 +398,10 @@ class _GaugePainter extends CustomPainter {
     return TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: textColor, fontSize: 10),
+        style: AppTextStyles.cardMeta.copyWith(
+          color: textColor,
+          fontSize: 10,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

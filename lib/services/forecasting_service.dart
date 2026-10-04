@@ -3,6 +3,7 @@ import 'app_state.dart';
 import 'package:http/http.dart' as http;
 import '../models/forecasting_models.dart';
 import 'supabase_client.dart';
+import '../utils/manila_time.dart';
 
 class ForecastingService {
   static const String backendApiUrl = String.fromEnvironment(
@@ -17,33 +18,37 @@ class ForecastingService {
     double currentEc = 1.5,
     double currentTemp = 24.0,
   }) async {
+    final chartPoints = <ForecastingChartPoint>[];
+    final requestTime = DateTime.now().toUtc();
+    final baselineVal = parameter == 'ph' ? currentPh : currentEc;
+
     try {
-      final String table =
-          parameter == 'ph' ? 'ph_readings' : 'ec_readings';
+      final table = parameter == 'ph' ? 'ph_readings' : 'ec_readings';
+      final cutoff = requestTime.subtract(Duration(hours: selectedHours)).subtract(sensorStoredUtcCorrection);
+
       final response = await supabase
           .from(table)
           .select('value, recorded_at')
           .eq('is_average', false)
+          .gte('recorded_at', cutoff.toIso8601String())
           .order('recorded_at', ascending: false)
-          .limit(12);
+          .limit(500);
 
-      List<ForecastingChartPoint> chartPoints = [];
-      if (response.isNotEmpty) {
-        final rows =
-            List<Map<String, dynamic>>.from(response).reversed.toList();
-        for (int i = 0; i < rows.length; i++) {
-          double hoursAgo = (i - (rows.length - 1)).toDouble();
-          chartPoints.add(
-            ForecastingChartPoint(
-              hour: hoursAgo,
-              value: (rows[i]['value'] as num).toDouble(),
-              isPredicted: false,
-            ),
-          );
-        }
+      final rows = List<Map<String, dynamic>>.from(response).reversed.toList();
+
+      for (final row in rows) {
+        final recordedAt = DateTime.parse(row['recorded_at'] as String).toUtc().add(sensorStoredUtcCorrection);
+        final hoursAgo = recordedAt.difference(requestTime).inSeconds / 3600.0;
+
+        chartPoints.add(
+          ForecastingChartPoint(
+            hour: hoursAgo,
+            value: (row['value'] as num).toDouble(),
+            isPredicted: false,
+          ),
+        );
       }
 
-      final double baselineVal = parameter == 'ph' ? currentPh : currentEc;
       final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
         'parameter': parameter.toLowerCase(),
         'ph': currentPh.toString(),
@@ -52,34 +57,43 @@ class ForecastingService {
         'horizon': selectedHours.toString(),
       });
 
-      final apiResponse = await http.get(uri).timeout(
-            const Duration(seconds: 10),
-          );
+      final apiResponse =
+          await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (apiResponse.statusCode == 200) {
         final data = json.decode(apiResponse.body);
         final List predictions = data['predictions'];
-        for (var pred in predictions) {
+
+        for (final prediction in predictions) {
           chartPoints.add(
             ForecastingChartPoint(
-              hour: (pred['hour'] as num).toDouble(),
-              value: (pred['value'] as num).toDouble(),
+              hour: (prediction['hour'] as num).toDouble(),
+              value: (prediction['value'] as num).toDouble(),
               isPredicted: true,
             ),
           );
         }
+
         return chartPoints;
-      } else {
-        return _getFallbackChartData(parameter, selectedHours, baselineVal);
       }
-    } catch (e) {
-      final double baselineVal = parameter == 'ph' ? currentPh : currentEc;
-      return _getFallbackChartData(parameter, selectedHours, baselineVal);
+
+      return _withFallbackPredictions(
+        chartPoints,
+        selectedHours,
+        baselineVal,
+      );
+    } catch (_) {
+      return _withFallbackPredictions(
+        chartPoints,
+        selectedHours,
+        baselineVal,
+      );
     }
   }
 
   /// Checks if an intervention was applied or dismissed recently
-  Future<String?> checkRecentIntervention(String parameter, int horizonHours) async {
+  Future<String?> checkRecentIntervention(
+      String parameter, int horizonHours) async {
     try {
       final cutoff = DateTime.now()
           .toUtc()
@@ -214,7 +228,8 @@ class ForecastingService {
         ];
       } else if (isPhWarningHigh) {
         statusBadge = 'Warning';
-        warningText = 'pH is expected to rise above safe levels within horizon.';
+        warningText =
+            'pH is expected to rise above safe levels within horizon.';
         double phDiff = (predictedPh - targetPh).abs();
         double suggestedMl = (phDiff * 10).clamp(1.0, 15.0);
         fixes = [
@@ -266,8 +281,7 @@ class ForecastingService {
         ];
       } else if (isEcWarningLow) {
         statusBadge = 'Warning';
-        warningText =
-            'EC level is expected to drop below ideal concentration.';
+        warningText = 'EC level is expected to drop below ideal concentration.';
         fixes = [
           'Inspect nutrient solution strength.',
           'Replenish nutrients according to standard procedure.'
@@ -375,20 +389,30 @@ class ForecastingService {
     } catch (_) {}
   }
 
-  List<ForecastingChartPoint> _getFallbackChartData(
-      String parameter, int hours, double baselineVal) {
-    double base = baselineVal;
-    double step = hours / 3.0;
+  List<ForecastingChartPoint> _withFallbackPredictions(
+    List<ForecastingChartPoint> actualPoints,
+    int hours,
+    double baselineVal,
+  ) {
+    final step = hours / 3.0;
+
     return [
+      ...actualPoints,
       ForecastingChartPoint(
-          hour: -hours.toDouble(), value: base, isPredicted: false),
-      ForecastingChartPoint(hour: 0, value: base, isPredicted: false),
+        hour: step,
+        value: baselineVal + 0.1,
+        isPredicted: true,
+      ),
       ForecastingChartPoint(
-          hour: step, value: base + 0.1, isPredicted: true),
+        hour: step * 2,
+        value: baselineVal + 0.2,
+        isPredicted: true,
+      ),
       ForecastingChartPoint(
-          hour: step * 2, value: base + 0.2, isPredicted: true),
-      ForecastingChartPoint(
-          hour: hours.toDouble(), value: base + 0.3, isPredicted: true),
+        hour: hours.toDouble(),
+        value: baselineVal + 0.3,
+        isPredicted: true,
+      ),
     ];
   }
 }

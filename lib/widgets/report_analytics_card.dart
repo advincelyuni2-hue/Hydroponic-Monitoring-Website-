@@ -184,7 +184,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
             Container(
               width: 9,
               height: 9,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                   color: AppColors.alertBorder, shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),

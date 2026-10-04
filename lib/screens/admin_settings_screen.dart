@@ -406,7 +406,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   const SizedBox(width: 12),
                   Switch.adaptive(
                     value: user['is_active'] as bool? ?? false,
-                    activeColor: AppColors.primaryButton,
+                    activeThumbColor: AppColors.primaryButton,
                     onChanged: _isSelf(user)
                         ? null
                         : (active) => _toggleUserActive(user, active),

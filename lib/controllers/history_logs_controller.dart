@@ -139,12 +139,25 @@ class HistoryLogsController extends ChangeNotifier {
   Future<void> loadSelectedLogs() async {
     selectedRowIndices.clear();
     if (selectedTab == 'Calibration logs') {
-      columns = const ['Time', 'Sensor', 'Action', 'Status'];
-      rows = const [];
-      isLoading = false;
-      notifyListeners();
-      return;
-    }
+        isLoading = true;
+        errorMessage = null;
+        columns = MonitoringService.calibrationLogColumns;
+        notifyListeners();
+
+        try {
+          final range = _selectedDateRange();
+          rows = await monitoringService.getCalibrationHistory(
+            start: range.start,
+            end: range.end,
+          );
+        } catch(_) {
+          errorMessage = 'Failed to load calibration logs from Supabase';
+        } finally {
+          isLoading = false;
+          notifyListeners();
+        }
+        return;
+      }
 
     if (selectedTab == 'Reports logs') {
       columns = const [

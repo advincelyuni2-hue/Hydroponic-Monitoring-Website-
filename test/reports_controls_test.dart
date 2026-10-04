@@ -4,7 +4,6 @@ import 'package:monitoring_app/models/reports_models.dart';
 import 'package:monitoring_app/widgets/report_analytics_card.dart';
 import 'package:monitoring_app/widgets/report_prediction_card.dart';
 import 'package:monitoring_app/widgets/target_distribution_card.dart';
-import 'package:monitoring_app/models/reports_models.dart';
 
 void main() {
   testWidgets('historical trend parameter and timeframe controls respond',

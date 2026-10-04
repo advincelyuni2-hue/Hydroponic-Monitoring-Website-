@@ -1,50 +1,84 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import 'app_colors.dart';
 
 class AppTheme {
   AppTheme._();
 
+  static TextStyle _headingStyle(TextStyle? base) {
+    return GoogleFonts.manrope(
+      textStyle: base,
+      color: AppColors.textPrimary,
+      fontWeight: FontWeight.w700,
+    );
+  }
+
+  static TextTheme _textTheme({required bool dark}) {
+    final base = GoogleFonts.workSansTextTheme(
+      dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
+    );
+
+    return base.copyWith(
+      displayLarge: _headingStyle(base.displayLarge),
+      displayMedium: _headingStyle(base.displayMedium),
+      displaySmall: _headingStyle(base.displaySmall),
+      headlineLarge: _headingStyle(base.headlineLarge),
+      headlineMedium: _headingStyle(base.headlineMedium),
+      headlineSmall: _headingStyle(base.headlineSmall),
+      titleLarge: _headingStyle(base.titleLarge),
+      titleMedium: _headingStyle(base.titleMedium),
+      titleSmall: _headingStyle(base.titleSmall),
+    );
+  }
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primaryButton,
-        surface: AppColors.background,
+        brightness: Brightness.light,
+        surface: AppColors.cardBackground,
+      ),
+      textTheme: _textTheme(dark: false),
+      cardColor: AppColors.cardBackground,
+      dividerColor: AppColors.cardBorder,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.inputFill,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.inputBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: AppColors.accentGreen, width: 1.5),
+        ),
       ),
     );
   }
 
   static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primaryButton,
-      brightness: Brightness.dark,
-    );
-
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xFF121712),
-      colorScheme: colorScheme.copyWith(
-        surface: const Color(0xFF1B211B),
+      scaffoldBackgroundColor: AppColors.background,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primaryButton,
+        brightness: Brightness.dark,
+        surface: AppColors.cardBackground,
       ),
-      cardColor: const Color(0xFF1B211B),
-      dividerColor: const Color(0xFF3A443A),
-      inputDecorationTheme: const InputDecorationTheme(
+      textTheme: _textTheme(dark: true),
+      cardColor: AppColors.cardBackground,
+      dividerColor: AppColors.cardBorder,
+      inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF252D25),
+        fillColor: AppColors.inputFill,
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF4C584C)),
+          borderSide: BorderSide(color: AppColors.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF8EC66E), width: 1.5),
-        ),
-      ),
-      dropdownMenuTheme: const DropdownMenuThemeData(
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Color(0xFF252D25),
+          borderSide: BorderSide(color: AppColors.accentGreen, width: 1.5),
         ),
       ),
     );

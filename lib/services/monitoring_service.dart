@@ -487,7 +487,7 @@ class MonitoringService {
         return '${formatManilaClockTime(bucket)} - '
             '${formatManilaClockTime(end)}';
       case HistoryAggregation.daily:
-        return 'All day';
+        return '';
     }
   }
 

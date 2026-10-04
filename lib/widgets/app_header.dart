@@ -7,10 +7,10 @@ import '../services/notification_service.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'notification_overlay_widget.dart';
+import 'header_search.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
@@ -27,8 +27,7 @@ class AppHeader extends StatelessWidget {
   });
 
   void showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
-    final renderBox =
-        bellKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox = bellKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -119,15 +118,14 @@ class AppHeader extends StatelessWidget {
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                title,
-                style: AppTextStyles.pageHeading.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: isMobile ? 18 : 24,
-                ),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: AppTextStyles.pageHeading.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: isMobile ? 18 : 24,
               ),
             ),
           ),
@@ -150,39 +148,15 @@ class AppHeader extends StatelessWidget {
 
         // Search Control
         if (!isMobile) ...[
-          Expanded(
+          const Expanded(
             flex: 2,
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: AppDecorations.card(radius: 24),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.search,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        hintStyle: AppTextStyles.cardMeta,
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: HeaderSearchField(),
           ),
           const SizedBox(width: 16),
         ] else ...[
           _iconCircle(
             Icons.search,
-            () => _openMobileSearch(context),
+            () => showMobileSearchSheet(context),
             size: iconSize,
           ),
           const SizedBox(width: 8),
@@ -259,57 +233,6 @@ class AppHeader extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-
-  void _openMobileSearch(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.cardBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Search',
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    hintStyle: AppTextStyles.cardMeta,
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: AppColors.textSecondary,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
