@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../models/notification_models.dart';
 
 class NotificationTile extends StatelessWidget {
-  final Object notification;
+  final AppNotificationItem notification;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -18,37 +17,16 @@ class NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notification = this.notification;
-    late final String title;
-    late final String detail;
-    late final String timestamp;
-    late final bool isCritical;
-
-    if (notification is AppNotificationItem) {
-      title = notification.title;
-      detail = notification.subtitle;
-      timestamp = notification.timestamp;
-      isCritical = notification.isCritical;
-    } else if (notification is AppNotification) {
-      title = notification.title;
-      detail = notification.detail;
-      timestamp = notification.timeAgo;
-      isCritical = notification.isCritical;
-    } else {
-      throw ArgumentError.value(
-        notification,
-        'notification',
-        'Expected an AppNotification or AppNotificationItem.',
-      );
-    }
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color:
-            isCritical ? AppColors.alertBackground : AppColors.cardBackground,
+        color: notification.isCritical
+            ? AppColors.alertBackground
+            : AppColors.cardBackground,
         border: Border.all(
-          color: isCritical ? AppColors.alertBorder : AppColors.cardBorder,
+          color: notification.isCritical
+              ? AppColors.alertBorder
+              : AppColors.cardBorder,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
@@ -73,14 +51,15 @@ class NotificationTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      title,
-                      style: isCritical
+                      notification.title,
+                      style: notification.isCritical
                           ? AppTextStyles.alert
                           : AppTextStyles.bodyBold,
                     ),
                     Row(
                       children: [
-                        Text(timestamp, style: AppTextStyles.cardMeta),
+                        Text(notification.timestamp,
+                            style: AppTextStyles.cardMeta),
                         if (onDelete != null)
                           IconButton(
                             tooltip: 'Delete notification',
@@ -92,10 +71,9 @@ class NotificationTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(detail, style: AppTextStyles.body),
-                if (notification is AppNotificationItem &&
-                    (notification.currentValue != 'Not recorded' ||
-                        notification.idealRange != 'Not recorded')) ...[
+                Text(notification.subtitle, style: AppTextStyles.body),
+                if (notification.currentValue != 'Not recorded' ||
+                    notification.idealRange != 'Not recorded') ...[
                   const SizedBox(height: 6),
                   Text(
                     '${notification.currentStatus} • ${notification.currentValue} • Ideal: ${notification.idealRange}',

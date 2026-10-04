@@ -138,49 +138,55 @@ class HistoryLogsController extends ChangeNotifier {
 
   Future<void> loadSelectedLogs() async {
     selectedRowIndices.clear();
+    if (selectedTab == 'Calibration logs') {
+      columns = const ['Time', 'Sensor', 'Action', 'Status'];
+      rows = const [];
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    if (selectedTab == 'Reports logs') {
+      columns = const [
+        'Date',
+        'Time',
+        'Average pH',
+        'Average EC',
+        'Average Temp',
+        'Critical Alerts'
+      ];
+      rows = const [];
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
       final range = _selectedDateRange();
-      if (selectedTab == 'Calibration logs') {
-        columns = MonitoringService.calibrationLogColumns;
-        rows = await monitoringService.getCalibrationHistory(
-          start: range.start,
-          end: range.end,
-        );
-      } else if (selectedTab == 'Reports logs') {
-        columns = const [
-          'Date',
-          'Time',
-          'Average pH',
-          'Average EC',
-          'Average Temp',
-          'Critical Alerts'
-        ];
-        rows = const [];
-      } else {
-        columns = const [
-          'Date',
-          'Time',
-          'Average pH',
-          'Average EC',
-          'Average Temp',
-          'Status'
-        ];
-        rows = await monitoringService.getSensorHistory(
-          start: range.start,
-          end: range.end,
-          aggregation: switch (selectedRange) {
-            'Weekly' => HistoryAggregation.eightHours,
-            'Monthly' => HistoryAggregation.daily,
-            _ => HistoryAggregation.tenMinutes,
-          },
-        );
-      }
+      columns = const [
+        'Date',
+        'Time',
+        'Average pH',
+        'Average EC',
+        'Average Temp',
+        'Status'
+      ];
+
+      rows = await monitoringService.getSensorHistory(
+        start: range.start,
+        end: range.end,
+        aggregation: switch (selectedRange) {
+          'Weekly' => HistoryAggregation.eightHours,
+          'Monthly' => HistoryAggregation.daily,
+          _ => HistoryAggregation.tenMinutes,
+        },
+      );
     } catch (_) {
-      errorMessage = 'Failed to load $selectedTab from Supabase';
+      errorMessage = 'Failed to load sensor history from Supabase';
     } finally {
       isLoading = false;
       notifyListeners();
@@ -188,21 +194,20 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   Future<void> deleteSingleRow(int index) async {
-    if (index < 0 || index >= rows.length) return;
-    await _deleteEntry(rows[index]);
-    rows.removeAt(index);
-    selectedRowIndices.remove(index);
-    notifyListeners();
+    if (index >= 0 && index < rows.length) {
+      rows.removeAt(index);
+      selectedRowIndices.remove(index);
+      notifyListeners();
+    }
   }
 
   Future<void> deleteSelectedRows() async {
     final sortedIndices = selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
     for (final idx in sortedIndices) {
-      if (idx >= 0 && idx < rows.length) await _deleteEntry(rows[idx]);
-    }
-    for (final idx in sortedIndices) {
-      if (idx >= 0 && idx < rows.length) rows.removeAt(idx);
+      if (idx >= 0 && idx < rows.length) {
+        rows.removeAt(idx);
+      }
     }
     selectedRowIndices.clear();
     isSelectionMode = false;
@@ -211,46 +216,22 @@ class HistoryLogsController extends ChangeNotifier {
 
   Future<void> updateRowValues(
       int index, double newPh, double newEc, double newTemp) async {
-    if (index < 0 || index >= rows.length) return;
-    final entry = rows[index];
-    final start = entry.recordStart;
-    final duration = entry.recordDuration;
-    if (selectedTab != 'Sensor logs' ||
-        start == null ||
-        duration == null ||
-        duration != const Duration(minutes: 1)) {
-      throw StateError('Only individual daily sensor readings can be edited.');
-    }
-    await monitoringService.updateSensorHistoryBucket(
-      start: start,
-      end: start.add(duration),
-      ph: newPh,
-      ec: newEc,
-      temperature: newTemp,
-    );
-    await loadSelectedLogs();
-  }
+    if (index >= 0 && index < rows.length) {
+      final oldEntry = rows[index];
+      final newValues = List<String>.from(oldEntry.values);
 
-  Future<void> _deleteEntry(HistoryLogEntry entry) async {
-    final start = entry.recordStart;
-    if (start == null) {
-      throw StateError('This history entry cannot be identified for deletion.');
+      if (newValues.length >= 6) {
+        newValues[2] = newPh.toStringAsFixed(2);
+        newValues[3] = '${newEc.toStringAsFixed(2)} mS/cm';
+        newValues[4] = '${newTemp.toStringAsFixed(1)} °C';
+      }
+
+      rows[index] = HistoryLogEntry(
+        newValues,
+        ranges: oldEntry.ranges,
+      );
+      notifyListeners();
     }
-    if (selectedTab == 'Calibration logs') {
-      await monitoringService.deleteCalibrationLog(start);
-      return;
-    }
-    if (selectedTab != 'Sensor logs') {
-      throw StateError('Report log deletion is not available.');
-    }
-    final duration = entry.recordDuration;
-    if (duration == null) {
-      throw StateError('This sensor history entry has no time range.');
-    }
-    await monitoringService.deleteHistoryLogs(
-      start: start,
-      end: start.add(duration),
-    );
   }
 
   DateTimeRange _selectedDateRange() {

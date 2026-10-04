@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/notification_models.dart';
 import '../services/app_state.dart';
+import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -7,13 +9,12 @@ import '../theme/theme_mode_controller.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
-
-// ---------------------------------------------------------------------
-// Screen (desktop / web page)
-// ---------------------------------------------------------------------
+import 'notifications_screen.dart';
 
 class AddLogScreen extends StatelessWidget {
-  const AddLogScreen({super.key});
+  final AppNotificationItem? notification;
+
+  const AddLogScreen({super.key, this.notification});
 
   @override
   Widget build(BuildContext context) {
@@ -34,13 +35,25 @@ class AddLogScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               RecordFixCard(
+                notification: notification,
                 onCancel: () => Navigator.of(context).maybePop(),
-                onSubmit: (entry) {
-                  // TODO: save with your service, e.g. LogService().addFix(entry)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fix recorded.')),
-                  );
-                  Navigator.of(context).maybePop();
+                onSubmit: (entry) async {
+                  if (notification != null) {
+                    await NotificationService()
+                        .updateAlertResolved(notification!.id, true);
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Fix recorded successfully.')),
+                    );
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(
+                          initialTab: 'Resolved',
+                        ),
+                      ),
+                    );
+                  }
                 },
               ),
             ],
@@ -50,10 +63,6 @@ class AddLogScreen extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------
-// Data model
-// ---------------------------------------------------------------------
 
 class FixEntry {
   final String parameter;
@@ -71,40 +80,64 @@ class FixEntry {
   });
 }
 
-// ---------------------------------------------------------------------
-// Reusable form card (used by the page AND the mobile dialog)
-// ---------------------------------------------------------------------
-
 class RecordFixCard extends StatefulWidget {
+  final AppNotificationItem? notification;
   final VoidCallback onCancel;
   final ValueChanged<FixEntry> onSubmit;
 
   const RecordFixCard({
     super.key,
+    this.notification,
     required this.onCancel,
     required this.onSubmit,
   });
 
   @override
-  State<RecordFixCard> createState() => _RecordFixCardState();
+  State<RecordFixCard> createState() => RecordFixCardState();
 }
 
-class _RecordFixCardState extends State<RecordFixCard> {
-  static const _parameters = ['pH', 'EC', 'Temperature'];
-  static const _units = {'pH': 'pH', 'EC': 'mS/cm', 'Temperature': '°C'};
-  static const _actions = {
+class RecordFixCardState extends State<RecordFixCard> {
+  static const parameters = ['pH', 'EC', 'Temperature'];
+  static const units = {'pH': 'pH', 'EC': 'mS/cm', 'Temperature': '°C'};
+  static const actions = {
     'pH': ['pH Up', 'pH Down', 'Other'],
     'EC': ['Add Nutrient', 'Add Water', 'Other'],
     'Temperature': ['Add Water', 'Other'],
   };
 
   final _formKey = GlobalKey<FormState>();
-  final _currentValueController = TextEditingController();
+  late final TextEditingController _currentValueController;
   final _amountController = TextEditingController();
-  final _notesController = TextEditingController();
+  late final TextEditingController _notesController;
 
-  String? _parameter;
-  String? _actionType;
+  String? parameter;
+  String? actionType;
+  late final String dateTimestamp;
+
+  @override
+  void initState() {
+    super.initState();
+    dateTimestamp = widget.notification?.timestamp ?? 'Oct 4, 2026, 2:13 PM';
+
+    String prefilledParam = 'pH';
+    if (widget.notification != null) {
+      final title = widget.notification!.title.toLowerCase();
+      if (title.contains('ec')) {
+        prefilledParam = 'EC';
+      } else if (title.contains('temp')) {
+        prefilledParam = 'Temperature';
+      }
+    }
+    parameter = prefilledParam;
+
+    final rawVal = widget.notification?.currentValue
+            .replaceAll(RegExp(r'[^0-9.]'), '') ??
+        '7.2';
+    _currentValueController = TextEditingController(text: rawVal);
+    _notesController = TextEditingController(
+      text: widget.notification?.recommendation ?? '',
+    );
+  }
 
   @override
   void dispose() {
@@ -116,28 +149,40 @@ class _RecordFixCardState extends State<RecordFixCard> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    widget.onSubmit(FixEntry(
-      parameter: _parameter!,
-      currentValue: double.parse(_currentValueController.text),
-      actionType: _actionType!,
-      amount: double.parse(_amountController.text),
-      notes: _notesController.text.trim(),
-    ));
+    widget.onSubmit(
+      FixEntry(
+        parameter: parameter!,
+        currentValue: double.parse(_currentValueController.text),
+        actionType: actionType ?? 'Other',
+        amount: double.tryParse(_amountController.text) ?? 0.0,
+        notes: _notesController.text.trim(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
+    final timestampField = _labeled(
+      'Logged Date & Time (Read-only)',
+      TextFormField(
+        initialValue: dateTimestamp,
+        enabled: false,
+        style: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
+        decoration: _decoration(hint: dateTimestamp),
+      ),
+    );
+
     final parameterField = _labeled(
       'Parameter',
       _dropdown(
         hint: 'Select parameter',
-        value: _parameter,
-        items: _parameters,
+        value: parameter,
+        items: parameters,
         onChanged: (v) => setState(() {
-          _parameter = v;
-          _actionType = null; // actions depend on the parameter
+          parameter = v;
+          actionType = null;
         }),
       ),
     );
@@ -147,7 +192,7 @@ class _RecordFixCardState extends State<RecordFixCard> {
       _textField(
         controller: _currentValueController,
         hint: '7.2',
-        suffix: _units[_parameter] ?? '',
+        suffix: units[parameter] ?? '',
         numeric: true,
       ),
     );
@@ -156,9 +201,9 @@ class _RecordFixCardState extends State<RecordFixCard> {
       'Type of action',
       _dropdown(
         hint: 'Select action',
-        value: _actionType,
-        items: _actions[_parameter] ?? const [],
-        onChanged: (v) => setState(() => _actionType = v),
+        value: actionType,
+        items: actions[parameter] ?? const [],
+        onChanged: (v) => setState(() => actionType = v),
       ),
     );
 
@@ -191,7 +236,8 @@ class _RecordFixCardState extends State<RecordFixCard> {
             const SizedBox(height: 14),
             Divider(color: AppColors.cardBorder, height: 1),
             const SizedBox(height: 16),
-
+            timestampField,
+            const SizedBox(height: 16),
             if (isMobile) ...[
               parameterField,
               const SizedBox(height: 16),
@@ -205,19 +251,17 @@ class _RecordFixCardState extends State<RecordFixCard> {
               const SizedBox(height: 16),
               _twoColumns(actionField, amountField),
             ],
-
             const SizedBox(height: 16),
             _labeled(
-              'Notes',
+              'Notes / Intervention Details',
               _textField(
                 controller: _notesController,
-                hint: 'Added after the 8:00 AM reading',
+                hint: 'Describe the action performed...',
                 maxLines: 4,
                 required: false,
               ),
             ),
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -254,8 +298,10 @@ class _RecordFixCardState extends State<RecordFixCard> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: Text('Record fix',
-                        style: AppTextStyles.button.copyWith(fontSize: 13)),
+                    child: Text(
+                      'Record fix',
+                      style: AppTextStyles.button.copyWith(fontSize: 13),
+                    ),
                   ),
                 ),
               ],
@@ -265,10 +311,6 @@ class _RecordFixCardState extends State<RecordFixCard> {
       ),
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Layout helpers
-  // ---------------------------------------------------------------------
 
   Widget _twoColumns(Widget left, Widget right) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,10 +330,6 @@ class _RecordFixCardState extends State<RecordFixCard> {
         ],
       );
 
-  // ---------------------------------------------------------------------
-  // Field builders (theme-aware: correct in light AND dark mode)
-  // ---------------------------------------------------------------------
-
   Color get _fill => appThemeMode.value == ThemeMode.dark
       ? const Color(0xFF252D25)
       : AppColors.inputFill;
@@ -304,7 +342,8 @@ class _RecordFixCardState extends State<RecordFixCard> {
 
     return InputDecoration(
       hintText: hint,
-      hintStyle: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
+      hintStyle:
+          AppTextStyles.input.copyWith(color: AppColors.textSecondary),
       suffixText: (suffix == null || suffix.isEmpty) ? null : suffix,
       suffixStyle: AppTextStyles.cardMeta,
       filled: true,
@@ -354,9 +393,10 @@ class _RecordFixCardState extends State<RecordFixCard> {
       key: ValueKey('$hint-$value-${items.length}'),
       initialValue: value,
       isExpanded: true,
-      hint: Text(hint,
-          style:
-              AppTextStyles.input.copyWith(color: AppColors.textSecondary)),
+      hint: Text(
+        hint,
+        style: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
+      ),
       style: AppTextStyles.input,
       dropdownColor: AppColors.cardBackground,
       iconEnabledColor: AppColors.textPrimary,
@@ -370,12 +410,9 @@ class _RecordFixCardState extends State<RecordFixCard> {
   }
 }
 
-// ---------------------------------------------------------------------
-// Mobile: same form shown as a dialog (your second screenshot)
-// ---------------------------------------------------------------------
-
 Future<void> showRecordFixDialog(
   BuildContext context, {
+  AppNotificationItem? notification,
   required ValueChanged<FixEntry> onSubmit,
 }) {
   return showDialog(
@@ -385,6 +422,7 @@ Future<void> showRecordFixDialog(
       insetPadding: const EdgeInsets.all(16),
       child: SingleChildScrollView(
         child: RecordFixCard(
+          notification: notification,
           onCancel: () => Navigator.of(dialogContext).pop(),
           onSubmit: (entry) {
             Navigator.of(dialogContext).pop();

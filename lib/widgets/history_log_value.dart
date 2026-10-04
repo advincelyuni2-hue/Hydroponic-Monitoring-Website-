@@ -183,7 +183,7 @@ class HistoryLogLegend {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
+            color: color.withOpacity(0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 18, color: color),

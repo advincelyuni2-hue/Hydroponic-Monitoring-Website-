@@ -20,16 +20,32 @@ class NotificationCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCritical = item.type == NotificationType.critical;
+    final isCritical = item.type == NotificationType.critical ||
+        item.currentStatus.toLowerCase().contains('critical');
+    final isWarning = item.type == NotificationType.warning ||
+        item.currentStatus.toLowerCase().contains('warning') ||
+        item.currentStatus.toLowerCase().contains('drift') ||
+        item.currentStatus.toLowerCase().contains('high') ||
+        item.currentStatus.toLowerCase().contains('low');
+
     final hasReadingDetails = item.currentValue != 'Not recorded' ||
         item.idealRange != 'Not recorded';
-    final badgeBg =
-        isCritical ? AppColors.alertBackground : AppColors.statusCardYellow;
+
+    // Badge styling based on alert type
+    final badgeBg = isCritical
+        ? AppColors.alertBackground
+        : (isWarning ? AppColors.statusCardYellow : AppColors.statusCardGreen);
+
     final badgeText = item.type == NotificationType.info
         ? 'Information'
         : isCritical
             ? 'Critical Alert'
             : 'Warning Alert';
+
+    // Border color determined dynamically: Red for Critical, Yellow/Amber for Warning
+    final Color severityBorderColor = isCritical
+        ? const Color(0xFFDC2626)
+        : (isWarning ? const Color(0xFFD97706) : AppColors.cardBorder);
 
     return GestureDetector(
       onTap: onTap,
@@ -38,9 +54,8 @@ class NotificationCardWidget extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: AppDecorations.card().copyWith(
           border: Border.all(
-            color:
-                isHighlighted ? AppColors.primaryButton : AppColors.cardBorder,
-            width: isHighlighted ? 2.0 : 1.0,
+            color: isHighlighted ? AppColors.primaryButton : severityBorderColor,
+            width: isHighlighted ? 2.0 : 1.5,
           ),
           boxShadow: isHighlighted
               ? [
@@ -48,7 +63,7 @@ class NotificationCardWidget extends StatelessWidget {
                     color: AppColors.primaryButton.withValues(alpha: 0.18),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ]
               : null,
         ),
@@ -168,8 +183,8 @@ class NotificationCardWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
             ],
+            const SizedBox(height: 10),
             // DSS Recommendation Box
             Text(
               'Recommendation:',
@@ -211,8 +226,7 @@ class NotificationCardWidget extends StatelessWidget {
                 if (item.isResolved && item.resolvedByName != null) ...[
                   const SizedBox(height: 3),
                   Text(
-                    'Resolved by ${item.resolvedByName}'
-                    '${item.resolvedAt == null ? '' : ' • ${item.resolvedAt}'}',
+                    'Resolved by ${item.resolvedByName} ${item.resolvedAt == null ? '' : item.resolvedAt}',
                     style: AppTextStyles.cardMeta.copyWith(
                       fontSize: 10.5,
                       color: AppColors.primaryButton,

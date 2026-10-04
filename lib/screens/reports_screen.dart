@@ -44,7 +44,7 @@ class ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      drawer: const AppDrawer(selectedIndex: 4),
+      drawer: const AppDrawer(selectedIndex: 3), // Index 3 is Reports
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
@@ -76,9 +76,6 @@ class ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// Desktop Layout:
-  /// Left Sidebar (320px): Telemetry Last Updated -> Metric Cards -> Critical Alert Frequency -> Frequency Distribution
-  /// Right Main Column: Trend Analytics -> Forecast Chart -> Sensor Calibration -> Generate Report Card
   Widget _buildDesktopLayout() {
     final summary = _controller.summary;
     final lastUpdated = _controller.lastUpdatedTimestamp;
@@ -92,7 +89,6 @@ class ReportsScreenState extends State<ReportsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // TELEMETRY TIMESTAMP AT TOP OF LEFT SIDEBAR
               _buildTelemetryStatusCard(lastUpdated),
               const SizedBox(height: 12),
               _buildMetricCard(
@@ -125,7 +121,6 @@ class ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 20),
               AlertFrequencyCard(
                 alerts: _controller.alertFrequency,
-                fixedCount: _controller.fixedAlertsCount,
                 activeCount: _controller.activeAlertsCount,
               ),
               const SizedBox(height: 20),
@@ -138,7 +133,6 @@ class ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         const SizedBox(width: 20),
-
         // RIGHT MAIN COLUMN
         Expanded(
           child: Column(
@@ -159,20 +153,14 @@ class ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 20),
               ReportPredictionCard(
                 points: _controller.predictionPoints,
-                phPoints: _controller.phTrendPoints,
-                ecPoints: _controller.ecTrendPoints,
-                selectedParameter: _controller.selectedPredictionParameter,
+                selectedParameter: _controller.selectedParameter,
                 accuracyText: '95.8% Accuracy',
-                isLoading: _controller.isTrendLoading,
-                errorMessage: _controller.trendError,
-                onParameterChanged: _controller.setPredictionParameter,
               ),
               const SizedBox(height: 20),
               SensorHealthCard(
                 sensors: _controller.sensorHealthList,
               ),
               const SizedBox(height: 20),
-              // GENERATE REPORT CARD AT VERY BOTTOM
               GenerateReportCard(
                 onGenerateReport: _navigateToGenerateReport,
               ),
@@ -183,7 +171,6 @@ class ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// Mobile Layout
   Widget _buildMobileLayout() {
     final summary = _controller.summary;
     final lastUpdated = _controller.lastUpdatedTimestamp;
@@ -236,13 +223,8 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 16),
         ReportPredictionCard(
           points: _controller.predictionPoints,
-          phPoints: _controller.phTrendPoints,
-          ecPoints: _controller.ecTrendPoints,
-          selectedParameter: _controller.selectedPredictionParameter,
+          selectedParameter: _controller.selectedParameter,
           accuracyText: '95.8% Accuracy',
-          isLoading: _controller.isTrendLoading,
-          errorMessage: _controller.trendError,
-          onParameterChanged: _controller.setPredictionParameter,
         ),
         const SizedBox(height: 16),
         SensorHealthCard(
@@ -255,7 +237,6 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 16),
         AlertFrequencyCard(
           alerts: _controller.alertFrequency,
-          fixedCount: _controller.fixedAlertsCount,
           activeCount: _controller.activeAlertsCount,
         ),
         const SizedBox(height: 16),

@@ -15,9 +15,9 @@ class ForecastingController extends ChangeNotifier {
   String? errorMessage;
   UserProfile? profile;
 
-  String selectedTab = 'pH Forecast'; // 'pH Forecast', 'EC Forecast', or 'Both'
+  // Default initial view set to 'Both' so user lands on the combined graph
+  String selectedTab = 'Both'; // 'pH Forecast', 'EC Forecast', or 'Both'
   int selectedHours = 12;
-
   String selectedBothInsightParam = 'pH'; // Inner tab selection when in 'Both' view
 
   double currentPh = 6.5;
@@ -38,7 +38,7 @@ class ForecastingController extends ChangeNotifier {
       ? 'ph'
       : (selectedTab.startsWith('EC') ? 'ec' : 'both');
 
-  /// Active single insight detail to display
+  /// Active single insight detail to display based on inner tab or primary tab selection
   PredictionInsightDetail? get activeInsightDetail {
     if (selectedTab == 'Both') {
       return selectedBothInsightParam == 'pH'
@@ -130,7 +130,7 @@ class ForecastingController extends ChangeNotifier {
       phInsightDetail = insightResults[0];
       ecInsightDetail = insightResults[1];
 
-      // Auto-focus the inner tab on whichever parameter has an active warning/critical badge
+      // Auto-focus the inner insight tab on whichever parameter has an active alert
       if (ecInsightDetail?.statusBadge.toLowerCase() != 'stable' &&
           phInsightDetail?.statusBadge.toLowerCase() == 'stable') {
         selectedBothInsightParam = 'EC';

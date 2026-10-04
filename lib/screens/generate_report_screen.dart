@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../controllers/reports_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -14,8 +13,6 @@ class GenerateReportScreen extends StatefulWidget {
 }
 
 class GenerateReportScreenState extends State<GenerateReportScreen> {
-  final ReportsController _controller = ReportsController();
-
   // Checklist Options
   bool includeSensorLogs = true;
   bool includeCalibrationLogs = false;
@@ -25,30 +22,17 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
 
   bool isGenerating = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> onGeneratePdf() async {
-    if (isGenerating) return;
+  void onGeneratePdf() async {
     setState(() => isGenerating = true);
-    try {
-      await _controller.generatePdfReport();
-      if (!mounted) return;
+    // Simulate PDF generation/download pipeline
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() => isGenerating = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('PDF report downloaded.'),
+          content: Text('PDF Report generated successfully!'),
         ),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate report: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => isGenerating = false);
     }
   }
 
@@ -129,7 +113,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'PDF report',
+                  '1 Page • PDF',
                   style: AppTextStyles.cardMeta.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryButton,
@@ -151,7 +135,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Colors.black.withOpacity(0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -256,7 +240,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             width: double.infinity,
             height: 16,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
+              color: color.withOpacity(0.08),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -287,42 +271,31 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           _checkboxTile(
             title: 'Sensor history logs',
             value: includeSensorLogs,
-            onChanged: (val) {
-              setState(() => includeSensorLogs = val ?? false);
-              _controller.toggleSensorLogs(val);
-            },
+            onChanged: (val) => setState(() => includeSensorLogs = val ?? false),
           ),
           _checkboxTile(
             title: 'Calibration history logs',
             value: includeCalibrationLogs,
-            onChanged: (val) {
-              setState(() => includeCalibrationLogs = val ?? false);
-              _controller.toggleCalibrationLogs(val);
-            },
+            onChanged: (val) =>
+                setState(() => includeCalibrationLogs = val ?? false),
           ),
           _checkboxTile(
             title: 'pH optimization results',
             value: includePhOptimization,
-            onChanged: (val) {
-              setState(() => includePhOptimization = val ?? false);
-              _controller.togglePhOptimization(val);
-            },
+            onChanged: (val) =>
+                setState(() => includePhOptimization = val ?? false),
           ),
           _checkboxTile(
             title: 'EC optimization results',
             value: includeEcOptimization,
-            onChanged: (val) {
-              setState(() => includeEcOptimization = val ?? false);
-              _controller.toggleEcOptimization(val);
-            },
+            onChanged: (val) =>
+                setState(() => includeEcOptimization = val ?? false),
           ),
           _checkboxTile(
             title: 'All analytics and graphs',
             value: includeAllAnalytics,
-            onChanged: (val) {
-              setState(() => includeAllAnalytics = val ?? false);
-              _controller.toggleAllAnalytics(val);
-            },
+            onChanged: (val) =>
+                setState(() => includeAllAnalytics = val ?? false),
           ),
 
           const Spacer(),

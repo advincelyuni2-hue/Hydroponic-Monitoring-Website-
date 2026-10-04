@@ -11,26 +11,31 @@ class NavItem {
 }
 
 const List<NavItem> kNavItems = [
-  NavItem(icon: Icons.dashboard_outlined, label: 'Dashboard'),
-  NavItem(icon: Icons.show_chart, label: 'Forecasts'),
-  NavItem(icon: Icons.receipt_long_outlined, label: 'History logs'),
-  NavItem(icon: Icons.description_outlined, label: 'Reports'),
+  NavItem(icon: Icons.dashboard_outlined, label: 'Dashboard'),       // Index 0
+  NavItem(icon: Icons.show_chart, label: 'Forecasts'),               // Index 1
+  NavItem(icon: Icons.receipt_long_outlined, label: 'History logs'), // Index 2
+  NavItem(icon: Icons.description_outlined, label: 'Reports'),        // Index 3
 ];
 
 const List<NavItem> kNavFooterItems = [
-  NavItem(icon: Icons.settings_outlined, label: 'Settings'),
-  NavItem(icon: Icons.help_outline, label: 'Help'),
+  NavItem(icon: Icons.settings_outlined, label: 'Settings'),         // Index 4
+  NavItem(icon: Icons.help_outline, label: 'Help'),                   // Index 5
 ];
 
-const NavItem kAdminNavItem =
-    NavItem(icon: Icons.admin_panel_settings_outlined, label: 'Admin settings');
+const NavItem kAdminNavItem = NavItem(
+  icon: Icons.admin_panel_settings_outlined,
+  label: 'Admin settings',                                           // Index 6
+);
 
 class SideNav extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
-  const SideNav(
-      {super.key, required this.selectedIndex, required this.onSelect});
+  const SideNav({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,26 +46,27 @@ class SideNav extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (int i = 0; i < kNavItems.length; i++)
-            _NavTile(
+            NavTile(
               item: kNavItems[i],
               selected: i == selectedIndex,
               onTap: () => onSelect(i),
             ),
           const Spacer(),
           const Divider(color: Colors.white30, height: 32),
-          for (final item in kNavFooterItems)
-            _NavTile(
-              item: item,
-              selected: false,
-              onTap: () =>
-                  onSelect(kNavItems.length + kNavFooterItems.indexOf(item)),
+          for (int j = 0; j < kNavFooterItems.length; j++) ...[
+            NavTile(
+              item: kNavFooterItems[j],
+              selected: (kNavItems.length + j) == selectedIndex,
+              onTap: () => onSelect(kNavItems.length + j),
             ),
+          ],
           if (appProfile.value?.isAdmin == true)
-            _NavTile(
+            NavTile(
               item: kAdminNavItem,
-              selected:
-                  selectedIndex == kNavItems.length + kNavFooterItems.length,
-              onTap: () => onSelect(kNavItems.length + kNavFooterItems.length),
+              selected: selectedIndex ==
+                  (kNavItems.length + kNavFooterItems.length),
+              onTap: () => onSelect(
+                  kNavItems.length + kNavFooterItems.length),
             ),
         ],
       ),
@@ -68,21 +74,26 @@ class SideNav extends StatelessWidget {
   }
 }
 
-class _NavTile extends StatelessWidget {
+class NavTile extends StatelessWidget {
   final NavItem item;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavTile(
-      {required this.item, required this.selected, required this.onTap});
+  const NavTile({
+    super.key,
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
-        color:
-            selected ? AppColors.sidebarSelectedBackground : Colors.transparent,
+        color: selected
+            ? AppColors.sidebarSelectedBackground
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -105,7 +116,8 @@ class _NavTile extends StatelessWidget {
                     color: selected
                         ? const Color(0xFF1A1A1A)
                         : AppColors.sidebarText,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight:
+                        selected ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ],

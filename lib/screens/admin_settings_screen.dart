@@ -146,31 +146,6 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     final client = supabaseClient;
     if (client == null) return;
 
-    if (!active) {
-      final email = user['email'] as String? ?? 'this user';
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Deactivate user?'),
-          content: Text(
-            'This will prevent $email from accessing the application. '
-            'Their account and history will be preserved.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Deactivate'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-    }
-
     try {
       await client
           .from('profiles')
@@ -392,7 +367,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   const SizedBox(width: 12),
                   Switch.adaptive(
                     value: user['is_active'] as bool? ?? false,
-                    activeThumbColor: AppColors.primaryButton,
+                    activeColor: AppColors.primaryButton,
                     onChanged: (active) => _toggleUserActive(user, active),
                   ),
                   const SizedBox(width: 8),

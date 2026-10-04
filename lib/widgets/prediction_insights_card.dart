@@ -78,7 +78,7 @@ class PredictionInsightsCard extends StatelessWidget {
     this.onInsightParamChanged,
   });
 
-  List<InlineSpan> highlightSpans(
+  List<InlineSpan> _highlightSpans(
     String text,
     String highlight,
     TextStyle base,
@@ -87,8 +87,10 @@ class PredictionInsightsCard extends StatelessWidget {
     if (highlight.isEmpty || !text.contains(highlight)) {
       return [TextSpan(text: text, style: base)];
     }
+
     final parts = text.split(highlight);
     final spans = <InlineSpan>[];
+
     for (var i = 0; i < parts.length; i++) {
       if (parts[i].isNotEmpty) {
         spans.add(TextSpan(text: parts[i], style: base));
@@ -105,6 +107,7 @@ class PredictionInsightsCard extends StatelessWidget {
     final severity = SeverityStyle.fromBadge(detail.statusBadge);
     bool isPhTab = detail.statusLabel.contains('pH');
     String mainUnit = isPhTab ? '' : ' mS/cm';
+
     bool isNoRecommendation = detail.suggestedFixes.isEmpty ||
         (detail.suggestedFixes.length == 1 &&
             (detail.suggestedFixes.first.contains('No recommendation') ||
@@ -118,6 +121,7 @@ class PredictionInsightsCard extends StatelessWidget {
     final IconData? directionIcon = delta > tolerance
         ? Icons.arrow_upward_rounded
         : (delta < -tolerance ? Icons.arrow_downward_rounded : null);
+
     final directionLabel = delta > tolerance
         ? 'above target'
         : (delta < -tolerance ? 'below target' : 'on target');
@@ -126,6 +130,7 @@ class PredictionInsightsCard extends StatelessWidget {
       color: AppColors.textPrimary,
       fontSize: 12.5,
     );
+
     final calloutEmphasis = calloutBase.copyWith(
       fontWeight: FontWeight.w700,
       color: severity.isAlert ? severity.text : AppColors.textPrimary,
@@ -252,7 +257,7 @@ class PredictionInsightsCard extends StatelessWidget {
             ),
             child: Text.rich(
               TextSpan(
-                children: highlightSpans(
+                children: _highlightSpans(
                   detail.calloutText,
                   detail.temperature,
                   calloutBase,
@@ -367,7 +372,7 @@ class PredictionInsightsCard extends StatelessWidget {
                 fontStyle: FontStyle.italic,
               ),
             )
-          else
+          else ...[
             for (final fix in detail.suggestedFixes)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -388,62 +393,59 @@ class PredictionInsightsCard extends StatelessWidget {
                   ],
                 ),
               ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: isNoRecommendation
-                        ? null
-                        : () => ActionConfirmationDialog.showApplyFix(
-                              context,
-                              onConfirm: onApplyFix,
-                            ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryButton,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: () => ActionConfirmationDialog.showApplyFix(
+                        context,
+                        onConfirm: onApplyFix,
                       ),
-                    ),
-                    child: Text(
-                      'Apply fix',
-                      style: AppTextStyles.button.copyWith(fontSize: 14),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: OutlinedButton(
-                    onPressed: isNoRecommendation
-                        ? null
-                        : () => ActionConfirmationDialog.showDismissFix(
-                              context,
-                              onConfirm: onDismiss,
-                            ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primaryButton),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryButton,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      'Dismiss',
-                      style: AppTextStyles.button.copyWith(
-                        fontSize: 14,
-                        color: AppColors.primaryButton,
+                      child: Text(
+                        'Apply fix',
+                        style: AppTextStyles.button.copyWith(fontSize: 14),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: OutlinedButton(
+                      onPressed: () => ActionConfirmationDialog.showDismissFix(
+                        context,
+                        onConfirm: onDismiss,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primaryButton),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        'Dismiss',
+                        style: AppTextStyles.button.copyWith(
+                          fontSize: 14,
+                          color: AppColors.primaryButton,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -468,7 +470,9 @@ class PredictionInsightsCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                color: isSelected
+                    ? AppColors.primaryButton
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(

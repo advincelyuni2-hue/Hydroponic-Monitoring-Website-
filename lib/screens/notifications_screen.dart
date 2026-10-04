@@ -1,32 +1,37 @@
 import 'package:flutter/material.dart';
 import '../controllers/notification_controller.dart';
+import '../models/notification_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/notification_card_widget.dart';
+import 'add_log_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final String? initialSelectedId;
+  final String initialTab;
 
   const NotificationsScreen({
     super.key,
     this.initialSelectedId,
+    this.initialTab = 'Active',
   });
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
+  State<NotificationsScreen> createState() => NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationController _controller = NotificationController();
-  String selectedTab = 'Active';
+  late String selectedTab;
   String? highlightedNotificationId;
 
   @override
   void initState() {
     super.initState();
+    selectedTab = widget.initialTab;
     highlightedNotificationId = widget.initialSelectedId;
   }
 
@@ -36,14 +41,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.dispose();
   }
 
-  void _handleCardTap(String id) {
-    setState(() {
-      if (highlightedNotificationId == id) {
-        highlightedNotificationId = null;
-      } else {
-        highlightedNotificationId = id;
-      }
-    });
+  void _handleCardTap(AppNotificationItem item) {
+    if (Responsive.isMobile(context)) {
+      showRecordFixDialog(
+        context,
+        notification: item,
+        onSubmit: (entry) async {
+          await _controller.toggleResolve(item, true);
+          setState(() {
+            selectedTab = 'Resolved';
+          });
+        },
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AddLogScreen(notification: item),
+        ),
+      );
+    }
   }
 
   @override
@@ -69,7 +85,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 children: [
                   const AppHeader(title: 'Notifications'),
                   const SizedBox(height: 24),
-
                   // Active / Resolved Tabs
                   Row(
                     children: [
@@ -81,7 +96,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: 12),
                   Divider(color: AppColors.cardBorder, height: 1),
                   const SizedBox(height: 20),
-
                   if (_controller.errorMessage != null) ...[
                     Container(
                       width: double.infinity,
@@ -99,7 +113,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-
                   if (_controller.isLoading)
                     const Center(
                       child: Padding(
@@ -124,8 +137,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   else
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        int crossAxisCount = isDesktop ? 3 : (isMobile ? 1 : 2);
-
+                        int crossAxisCount =
+                            isDesktop ? 3 : (isMobile ? 1 : 2);
                         return GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -143,7 +156,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               item: item,
                               isHighlighted:
                                   item.id == highlightedNotificationId,
-                              onTap: () => _handleCardTap(item.id),
+                              onTap: () => _handleCardTap(item),
                               onResolveChanged: (val) =>
                                   _controller.toggleResolve(item, val),
                             );
@@ -173,8 +186,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               title,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: 16,
-                color:
-                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                color: isActive
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -183,7 +197,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               duration: const Duration(milliseconds: 200),
               height: 3,
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primaryButton : Colors.transparent,
+                color: isActive
+                    ? AppColors.primaryButton
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

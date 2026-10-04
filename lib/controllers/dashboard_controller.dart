@@ -27,14 +27,12 @@ class DashboardController extends ChangeNotifier {
   forecasting.PredictionInsightDetail? latestInsight;
   forecasting.PredictionInsightDetail? phPredictionInsight;
   forecasting.PredictionInsightDetail? ecPredictionInsight;
-  List<AppNotification> notifications = [];
-  List<AppNotificationItem> notificationItems = [];
+  List<AppNotificationItem> notifications = [];
   List<ForecastPoint> phForecast = [];
   List<ForecastPoint> ecForecast = [];
   List<ForecastHorizonSummary> forecastSummaries = [];
   DateTime? forecastGeneratedAt;
   RealtimeChannel? _parameterChannel;
-  RealtimeChannel? _notificationChannel;
   StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
   bool _refreshingParameters = false;
 
@@ -43,22 +41,14 @@ class DashboardController extends ChangeNotifier {
     _parameterChannel = _monitoringService.subscribeToParameterChanges(
       _refreshParameterStatuses,
     );
-    _notificationChannel = _notificationService.subscribeToAdminAlerts(
-      onAlert: _refreshNotifications,
-    );
     _notificationSubscription =
         _notificationService.streamNotificationItems().listen((items) {
-      notificationItems = items
+      notifications = items
           .where((notification) => !notification.isResolved)
           .take(3)
           .toList();
       notifyListeners();
     });
-  }
-
-  Future<void> _refreshNotifications() async {
-    notifications = await _notificationService.getNotifications();
-    notifyListeners();
   }
 
   Future<void> _refreshParameterStatuses() async {
@@ -89,13 +79,11 @@ class DashboardController extends ChangeNotifier {
         ),
         _monitoringService.getParameterStatuses(),
         _notificationService.getNotificationItems(limit: 3, activeOnly: true),
-        _notificationService.getNotifications(),
       ]);
 
       profile = results[0] as UserProfile;
       parameterStatuses = results[1] as List<ParameterStatus>;
-      notificationItems = results[2] as List<AppNotificationItem>;
-      notifications = results[3] as List<AppNotification>;
+      notifications = results[2] as List<AppNotificationItem>;
       await _refreshPredictiveData(notify: false);
     } catch (e) {
       errorMessage = 'Could not load dashboard data';
@@ -231,10 +219,6 @@ class DashboardController extends ChangeNotifier {
     final channel = _parameterChannel;
     if (channel != null) {
       _monitoringService.unsubscribe(channel);
-    }
-    final notificationChannel = _notificationChannel;
-    if (notificationChannel != null) {
-      supabaseClient?.removeChannel(notificationChannel);
     }
     _notificationSubscription?.cancel();
     super.dispose();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/history_logs_controller.dart';
+import '../models/monitoring_models.dart';
 import '../services/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -560,7 +561,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.calendar_today_rounded,
+                Icon(Icons.calendar_today_rounded,
                     size: 14, color: AppColors.primaryButton),
                 const SizedBox(width: 6),
                 Text(
@@ -595,7 +596,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline_rounded,
                   size: 15,
                   color: AppColors.primaryButton,
