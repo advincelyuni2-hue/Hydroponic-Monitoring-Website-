@@ -17,48 +17,52 @@ class AppDrawer extends StatelessWidget {
     required this.selectedIndex,
   });
 
-  void _navigateTo(BuildContext context, int index) {
-    if (index == selectedIndex) return;
+  void navigateTo(BuildContext context, int index) {
+    if (index == selectedIndex) {
+      Navigator.pop(context);
+      return;
+    }
 
     final navigator = Navigator.of(context);
-
     Navigator.pop(context);
 
     switch (index) {
       case 0: // Dashboard
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
         break;
       case 1: // Forecasts
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const ForecastingDashboardScreen()),
+          MaterialPageRoute(
+              builder: (context) => const ForecastingDashboardScreen()),
         );
         break;
       case 2: // History logs
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const HistoryLogsScreen()),
+          MaterialPageRoute(builder: (context) => const HistoryLogsScreen()),
         );
         break;
       case 3: // Reports
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const ReportsScreen()),
+          MaterialPageRoute(builder: (context) => const ReportsScreen()),
         );
         break;
       case 4: // Settings
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          MaterialPageRoute(builder: (context) => const SettingsScreen()),
         );
         break;
       case 5: // Help
         navigator.pushReplacement(
-          MaterialPageRoute(builder: (_) => const HelpScreen()),
+          MaterialPageRoute(builder: (context) => const HelpScreen()),
         );
         break;
-      case 6:
+      case 6: // Admin Settings
         if (appProfile.value?.isAdmin == true) {
           navigator.pushReplacement(
-            MaterialPageRoute(builder: (_) => const AdminSettingsScreen()),
+            MaterialPageRoute(
+                builder: (context) => const AdminSettingsScreen()),
           );
         }
         break;
@@ -72,7 +76,7 @@ class AppDrawer extends StatelessWidget {
       child: SafeArea(
         child: SideNav(
           selectedIndex: selectedIndex,
-          onSelect: (index) => _navigateTo(context, index),
+          onSelect: (index) => navigateTo(context, index),
         ),
       ),
     );

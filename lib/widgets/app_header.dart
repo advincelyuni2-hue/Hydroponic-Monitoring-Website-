@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification_models.dart';
-import '../screens/login_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/settings_screen.dart';
 import '../services/app_state.dart';
-import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
@@ -14,12 +12,10 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'notification_overlay_widget.dart';
-import '../screens/add_log_screen.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
   final UserProfile? profile;
-  final VoidCallback? onAddTap;
   final VoidCallback? onBellTap;
   final VoidCallback? onProfileTap;
 
@@ -27,13 +23,13 @@ class AppHeader extends StatelessWidget {
     super.key,
     required this.title,
     this.profile,
-    this.onAddTap,
     this.onBellTap,
     this.onProfileTap,
   });
 
-  void _showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
-    final renderBox = bellKey.currentContext?.findRenderObject() as RenderBox?;
+  void showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
+    final renderBox =
+        bellKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const NotificationsScreen()),
@@ -65,7 +61,9 @@ class AppHeader extends StatelessWidget {
               onViewAllTap: () {
                 overlayEntry.remove();
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
                 );
               },
             ),
@@ -79,36 +77,20 @@ class AppHeader extends StatelessWidget {
 
   /// Opens the Settings screen from the profile avatar.
   void _openSettings(BuildContext context) {
-    // Already on Settings, so don't stack another copy
     if (title == 'Settings') return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
   }
 
-  void _openAddLog(BuildContext context) {
-  // Already on the Add a log page, so don't stack another copy
-  if (title == 'Add a log') return;
-
-  if (Responsive.isMobile(context)) {
-    showRecordFixDialog(context, onSubmit: (entry) {
-      // TODO: save entry
-    });
-  } else {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AddLogScreen()),
-    );
-  }
-}
-
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
     final iconSize = isMobile ? 35.0 : 40.0;
-    final iconGap = isMobile ? 6.0 : 12.0;
     final GlobalKey bellKey = GlobalKey();
 
-    return Row(
+    // Dynamically scales title text down if it exceeds available space
+    final Widget titleSection = Row(
       children: [
         // Hamburger Menu Button
         GestureDetector(
@@ -129,17 +111,36 @@ class AppHeader extends StatelessWidget {
         ),
         SizedBox(width: isMobile ? 8 : 16),
 
-        // Page Title
-        Flexible(
-          child: Text(
-            title,
-            style: AppTextStyles.pageHeading.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: isMobile ? 18 : 24,
-              overflow: TextOverflow.ellipsis,
+        // Page Title with automatic font scaling for longer text
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                style: AppTextStyles.pageHeading.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: isMobile ? 18 : 24,
+                ),
+              ),
             ),
           ),
         ),
+      ],
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (!isMobile)
+          SizedBox(
+            width: 340, // Increased to 340px to accommodate longer titles cleanly
+            child: titleSection,
+          )
+        else
+          Expanded(child: titleSection),
 
         const Spacer(),
 
@@ -153,7 +154,6 @@ class AppHeader extends StatelessWidget {
               decoration: AppDecorations.card(radius: 24),
               child: Row(
                 children: [
-                  // Fixed: Removed const here because AppColors.textSecondary is a dynamic getter
                   Icon(
                     Icons.search,
                     color: AppColors.textSecondary,
@@ -174,22 +174,17 @@ class AppHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
         ] else ...[
           _iconCircle(
             Icons.search,
             () => _openMobileSearch(context),
             size: iconSize,
           ),
-          SizedBox(width: iconGap),
+          const SizedBox(width: 8),
         ],
 
-        // Action Buttons
-        _iconCircle(Icons.add, onAddTap ?? () => _openAddLog(context),
-    size: iconSize),
-        SizedBox(width: iconGap),
-
-        // Bell Notification Button 
+        // Bell Notification Button
         Container(
           key: bellKey,
           child: onBellTap != null
@@ -205,42 +200,51 @@ class AppHeader extends StatelessWidget {
                         ),
                       );
                     } else {
-                      _showNotificationOverlay(context, bellKey);
+                      showNotificationOverlay(context, bellKey);
                     }
                   },
                 ),
         ),
 
+        // User Profile Info
         if (!isMobile) ...[
           const SizedBox(width: 12),
           GestureDetector(
             onTap: onProfileTap ?? () => _openSettings(context),
-            child: const CircleAvatar(
-              radius: 20,
-              backgroundColor: AppColors.iconCircle,
-              child: Icon(Icons.person, color: Colors.white),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppColors.iconCircle,
+                  child: Icon(Icons.person, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      profile?.name ?? '',
+                      style: AppTextStyles.bodyBold.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      profile?.roleLabel ?? '',
+                      style: AppTextStyles.cardMeta.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                profile?.name ?? '',
-                style: AppTextStyles.bodyBold.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              Text(
-                profile?.roleLabel ?? '',
-                style: AppTextStyles.cardMeta.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
         ] else ...[
-          SizedBox(width: iconGap),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: onProfileTap ?? () => _openSettings(context),
             child: const CircleAvatar(
@@ -275,15 +279,16 @@ class AppHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Search',
-                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
+                Text(
+                  'Search',
+                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   autofocus: true,
                   decoration: InputDecoration(
                     hintText: 'Search...',
                     hintStyle: AppTextStyles.cardMeta,
-                    // Fixed: Removed const here because AppColors.textSecondary is a dynamic getter
                     prefixIcon: Icon(
                       Icons.search,
                       color: AppColors.textSecondary,
@@ -301,39 +306,6 @@ class AppHeader extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  // No longer used by default (the avatar now opens Settings), but kept in
-  // case something else still calls it.
-  void showProfileMenu(BuildContext context) {
-    final profile = appProfile.value;
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person)),
-              title: Text(profile?.name ?? 'User'),
-              subtitle: Text(profile?.email ?? ''),
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Log out'),
-              onTap: () async {
-                await AuthService().logout();
-                if (!context.mounted) return;
-                Navigator.of(context).pop();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (_) => false,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 
