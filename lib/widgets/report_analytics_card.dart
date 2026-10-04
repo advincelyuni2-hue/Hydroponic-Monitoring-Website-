@@ -195,9 +195,11 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
     }
     final dataRange = dataMax - dataMin;
     final padding = (dataRange * 0.1).clamp(0.1, double.infinity).toDouble();
-    final minY = dataMin - padding;
-    final maxY = dataMax + padding;
-    final titleInterval = (maxY - minY) / 5;
+    final paddedMinY = ((dataMin - padding) / 0.5).floorToDouble() * 0.5;
+    final minY = paddedMinY < 0 ? 0.0 : paddedMinY;
+    final maxY = (((dataMax + padding) / 0.5).ceilToDouble() * 0.5)
+        .clamp(0.5, double.infinity)
+        .toDouble();
     final labelIntervals = isMobile ? 5 : 6;
     final xInterval = widget.points.length > 1
         ? ((widget.points.length - 2 + labelIntervals) ~/ labelIntervals)
@@ -236,7 +238,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: isMobile ? 33 : 42,
-            interval: titleInterval,
+            interval: 0.5,
             getTitlesWidget: (val, _) => Text(
               val.toStringAsFixed(1),
               style: AppTextStyles.cardMeta.copyWith(fontSize: 10),

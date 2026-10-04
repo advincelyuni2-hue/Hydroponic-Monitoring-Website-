@@ -63,10 +63,7 @@ class ReportsScreenState extends State<ReportsScreen> {
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-                  if (isMobile)
-                    _buildMobileLayout()
-                  else
-                    _buildDesktopLayout(),
+                  if (isMobile) _buildMobileLayout() else _buildDesktopLayout(),
                 ],
               ),
             );
@@ -127,6 +124,8 @@ class ReportsScreenState extends State<ReportsScreen> {
               TargetDistributionCard(
                 data: _controller.targetDistribution,
                 selectedParam: _controller.selectedDistributionParam,
+                isLoading: _controller.isDistributionLoading,
+                errorMessage: _controller.distributionError,
                 onParamChanged: _controller.setDistributionParam,
               ),
             ],
@@ -152,8 +151,12 @@ class ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 20),
               ReportPredictionCard(
-                points: _controller.predictionPoints,
-                selectedParameter: _controller.selectedParameter,
+                phPoints: _controller.phTrendPoints,
+                ecPoints: _controller.ecTrendPoints,
+                selectedParameter: _controller.selectedPredictionParameter,
+                isLoading: _controller.isTrendLoading,
+                errorMessage: _controller.trendError,
+                onParameterChanged: _controller.setPredictionParameter,
                 accuracyText: '95.8% Accuracy',
               ),
               const SizedBox(height: 20),
@@ -222,8 +225,12 @@ class ReportsScreenState extends State<ReportsScreen> {
         ),
         const SizedBox(height: 16),
         ReportPredictionCard(
-          points: _controller.predictionPoints,
-          selectedParameter: _controller.selectedParameter,
+          phPoints: _controller.phTrendPoints,
+          ecPoints: _controller.ecTrendPoints,
+          selectedParameter: _controller.selectedPredictionParameter,
+          isLoading: _controller.isTrendLoading,
+          errorMessage: _controller.trendError,
+          onParameterChanged: _controller.setPredictionParameter,
           accuracyText: '95.8% Accuracy',
         ),
         const SizedBox(height: 16),
@@ -243,6 +250,8 @@ class ReportsScreenState extends State<ReportsScreen> {
         TargetDistributionCard(
           data: _controller.targetDistribution,
           selectedParam: _controller.selectedDistributionParam,
+          isLoading: _controller.isDistributionLoading,
+          errorMessage: _controller.distributionError,
           onParamChanged: _controller.setDistributionParam,
         ),
       ],
@@ -284,7 +293,8 @@ class ReportsScreenState extends State<ReportsScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isWarning
                       ? AppColors.alertBackground
@@ -294,9 +304,8 @@ class ReportsScreenState extends State<ReportsScreen> {
                 child: Text(
                   status,
                   style: AppTextStyles.cardMeta.copyWith(
-                    color: isWarning
-                        ? AppColors.alertText
-                        : AppColors.textPrimary,
+                    color:
+                        isWarning ? AppColors.alertText : AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),

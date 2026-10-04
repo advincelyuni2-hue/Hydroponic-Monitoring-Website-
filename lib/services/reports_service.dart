@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
 import 'monitoring_service.dart';
+import 'supabase_client.dart';
 
 class ReportsService {
   final MonitoringService _monitoringService;
@@ -12,6 +13,30 @@ class ReportsService {
 
   ReportsService({MonitoringService? monitoringService})
       : _monitoringService = monitoringService ?? MonitoringService();
+
+  Future<({RangeValues ph, RangeValues ec})> getParameterRanges() async {
+    final row = await supabase
+        .from('parameter_configurations')
+        .select('ph_min, ph_max, ec_min, ec_max')
+        .eq('id', 1)
+        .maybeSingle();
+    if (row == null) {
+      throw StateError('No parameter configuration is available.');
+    }
+
+    double readRangeValue(String key) {
+      final value = row[key];
+      if (value is! num || !value.isFinite) {
+        throw StateError('Invalid parameter configuration value: $key.');
+      }
+      return value.toDouble();
+    }
+
+    return (
+      ph: RangeValues(readRangeValue('ph_min'), readRangeValue('ph_max')),
+      ec: RangeValues(readRangeValue('ec_min'), readRangeValue('ec_max')),
+    );
+  }
 
   Future<DateTimeRange?> getCollectionDateRange() async {
     final fetchedAt = _collectionRangeFetchedAt;

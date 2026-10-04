@@ -8,12 +8,16 @@ import '../theme/app_text_styles.dart';
 class TargetDistributionCard extends StatelessWidget {
   final TargetDistributionData data;
   final String selectedParam;
+  final bool isLoading;
+  final String? errorMessage;
   final ValueChanged<String> onParamChanged;
 
   const TargetDistributionCard({
     super.key,
     required this.data,
     required this.selectedParam,
+    this.isLoading = false,
+    this.errorMessage,
     required this.onParamChanged,
   });
 
@@ -48,76 +52,91 @@ class TargetDistributionCard extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 160,
-            child: hasData
-                ? PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 42,
-                      sections: [
-                        PieChartSectionData(
-                          value: data.optimalPercentage,
-                          color: AppColors.primaryButton,
-                          title: '${data.optimalPercentage.toInt()}%',
-                          radius: 28,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : errorMessage != null
+                    ? Center(
+                        child: Text(
+                          'Unable to load distribution data.',
+                          style: AppTextStyles.cardMeta,
+                          textAlign: TextAlign.center,
                         ),
-                        PieChartSectionData(
-                          value: data.warningPercentage,
-                          color: const Color(0xFFF39C12),
-                          title: '${data.warningPercentage.toInt()}%',
-                          radius: 28,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
+                      )
+                    : hasData
+                        ? PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 42,
+                              sections: [
+                                PieChartSectionData(
+                                  value: data.optimalPercentage,
+                                  color: AppColors.primaryButton,
+                                  title: '${data.optimalPercentage.toInt()}%',
+                                  radius: 28,
+                                  titleStyle: AppTextStyles.cardMeta.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                PieChartSectionData(
+                                  value: data.warningPercentage,
+                                  color: const Color(0xFFF39C12),
+                                  title: '${data.warningPercentage.toInt()}%',
+                                  radius: 28,
+                                  titleStyle: AppTextStyles.cardMeta.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                PieChartSectionData(
+                                  value: data.criticalPercentage,
+                                  color: AppColors.alertBorder,
+                                  title: '${data.criticalPercentage.toInt()}%',
+                                  radius: 28,
+                                  titleStyle: AppTextStyles.cardMeta.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              'No data available',
+                              style: AppTextStyles.cardMeta,
+                            ),
                           ),
-                        ),
-                        PieChartSectionData(
-                          value: data.criticalPercentage,
-                          color: AppColors.alertBorder,
-                          title: '${data.criticalPercentage.toInt()}%',
-                          radius: 28,
-                          titleStyle: AppTextStyles.cardMeta.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Center(
-                    child: Text(
-                      'No data available',
-                      style: AppTextStyles.cardMeta,
-                    ),
-                  ),
           ),
           const SizedBox(height: 16),
           _legendRow(
             'Optimal (In Target)',
             AppColors.primaryButton,
-            '${data.optimalPercentage.toInt()}%',
+            _percentageLabel(data.optimalPercentage),
           ),
           const SizedBox(height: 6),
           _legendRow(
             'Warning Zone',
             const Color(0xFFF39C12),
-            '${data.warningPercentage.toInt()}%',
+            _percentageLabel(data.warningPercentage),
           ),
           const SizedBox(height: 6),
           _legendRow(
             'Critical Bounds',
             AppColors.alertBorder,
-            '${data.criticalPercentage.toInt()}%',
+            _percentageLabel(data.criticalPercentage),
           ),
         ],
       ),
     );
+  }
+
+  String _percentageLabel(double value) {
+    if (isLoading || errorMessage != null) return '—';
+    return '${value.toInt()}%';
   }
 
   Widget _buildParamPill() {
@@ -137,7 +156,8 @@ class TargetDistributionCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

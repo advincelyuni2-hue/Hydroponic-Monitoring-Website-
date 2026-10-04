@@ -7,6 +7,7 @@ import '../services/pdf_report_service.dart';
 import '../services/reports_service.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
+import '../utils/manila_time.dart';
 
 class ReportsController extends ChangeNotifier {
   final ReportsService _reportsService = ReportsService();
@@ -15,11 +16,14 @@ class ReportsController extends ChangeNotifier {
   final PdfReportService _pdfReportService = PdfReportService();
 
   bool isLoading = false;
+  bool isDistributionLoading = false;
+  String? distributionError;
   String? errorMessage;
   UserProfile? profile;
+  int _distributionRequest = 0;
+  int _trendRequest = 0;
 
-  // Formatted timestamp string for UI cards
-  String lastUpdatedTimestamp = 'Oct 3, 2026, 6:22 PM';
+  String lastUpdatedTimestamp = 'Loading sensor history...';
 
   ReportSummaryData summary = const ReportSummaryData(
     avgPh: 6.2,
@@ -43,29 +47,18 @@ class ReportsController extends ChangeNotifier {
     AnalyticsPoint(label: 'Jul 29', value: 6.2),
   ];
 
-  List<PredictedAnalyticsPoint> predictionPoints = [
-    PredictedAnalyticsPoint(
-        label: 'Jul 1', actualValue: 6.4, predictedValue: 6.3),
-    PredictedAnalyticsPoint(
-        label: 'Jul 5', actualValue: 6.6, predictedValue: 6.5),
-    PredictedAnalyticsPoint(
-        label: 'Jul 9', actualValue: 6.9, predictedValue: 6.8),
-    PredictedAnalyticsPoint(
-        label: 'Jul 13', actualValue: 6.5, predictedValue: 6.6),
-    PredictedAnalyticsPoint(
-        label: 'Jul 17', actualValue: 6.2, predictedValue: 6.1),
-    PredictedAnalyticsPoint(
-        label: 'Jul 21', actualValue: 6.1, predictedValue: 6.2),
-    PredictedAnalyticsPoint(
-        label: 'Jul 25', actualValue: 6.5, predictedValue: 6.4),
-    PredictedAnalyticsPoint(
-        label: 'Jul 29', actualValue: 6.2, predictedValue: 6.3),
-  ];
+  // Kept empty for PDF compatibility; model predictions are not report data.
+  List<PredictedAnalyticsPoint> predictionPoints = [];
+  List<AnalyticsPoint> phTrendPoints = [];
+  List<AnalyticsPoint> ecTrendPoints = [];
+  String selectedPredictionParameter = 'Both';
+  bool isTrendLoading = false;
+  String? trendError;
 
   TargetDistributionData targetDistribution = const TargetDistributionData(
-    optimalPercentage: 88,
-    warningPercentage: 8,
-    criticalPercentage: 4,
+    optimalPercentage: 0,
+    warningPercentage: 0,
+    criticalPercentage: 0,
   );
 
   List<AlertFrequencyData> alertFrequency = const [
@@ -104,7 +97,7 @@ class ReportsController extends ChangeNotifier {
   String selectedDistributionParam = 'pH'; // 'pH', 'EC', 'Temp'
 
   RangeValues phRange = const RangeValues(5.5, 6.5);
-  RangeValues ecRange = const RangeValues(5.0, 6.0);
+  RangeValues ecRange = const RangeValues(1.2, 1.8);
 
   bool includeSensorLogs = true;
   bool includeCalibrationLogs = false;
@@ -125,6 +118,12 @@ class ReportsController extends ChangeNotifier {
     loadTrendData();
   }
 
+  void setPredictionParameter(String param) {
+    if (selectedPredictionParameter == param) return;
+    selectedPredictionParameter = param;
+    notifyListeners();
+  }
+
   void setTimeframe(String tf) {
     if (selectedTimeframe == tf) return;
     selectedTimeframe = tf;
@@ -132,8 +131,9 @@ class ReportsController extends ChangeNotifier {
   }
 
   void setDistributionParam(String param) {
+    if (selectedDistributionParam == param) return;
     selectedDistributionParam = param;
-    notifyListeners();
+    loadTargetDistribution();
   }
 
   void updatePhRange(RangeValues values) {
@@ -182,8 +182,38 @@ class ReportsController extends ChangeNotifier {
 
   void revertRanges() {
     phRange = const RangeValues(5.5, 6.5);
-    ecRange = const RangeValues(5.0, 6.0);
+    ecRange = const RangeValues(1.2, 1.8);
     notifyListeners();
+  }
+
+  Future<void> loadTargetDistribution() async {
+    final request = ++_distributionRequest;
+    final parameter = selectedDistributionParam;
+    isDistributionLoading = true;
+    distributionError = null;
+    notifyListeners();
+
+    try {
+      final distribution =
+          await _reportsService.getTargetDistribution(parameter);
+      if (request == _distributionRequest) {
+        targetDistribution = distribution;
+      }
+    } catch (error) {
+      if (request == _distributionRequest) {
+        targetDistribution = const TargetDistributionData(
+          optimalPercentage: 0,
+          warningPercentage: 0,
+          criticalPercentage: 0,
+        );
+        distributionError = error.toString();
+      }
+    } finally {
+      if (request == _distributionRequest) {
+        isDistributionLoading = false;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> generatePdfReport() async {
@@ -224,14 +254,36 @@ class ReportsController extends ChangeNotifier {
   }
 
   Future<void> loadTrendData() async {
-    try {
-      final points = await _reportsService.getTrendData(
-          selectedParameter, selectedTimeframe);
-      if (points.isNotEmpty) {
-        trendPoints = points;
-      }
-    } catch (_) {}
+    final request = ++_trendRequest;
+    isTrendLoading = true;
+    trendError = null;
     notifyListeners();
+
+    try {
+      final trends = await _reportsService.getTrendDataForParameters(
+        const ['pH', 'EC'],
+        selectedTimeframe,
+      );
+      if (request != _trendRequest) return;
+
+      phTrendPoints = trends['pH']!;
+      ecTrendPoints = trends['EC']!;
+      trendPoints = selectedParameter == 'pH' ? phTrendPoints : ecTrendPoints;
+      if (trendPoints.isEmpty) {
+        trendError = 'No sensor readings were found for this period.';
+      }
+    } catch (error) {
+      if (request != _trendRequest) return;
+      trendPoints = [];
+      phTrendPoints = [];
+      ecTrendPoints = [];
+      trendError = 'Could not load sensor trends: $error';
+    } finally {
+      if (request == _trendRequest) {
+        isTrendLoading = false;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> loadData() async {
@@ -252,10 +304,26 @@ class ReportsController extends ChangeNotifier {
     } catch (_) {}
 
     try {
-      final t = await _reportsService.getTrendData(
-          selectedParameter, selectedTimeframe);
-      if (t.isNotEmpty) trendPoints = t;
-    } catch (_) {}
+      final ranges = await _reportsService.getParameterRanges();
+      phRange = ranges.ph;
+      ecRange = ranges.ec;
+    } catch (_) {
+      phRange = const RangeValues(5.5, 6.5);
+      ecRange = const RangeValues(1.2, 1.8);
+    }
+
+    await loadTargetDistribution();
+
+    await loadTrendData();
+
+    try {
+      final collectionRange = await _reportsService.getCollectionDateRange();
+      lastUpdatedTimestamp = collectionRange == null
+          ? 'No sensor readings available'
+          : formatManilaDateTime(collectionRange.end);
+    } catch (_) {
+      lastUpdatedTimestamp = 'Unavailable';
+    }
 
     isLoading = false;
     notifyListeners();
