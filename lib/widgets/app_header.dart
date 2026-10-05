@@ -11,6 +11,7 @@ import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'notification_overlay_widget.dart';
 import 'header_search.dart';
+import '../services/app_state.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
@@ -198,25 +199,33 @@ class AppHeader extends StatelessWidget {
                   child: Icon(Icons.person, color: Colors.white),
                 ),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      profile?.name ?? '',
-                      style: AppTextStyles.bodyBold.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      profile?.roleLabel ?? '',
-                      style: AppTextStyles.cardMeta.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                ValueListenableBuilder<UserProfile?>(
+                  valueListenable: appProfile,
+                  builder: (context, liveProfile, _) {
+                    final shownProfile = liveProfile ?? profile;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          shownProfile?.name ?? '',
+                          style: AppTextStyles.bodyBold.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          shownProfile?.roleLabel ?? '',
+                          style: AppTextStyles.cardMeta.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

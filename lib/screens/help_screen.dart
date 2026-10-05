@@ -31,7 +31,15 @@ class _HelpScreenState extends State<HelpScreen> {
   /// True when nothing is saved in the database, so the built-in guides show.
   bool get _usingDefaults => _saved.isEmpty;
 
-  List<HelpArticle> get _articles => _usingDefaults ? kDefaultHelpArticles : _saved;
+  List<HelpArticle> get _articles {
+    final articles = _usingDefaults ? kDefaultHelpArticles : _saved;
+
+    if (_isAdmin) return articles;
+
+    return articles
+        .where((article) => article.category != 'Admin settings')
+        .toList();
+  }
 
   @override
   void initState() {
@@ -252,9 +260,7 @@ class _HelpScreenState extends State<HelpScreen> {
           ),
           if (_usingDefaults && _loadError == null && !_loading)
             OutlinedButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () => _runBusy(() => _saveDefaults()),
+              onPressed: _busy ? null : () => _runBusy(() => _saveDefaults()),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppColors.accentGreen),
                 foregroundColor: AppColors.accentGreen,
@@ -347,9 +353,10 @@ class _HelpScreenState extends State<HelpScreen> {
         iconColor: AppColors.accentGreen,
         collapsedIconColor: AppColors.textSecondary,
         title: Text(article.title, style: AppTextStyles.bodyBold),
-        subtitle: _category == _all
-            ? Text(article.category, style: AppTextStyles.cardMeta)
-            : null,
+        subtitle: Text(
+          article.category,
+          style: AppTextStyles.cardMeta,
+        ),
         children: [
           Text(
             article.body,

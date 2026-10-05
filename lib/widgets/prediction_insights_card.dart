@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import '../screens/notifications_screen.dart';
 import '../models/forecasting_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/theme_mode_controller.dart';
-import 'apply_fix_dialog.dart';
-
 
 class SeverityStyle {
   final Color accent;
@@ -316,8 +315,8 @@ class PredictionInsightsCard extends StatelessWidget {
                           children: [
                             Text(
                               'Current ${isPhTab ? 'pH' : 'EC'}',
-                              style: AppTextStyles.cardMeta
-                                  .copyWith(fontSize: 11),
+                              style:
+                                  AppTextStyles.cardMeta.copyWith(fontSize: 11),
                             ),
                             const SizedBox(height: 2),
                             Row(
@@ -364,8 +363,8 @@ class PredictionInsightsCard extends StatelessWidget {
                           children: [
                             Text(
                               'Target ${isPhTab ? 'pH' : 'EC'}',
-                              style: AppTextStyles.cardMeta
-                                  .copyWith(fontSize: 11),
+                              style:
+                                  AppTextStyles.cardMeta.copyWith(fontSize: 11),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -419,56 +418,30 @@ class PredictionInsightsCard extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: ElevatedButton(
-                      onPressed: () => ActionConfirmationDialog.showApplyFix(
-                        context,
-                        onConfirm: onApplyFix,
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryButton,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Text(
-                        'Apply fix',
-                        style: AppTextStyles.button.copyWith(fontSize: 14),
-                      ),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationsScreen(),
                     ),
+                  );
+                },
+                icon: const Icon(Icons.notifications_outlined, size: 18),
+                label: Text(
+                  'See alerts',
+                  style: AppTextStyles.button.copyWith(fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryButton,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: OutlinedButton(
-                      onPressed: () => ActionConfirmationDialog.showDismissFix(
-                        context,
-                        onConfirm: onDismiss,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppColors.accentGreen),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Text(
-                        'Dismiss',
-                        style: AppTextStyles.button.copyWith(
-                          fontSize: 14,
-                          color: AppColors.accentGreen,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ],
@@ -495,9 +468,8 @@ class PredictionInsightsCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryButton
-                    : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(

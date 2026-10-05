@@ -180,24 +180,52 @@ class HistoryLogsController extends ChangeNotifier {
 
     try {
       final range = _selectedDateRange();
-      columns = const [
-        'Date',
-        'Time',
-        'Average pH',
-        'Average EC',
-        'Average Temp',
-        'Status'
-      ];
+      final aggregation = switch (selectedRange) {
+        'Weekly' => HistoryAggregation.eightHours,
+        'Monthly' => HistoryAggregation.daily,
+        _ => HistoryAggregation.tenMinutes,
+      };
 
-      rows = await monitoringService.getSensorHistory(
+      final sensorRows = await monitoringService.getSensorHistory(
         start: range.start,
         end: range.end,
-        aggregation: switch (selectedRange) {
-          'Weekly' => HistoryAggregation.eightHours,
-          'Monthly' => HistoryAggregation.daily,
-          _ => HistoryAggregation.tenMinutes,
-        },
+        aggregation: aggregation,
       );
+
+      if (selectedRange == 'Monthly') {
+        columns = const [
+          'Date',
+          'Average pH',
+          'Average EC',
+          'Average Temp',
+          'Status',
+        ];
+
+        rows = sensorRows.map((entry) {
+          return HistoryLogEntry(
+            [
+              entry.values[0],
+              ...entry.values.skip(2),
+            ],
+            ranges: {
+              for (final range in entry.ranges.entries)
+                range.key - 1: range.value,
+            },
+            recordStart: entry.recordStart,
+            recordDuration: entry.recordDuration,
+          );
+        }).toList();
+      } else {
+        columns = const [
+          'Date',
+          'Time',
+          'Average pH',
+          'Average EC',
+          'Average Temp',
+          'Status',
+        ];
+        rows = sensorRows;
+      }
     } catch (_) {
       errorMessage = 'Failed to load sensor history from Supabase';
     } finally {
@@ -233,10 +261,12 @@ class HistoryLogsController extends ChangeNotifier {
       final oldEntry = rows[index];
       final newValues = List<String>.from(oldEntry.values);
 
-      if (newValues.length >= 6) {
-        newValues[2] = newPh.toStringAsFixed(2);
-        newValues[3] = '${newEc.toStringAsFixed(2)} mS/cm';
-        newValues[4] = '${newTemp.toStringAsFixed(1)} °C';
+      final valueStart = selectedRange == 'Monthly' ? 1 : 2;
+
+      if (newValues.length > valueStart + 2) {
+        newValues[valueStart] = newPh.toStringAsFixed(2);
+        newValues[valueStart + 1] = '${newEc.toStringAsFixed(2)} mS/cm';
+        newValues[valueStart + 2] = '${newTemp.toStringAsFixed(1)} °C';
       }
 
       rows[index] = HistoryLogEntry(

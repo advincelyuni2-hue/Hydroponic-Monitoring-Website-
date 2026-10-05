@@ -70,6 +70,7 @@ void main() {
       includePhOptimization: true,
       includeEcOptimization: true,
       includeAllAnalytics: true,
+      includeInsightsAndDecisionSupport: false,
     );
 
     expect(bytes, isNotEmpty);

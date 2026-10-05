@@ -154,6 +154,8 @@ class ReportsScreenState extends State<ReportsScreen> {
               ReportPredictionCard(
                 evaluation: _controller.modelEvaluation,
                 selectedParameter: _controller.selectedPredictionParameter,
+                selectedHorizon: _controller.selectedPredictionHorizon,
+                onHorizonChanged: _controller.setPredictionHorizon,
                 isLoading: _controller.isEvaluationLoading,
                 errorMessage: _controller.evaluationError,
                 onParameterChanged: _controller.setPredictionParameter,
@@ -226,6 +228,8 @@ class ReportsScreenState extends State<ReportsScreen> {
         ReportPredictionCard(
           evaluation: _controller.modelEvaluation,
           selectedParameter: _controller.selectedPredictionParameter,
+          selectedHorizon: _controller.selectedPredictionHorizon,
+          onHorizonChanged: _controller.setPredictionHorizon,
           isLoading: _controller.isEvaluationLoading,
           errorMessage: _controller.evaluationError,
           onParameterChanged: _controller.setPredictionParameter,

@@ -549,7 +549,22 @@ class _ChangeCredentialDialogState extends State<_ChangeCredentialDialog> {
         style: AppTextStyles.input,
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          suffixIcon: secret
+              ? IconButton(
+                  tooltip: _showPasswords ? 'Hide password' : 'Show password',
+                  icon: Icon(
+                    _showPasswords ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: _busy
+                      ? null
+                      : () => setState(
+                            () => _showPasswords = !_showPasswords,
+                          ),
+                )
+              : null,
         ),
       ),
     );

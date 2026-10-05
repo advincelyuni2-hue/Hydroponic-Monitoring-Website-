@@ -134,32 +134,6 @@ class ForecastingService {
     double? predictedEc,
     int horizonHours = 12,
   }) async {
-    // Check if an intervention was already logged in Supabase
-    final recentIntervention =
-        await checkRecentIntervention(parameter, horizonHours);
-
-    if (recentIntervention != null) {
-      final isPh = parameter == 'ph';
-      final isApplied = recentIntervention == 'applied';
-
-      return PredictionInsightDetail(
-        statusLabel: isPh ? 'pH Level' : 'EC Level',
-        statusBadge: 'Stable',
-        warningText: isPh
-            ? 'pH levels are stable and within optimal bounds.'
-            : 'EC levels are stable and within safe parameters.',
-        temperature: '${currentTemp.toStringAsFixed(1)} °C',
-        ecLevel: isPh
-            ? '${currentEc.toStringAsFixed(1)} mS/cm'
-            : '${currentPh.toStringAsFixed(1)} pH',
-        calloutText: isApplied
-            ? 'Recent intervention logged: parameter fix applied successfully.'
-            : 'Insight dismissed by operator.',
-        currentPh: isPh ? currentPh : currentEc,
-        targetPh: isPh ? 6.5 : 1.5,
-        suggestedFixes: const ['No recommendation for now'],
-      );
-    }
 
     final insight = runFlutterDSS(
       parameter: parameter,

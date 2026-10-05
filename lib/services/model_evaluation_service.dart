@@ -18,11 +18,10 @@ class ModelEvaluationService {
     defaultValue: 'Forecast model',
   );
 
-  static const int horizonHours = 12; // how far ahead each test looks
   static const int sampleCount = 8; // how many past moments are tested
   static const Duration _tolerance = Duration(minutes: 45);
 
-  Future<ModelEvaluation> evaluate() async {
+  Future<ModelEvaluation> evaluate({int horizonHours = 12}) async {
     final readings = await Future.wait([
       _loadReadings('ph_readings'),
       _loadReadings('ec_readings'),
@@ -33,20 +32,32 @@ class ModelEvaluationService {
     final temp = readings[2];
 
     if (ph.isEmpty || ec.isEmpty) {
-      return const ModelEvaluation(
-        samples: [],
+      return ModelEvaluation(
+        samples: const [],
         horizonHours: horizonHours,
         modelName: modelName,
       );
     }
 
-    final latest = ph.first.time; // readings are newest first
+    final latest = ph.first.time;
     final jobs = <Future<EvaluationSample?>>[];
+
     for (var i = sampleCount; i >= 1; i--) {
       final testTime = latest.subtract(Duration(hours: horizonHours * i));
-      final targetTime = testTime.add(const Duration(hours: horizonHours));
-      jobs.add(_evaluateOne(testTime, targetTime, ph, ec, temp));
+      final targetTime = testTime.add(Duration(hours: horizonHours));
+
+      jobs.add(
+        _evaluateOne(
+          testTime,
+          targetTime,
+          ph,
+          ec,
+          temp,
+          horizonHours,
+        ),
+      );
     }
+
     final results = await Future.wait(jobs);
 
     return ModelEvaluation(
@@ -62,10 +73,12 @@ class ModelEvaluationService {
     List<_Reading> ph,
     List<_Reading> ec,
     List<_Reading> temp,
+    int horizonHours,
   ) async {
     final phNow = _nearest(ph, testTime);
     final ecNow = _nearest(ec, testTime);
     if (phNow == null || ecNow == null) return null;
+
     final tempNow = _nearest(temp, testTime)?.value ?? 24.0;
 
     final phThen = _nearest(ph, targetTime);
@@ -73,9 +86,10 @@ class ModelEvaluationService {
     if (phThen == null && ecThen == null) return null;
 
     final predicted = await Future.wait([
-      _predict('ph', phNow.value, ecNow.value, tempNow),
-      _predict('ec', phNow.value, ecNow.value, tempNow),
+      _predict('ph', phNow.value, ecNow.value, tempNow, horizonHours),
+      _predict('ec', phNow.value, ecNow.value, tempNow, horizonHours),
     ]);
+
     if (predicted[0] == null && predicted[1] == null) return null;
 
     return EvaluationSample(
@@ -93,6 +107,7 @@ class ModelEvaluationService {
     double ph,
     double ec,
     double temp,
+    int horizonHours,
   ) async {
     try {
       final uri = Uri.parse(ForecastingService.backendApiUrl).replace(
@@ -104,24 +119,32 @@ class ModelEvaluationService {
           'horizon': horizonHours.toString(),
         },
       );
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      final response = await http.get(uri).timeout(
+            const Duration(seconds: 10),
+          );
+
       if (response.statusCode != 200) return null;
 
       final body = json.decode(response.body) as Map<String, dynamic>;
+
       if (body['error_fallback'] != null) {
         debugPrint('Model returned a fallback: ${body['error_fallback']}');
         return null;
       }
+
       final raw = body['predictions'] as List;
-      final predictions = raw
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      final predictions =
+          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
       if (predictions.isEmpty) return null;
+
       predictions.sort(
         (a, b) => ((a['hour'] as num) - horizonHours)
             .abs()
             .compareTo(((b['hour'] as num) - horizonHours).abs()),
       );
+
       return (predictions.first['value'] as num).toDouble();
     } catch (_) {
       return null;
@@ -161,8 +184,18 @@ class ModelEvaluationService {
   String _label(DateTime time) {
     final local = toSensorManilaTime(time);
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
     return '${months[local.month - 1]} ${local.day}, '

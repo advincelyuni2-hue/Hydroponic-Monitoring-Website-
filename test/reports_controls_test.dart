@@ -45,9 +45,11 @@ void main() {
           body: ReportPredictionCard(
             evaluation: ModelEvaluation.empty,
             selectedParameter: 'Both',
+            selectedHorizon: 12,
+            onHorizonChanged: (_) {},
             isLoading: false,
             errorMessage: null,
-            onParameterChanged: (_) {},
+            onParameterChanged: selections.add,
           ),
         ),
       ),

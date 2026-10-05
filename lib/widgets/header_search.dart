@@ -6,6 +6,7 @@ import '../services/help_article_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/theme_mode_controller.dart';
 import '../utils/app_navigation.dart';
 
 /// Opens the page, help article or alert that was picked in the search.
@@ -92,6 +93,8 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
   @override
   void initState() {
     super.initState();
+    appThemeMode.addListener(_handleThemeChanged);
+
     _results = _service.quickLinks();
     _focus.addListener(() {
       if (_focus.hasFocus) {
@@ -103,11 +106,18 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
 
   @override
   void dispose() {
+    appThemeMode.removeListener(_handleThemeChanged);
     _entry?.remove();
     _entry = null;
     _controller.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  void _handleThemeChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _entry?.markNeedsBuild();
   }
 
   Future<void> _warmUp() async {
@@ -236,8 +246,6 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
                     style: AppTextStyles.body,
                     textInputAction: TextInputAction.search,
                     onTap: _openDropdown,
-                    // Keep focus while the list is used; the TapRegion above
-                    // closes the list when the user taps somewhere else.
                     onTapOutside: (_) {},
                     onChanged: (_) {
                       _openDropdown();
@@ -483,7 +491,7 @@ class _ResultTile extends StatelessWidget {
                 child: Icon(
                   result.icon,
                   size: 18,
-                  color: AppColors.primaryButton,
+                  color: AppColors.accentGreen,
                 ),
               ),
               const SizedBox(width: 10),

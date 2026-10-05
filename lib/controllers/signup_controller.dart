@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+
 class SignupController extends ChangeNotifier {
   final AuthService _authService = AuthService();
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
   final TextEditingController otpController = TextEditingController();
 
   bool isLoading = false;
@@ -37,17 +39,21 @@ class SignupController extends ChangeNotifier {
       return false;
     }
 
+    if (passwordController.text.length < 8) {
+      errorMessage = 'Password must be at least 8 characters.';
+      notifyListeners();
+      return false;
+    }
+
     if (passwordController.text != confirmPasswordController.text) {
       errorMessage = 'Passwords do not match';
       notifyListeners();
       return false;
     }
 
-
     isLoading = true;
     notifyListeners();
 
-   
     final result = await _authService.signUp(
       name: nameController.text.trim(),
       email: emailController.text.trim(),
@@ -90,15 +96,42 @@ class SignupController extends ChangeNotifier {
 
   Future<bool> resendOtp() async {
     errorMessage = null;
+
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      errorMessage = 'Enter your email address first';
+      notifyListeners();
+      return false;
+    }
+
     isLoading = true;
     notifyListeners();
 
-    final result = await _authService.resendSignupOtp(
-      email: emailController.text.trim(),
-    );
+    final result = await _authService.resendSignupOtp(email: email);
 
     isLoading = false;
-    if (!result.success) errorMessage = result.message;
+    if (result.success) {
+      isOtpStep = true;
+    } else {
+      errorMessage = result.message;
+    }
+
+    notifyListeners();
+    return result.success;
+  }
+
+  Future<bool> signUpWithGoogle() async {
+    errorMessage = null;
+    isLoading = true;
+    notifyListeners();
+
+    final result = await _authService.loginWithGoogle();
+
+    isLoading = false;
+    if (!result.success) {
+      errorMessage = result.message;
+    }
+
     notifyListeners();
     return result.success;
   }

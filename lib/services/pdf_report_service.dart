@@ -42,6 +42,7 @@ class PdfReportService {
     required bool includePhOptimization,
     required bool includeEcOptimization,
     required bool includeAllAnalytics,
+    required bool includeInsightsAndDecisionSupport,
   }) async {
     final document = pw.Document();
     final generatedAt = DateTime.now();
@@ -157,19 +158,20 @@ class PdfReportService {
             ),
             pw.SizedBox(height: 16),
           ],
-          _section(
-            title: 'Insights and Decision Support',
-            description:
-                'Plain-language advice based on the average pH and EC '
-                'compared with the target ranges above.',
-            children: [
-              pw.Text(
-                '${_recommendation(summary, predictionPoints, 'pH', phRange, ecRange)}\n'
-                '${_recommendation(summary, predictionPoints, 'EC', phRange, ecRange)}',
-                style: const pw.TextStyle(fontSize: 10, lineSpacing: 4),
-              ),
-            ],
-          ),
+          if (includeInsightsAndDecisionSupport)
+            _section(
+              title: 'Insights and Decision Support',
+              description:
+                  'Plain-language advice based on the average pH and EC '
+                  'compared with the target ranges above.',
+              children: [
+                pw.Text(
+                  '${_recommendation(summary, predictionPoints, 'pH', phRange, ecRange)}\n'
+                  '${_recommendation(summary, predictionPoints, 'EC', phRange, ecRange)}',
+                  style: const pw.TextStyle(fontSize: 10, lineSpacing: 4),
+                ),
+              ],
+            ),
           if (includeSensorLogs)
             ..._tableSection(
               title: 'Sensor History Logs',
@@ -178,7 +180,6 @@ class PdfReportService {
                   'the status of each day (Stable, Warning or Critical).',
               headers: const [
                 'Date',
-                'Time',
                 'Average pH',
                 'Average EC',
                 'Average Temp',
@@ -186,7 +187,8 @@ class PdfReportService {
               ],
               rows: sensorLogs.map((log) {
                 final row = List<String>.of(log.values);
-                if (row.length > 4) row[4] = formatTempText(row[4]);
+                if (row.length > 1) row.removeAt(1);
+                if (row.length > 3) row[3] = formatTempText(row[3]);
                 return row;
               }).toList(),
               emptyMessage: 'No sensor history records are available.',

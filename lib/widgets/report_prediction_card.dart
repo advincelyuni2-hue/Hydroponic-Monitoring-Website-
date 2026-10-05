@@ -11,6 +11,8 @@ import '../utils/responsive.dart';
 class ReportPredictionCard extends StatelessWidget {
   final ModelEvaluation evaluation;
   final String selectedParameter; // 'Both', 'pH' or 'EC'
+  final int selectedHorizon;
+  final ValueChanged<int> onHorizonChanged;
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<String> onParameterChanged;
@@ -19,6 +21,8 @@ class ReportPredictionCard extends StatelessWidget {
     super.key,
     required this.evaluation,
     required this.selectedParameter,
+    required this.selectedHorizon,
+    required this.onHorizonChanged,
     required this.isLoading,
     required this.errorMessage,
     required this.onParameterChanged,
@@ -94,6 +98,7 @@ class ReportPredictionCard extends StatelessWidget {
 
   Widget _buildHeader(bool isMobile) {
     final accuracy = evaluation.accuracyFor(selectedParameter);
+
     final title = Wrap(
       spacing: 8,
       runSpacing: 4,
@@ -119,19 +124,38 @@ class ReportPredictionCard extends StatelessWidget {
           ),
       ],
     );
-    final controls = _selector(
+
+    final parameterControls = _selector(
       const ['Both', 'pH', 'EC'],
       selectedParameter,
       onParameterChanged,
     );
 
+    final horizonControls = _horizonSelector();
+
     if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [title, const SizedBox(height: 12), controls],
+        children: [
+          title,
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [parameterControls, horizonControls],
+          ),
+        ],
       );
     }
-    return Row(children: [Expanded(child: title), controls]);
+
+    return Row(
+      children: [
+        Expanded(child: title),
+        parameterControls,
+        const SizedBox(width: 8),
+        horizonControls,
+      ],
+    );
   }
 
   Widget _selector(
@@ -166,6 +190,48 @@ class ReportPredictionCard extends StatelessWidget {
                   value,
                   style: AppTextStyles.cardMeta.copyWith(
                     color: selected == value
+                        ? Colors.white
+                        : AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _horizonSelector() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final hours in const [4, 8, 12])
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => onHorizonChanged(hours),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: selectedHorizon == hours
+                      ? AppColors.primaryButton
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${hours}h',
+                  style: AppTextStyles.cardMeta.copyWith(
+                    color: selectedHorizon == hours
                         ? Colors.white
                         : AppColors.textPrimary,
                     fontWeight: FontWeight.w700,

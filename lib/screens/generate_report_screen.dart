@@ -30,6 +30,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         _c.includePhOptimization,
         _c.includeEcOptimization,
         _c.includeAllAnalytics,
+        _c.includeInsightsAndDecisionSupport
       ].join('-');
 
   Future<Uint8List> _buildPreview(PdfPageFormat format) => _c.buildPdfBytes();
@@ -49,8 +50,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
   }
 
   void _snack(String text) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -222,6 +222,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             title: 'All analytics and graphs',
             value: _c.includeAllAnalytics,
             onChanged: _c.toggleAllAnalytics,
+          ),
+          _checkboxTile(
+            title: 'Insights and Decision Support',
+            value: _c.includeInsightsAndDecisionSupport,
+            onChanged: _c.toggleInsightsAndDecisionSupport,
           ),
           if (isMobile) const SizedBox(height: 24) else const Spacer(),
           Row(

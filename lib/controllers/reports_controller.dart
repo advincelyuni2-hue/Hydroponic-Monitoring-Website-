@@ -68,6 +68,17 @@ class ReportsController extends ChangeNotifier {
   List<AnalyticsPoint> phTrendPoints = [];
   List<AnalyticsPoint> ecTrendPoints = [];
   String selectedPredictionParameter = 'Both';
+  int selectedPredictionHorizon = 12;
+
+  void setPredictionHorizon(int hours) {
+    if (![4, 8, 12].contains(hours) || selectedPredictionHorizon == hours) {
+      return;
+    }
+
+    selectedPredictionHorizon = hours;
+    unawaited(loadModelEvaluation());
+  }
+
   bool isTrendLoading = false;
   String? trendError;
 
@@ -98,6 +109,7 @@ class ReportsController extends ChangeNotifier {
   bool includePhOptimization = true;
   bool includeEcOptimization = false;
   bool includeAllAnalytics = false;
+  bool includeInsightsAndDecisionSupport = false;
 
   bool recommendationApplied = false;
   bool recommendationDismissed = false;
@@ -160,6 +172,11 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleInsightsAndDecisionSupport(bool? val) {
+    includeInsightsAndDecisionSupport = val ?? false;
+    notifyListeners();
+  }
+
   void toggleAllAnalytics(bool? val) {
     includeAllAnalytics = val ?? false;
     notifyListeners();
@@ -171,6 +188,7 @@ class ReportsController extends ChangeNotifier {
     includePhOptimization = false;
     includeEcOptimization = false;
     includeAllAnalytics = false;
+    includeInsightsAndDecisionSupport = false;
     notifyListeners();
   }
 
@@ -234,6 +252,7 @@ class ReportsController extends ChangeNotifier {
       includePhOptimization: includePhOptimization,
       includeEcOptimization: includeEcOptimization,
       includeAllAnalytics: includeAllAnalytics,
+      includeInsightsAndDecisionSupport: includeInsightsAndDecisionSupport,
     );
   }
 
@@ -316,11 +335,15 @@ class ReportsController extends ChangeNotifier {
     evaluationError = null;
     notifyListeners();
     try {
-      modelEvaluation = await _evaluationService.evaluate();
+      modelEvaluation = await _evaluationService.evaluate(
+        horizonHours: selectedPredictionHorizon,
+      );
       if (modelEvaluation.samples.isEmpty) {
-        evaluationError = 'No model predictions could be compared yet. Make '
-            'sure the forecast model service is running (FORECAST_API_URL) '
-            'and that there are at least 12 hours of sensor readings.';
+        evaluationError =
+            'No model predictions could be compared yet. Make sure the '
+            'forecast model service is running (FORECAST_API_URL) and that '
+            'it returns valid predictions for the selected '
+            '${selectedPredictionHorizon}h horizon.';
       }
     } catch (error) {
       modelEvaluation = ModelEvaluation.empty;

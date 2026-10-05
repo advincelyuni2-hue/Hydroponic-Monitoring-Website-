@@ -34,7 +34,12 @@ class AlertFrequencyCard extends StatelessWidget {
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+          Text(
+            'Last 30 days',
+            style: AppTextStyles.cardMeta,
+            ),
+            const SizedBox(height: 12),
           SizedBox(
             height: 150,
             child: hasData
