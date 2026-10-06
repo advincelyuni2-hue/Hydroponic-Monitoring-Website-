@@ -20,11 +20,13 @@ class ForecastPoint {
   final double hour;
   final double value;
   final bool isPredicted;
+  final bool isFallback;
 
   ForecastPoint({
     required this.hour,
     required this.value,
     required this.isPredicted,
+    this.isFallback = false,
   });
 }
 

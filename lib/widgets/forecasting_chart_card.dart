@@ -56,10 +56,18 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
 
     final ecPointsResolved = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
         ? allFiltered.where((p) => p.value <= 3.0).toList()
-        : (showEc ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered) : <ForecastPoint>[]);
+        : (showEc
+            ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered)
+            : <ForecastPoint>[]);
 
-    final phRange = _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
-    final ecRange = _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
+    final hasFallbackHistory = [...phFiltered, ...ecPointsResolved].any(
+      (point) => !point.isPredicted && point.isFallback,
+    );
+
+    final phRange =
+        _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
+    final ecRange =
+        _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
 
     late _ChartRange chartRange;
     if (widget.activeTab == 'EC') {
@@ -97,7 +105,9 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           _buildHeader(isMobile),
           const SizedBox(height: 6),
           Text(
-            'Real-time sensor tracking vs. machine-learning forecast trajectory',
+            hasFallbackHistory
+                ? 'Sensor data unavailable: estimated baseline vs. machine-learning forecast'
+                : 'Real-time sensor tracking vs. machine-learning forecast trajectory',
             style: AppTextStyles.cardMeta,
           ),
           SizedBox(height: isMobile ? 12 : 16),
@@ -113,7 +123,9 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                     scrollDirection: Axis.vertical,
                     physics: const BouncingScrollPhysics(),
                     child: SizedBox(
-                      height: widget.activeTab == 'Both' ? 750 : (isDesktop ? 500 : 320),
+                      height: widget.activeTab == 'Both'
+                          ? 750
+                          : (isDesktop ? 500 : 320),
                       width: double.infinity,
                       child: LineChart(
                         _buildChartData(
@@ -134,7 +146,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           ),
 
           const SizedBox(height: 12),
-          _buildLegendAndDate(isMobile),
+          _buildLegendAndDate(isMobile, hasFallbackHistory),
         ],
       ),
     );
@@ -268,9 +280,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: isSelected
-                      ? AppColors.primaryButton
-                      : Colors.transparent,
+                  color:
+                      isSelected ? AppColors.primaryButton : Colors.transparent,
                   width: 2,
                 ),
               ),
@@ -304,8 +315,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             onTap: () => widget.onHoursChanged(h),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
               decoration: BoxDecoration(
                 color:
                     isSelected ? AppColors.primaryButton : Colors.transparent,
@@ -345,12 +355,12 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   }
 
   FlTitlesData _buildTitlesData(_ChartRange range, bool isMobile) {
-    final interval = math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
+    final interval =
+        math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
     final decimals = widget.activeTab == 'EC' ? 2 : 1;
     final centerTime = widget.generatedAt ?? manilaNow();
-    final horizontalInterval = isMobile
-        ? widget.selectedHours.toDouble()
-        : widget.selectedHours / 2;
+    final horizontalInterval =
+        isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
 
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -399,15 +409,23 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  Widget _buildLegendAndDate(bool isMobile) {
+  Widget _buildLegendAndDate(bool isMobile, bool hasFallbackHistory) {
     final legend = Wrap(
       spacing: 18,
       runSpacing: 8,
       children: [
         if (widget.activeTab != 'EC')
-          _legendItem('pH Historical', phHistoricalColor, isDashed: false),
+          _legendItem(
+            hasFallbackHistory ? 'pH Estimated baseline' : 'pH Historical',
+            phHistoricalColor,
+            isDashed: false,
+          ),
         if (widget.activeTab != 'pH')
-          _legendItem('EC Historical', ecHistoricalColor, isDashed: false),
+          _legendItem(
+            hasFallbackHistory ? 'EC Estimated baseline' : 'EC Historical',
+            ecHistoricalColor,
+            isDashed: false,
+          ),
         _legendItem('Predicted (ML)', predictedColor, isDashed: true),
       ],
     );
@@ -522,11 +540,10 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       final matching = pts.where((p) => p.isPredicted == predicted).toList();
       if (matching.isEmpty) return null;
       final point = predicted
-          ? matching.reduce((a, b) =>
-              (a.hour - widget.selectedHours).abs() <=
-                      (b.hour - widget.selectedHours).abs()
-                  ? a
-                  : b)
+          ? matching.reduce((a, b) => (a.hour - widget.selectedHours).abs() <=
+                  (b.hour - widget.selectedHours).abs()
+              ? a
+              : b)
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
       return point.value.toStringAsFixed(2);
     }

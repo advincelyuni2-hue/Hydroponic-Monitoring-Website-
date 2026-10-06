@@ -2,11 +2,13 @@ class ForecastingChartPoint {
   final double hour; // negative past, 0 = current, positive = predicted
   final double value;
   final bool isPredicted;
+  final bool isFallback;
 
   ForecastingChartPoint({
     required this.hour,
     required this.value,
     required this.isPredicted,
+    this.isFallback = false,
   });
 
   factory ForecastingChartPoint.fromJson(Map<String, dynamic> json) {
@@ -14,6 +16,7 @@ class ForecastingChartPoint {
       hour: (json['hour'] as num).toDouble(),
       value: (json['value'] as num).toDouble(),
       isPredicted: json['is_predicted'] ?? false,
+      isFallback: json['is_fallback'] ?? false,
     );
   }
 
@@ -21,6 +24,7 @@ class ForecastingChartPoint {
         'hour': hour,
         'value': value,
         'is_predicted': isPredicted,
+        'is_fallback': isFallback,
       };
 }
 

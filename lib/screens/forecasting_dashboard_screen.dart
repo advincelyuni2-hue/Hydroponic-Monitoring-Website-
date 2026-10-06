@@ -36,6 +36,7 @@ class _ForecastingDashboardScreenState
         hour: (p.hour as num).toDouble(),
         value: (p.value as num).toDouble(),
         isPredicted: p.isPredicted as bool,
+        isFallback: p.isFallback as bool,
       );
     }).toList();
   }
@@ -58,8 +59,7 @@ class _ForecastingDashboardScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!,
-                        style: AppTextStyles.body),
+                    Text(_controller.errorMessage!, style: AppTextStyles.body),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _controller.loadData,
@@ -73,10 +73,8 @@ class _ForecastingDashboardScreenState
             final isDesktop = Responsive.isDesktop(context);
             final isMobile = Responsive.isMobile(context);
 
-            final phPointsMapped =
-                _mapToForecastPoint(_controller.phPoints);
-            final ecPointsMapped =
-                _mapToForecastPoint(_controller.ecPoints);
+            final phPointsMapped = _mapToForecastPoint(_controller.phPoints);
+            final ecPointsMapped = _mapToForecastPoint(_controller.ecPoints);
 
             final insight = _controller.activeInsightDetail;
             final isBothTab = _controller.selectedTab == 'Both';
@@ -109,17 +107,16 @@ class _ForecastingDashboardScreenState
                         showParamSelector: isBothTab,
                         selectedInsightParam:
                             _controller.selectedBothInsightParam,
-                        onInsightParamChanged:
-                            _controller.setBothInsightParam,
+                        onInsightParamChanged: _controller.setBothInsightParam,
                       ),
-                      const SizedBox(height: 16),
-                      ReportIssueCard(
-                        onAlertAdmin: () => showAlertAdminDialog(
-                          context,
-                          source: 'Forecasting screen',
-                        ),
+                    const SizedBox(height: 16),
+                    ReportIssueCard(
+                      onAlertAdmin: () => showAlertAdminDialog(
+                        context,
+                        source: 'Forecasting screen',
                       ),
-                    ] else ...[
+                    ),
+                  ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

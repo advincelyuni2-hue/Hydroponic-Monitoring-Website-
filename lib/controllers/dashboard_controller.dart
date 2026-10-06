@@ -175,6 +175,7 @@ class DashboardController extends ChangeNotifier {
       hour: point.hour,
       value: point.value,
       isPredicted: point.isPredicted,
+      isFallback: point.isFallback,
     );
   }
 

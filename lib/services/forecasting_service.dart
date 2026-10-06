@@ -52,6 +52,13 @@ class ForecastingService {
           ),
         );
       }
+
+      _ensureHistoricalBaseline(
+        chartPoints,
+        selectedHours,
+        baselineVal,
+      );
+
       final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
         'parameter': parameter.toLowerCase(),
         'ph': currentPh.toString(),
@@ -391,10 +398,12 @@ class ForecastingService {
     int hours,
     double baselineVal,
   ) {
+    final points = [...actualPoints];
+    _ensureHistoricalBaseline(points, hours, baselineVal);
     final step = hours / 3.0;
 
     return [
-      ...actualPoints,
+      ...points,
       ForecastingChartPoint(
         hour: step,
         value: baselineVal + 0.1,
@@ -411,5 +420,24 @@ class ForecastingService {
         isPredicted: true,
       ),
     ];
+  }
+
+  void _ensureHistoricalBaseline(
+    List<ForecastingChartPoint> points,
+    int hours,
+    double baselineVal,
+  ) {
+    if (points.any((point) => !point.isPredicted)) return;
+
+    for (var offset = -hours; offset <= 0; offset++) {
+      points.add(
+        ForecastingChartPoint(
+          hour: offset.toDouble(),
+          value: baselineVal,
+          isPredicted: false,
+          isFallback: true,
+        ),
+      );
+    }
   }
 }

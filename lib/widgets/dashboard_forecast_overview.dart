@@ -45,6 +45,9 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     final phRange = _rangeFor(ph, fallback: const _ChartRange(5, 7));
     final ecRange = _rangeFor(ec, fallback: const _ChartRange(1, 2));
     final both = _parameter == 'Both';
+    final hasFallbackHistory = [...ph, ...ec].any(
+      (point) => !point.isPredicted && point.isFallback,
+    );
     final chartRange = both
         ? _rangeFor(
             [...ph, ...ec],
@@ -66,7 +69,9 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
           _buildHeader(isMobile),
           const SizedBox(height: 5),
           Text(
-            'Realtime measurements and machine-learning forecast trajectory',
+            hasFallbackHistory
+                ? 'Sensor data unavailable: estimated baseline and machine-learning forecast'
+                : 'Realtime measurements and machine-learning forecast trajectory',
             style: AppTextStyles.cardMeta,
           ),
           SizedBox(height: isMobile ? 16 : 22),
@@ -193,7 +198,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildLegendAndDate(isMobile),
+          _buildLegendAndDate(isMobile, hasFallbackHistory),
         ],
       ),
     );
@@ -357,20 +362,30 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     );
   }
 
-  Widget _buildLegend() {
+  Widget _buildLegend(bool hasFallbackHistory) {
     return Wrap(
       spacing: 18,
       runSpacing: 8,
       children: [
         if (_parameter != 'EC')
-          _legendItem('pH measured / predicted', _phColor),
+          _legendItem(
+            hasFallbackHistory
+                ? 'pH estimated / predicted'
+                : 'pH measured / predicted',
+            _phColor,
+          ),
         if (_parameter != 'pH')
-          _legendItem('EC measured / predicted', _ecColor),
+          _legendItem(
+            hasFallbackHistory
+                ? 'EC estimated / predicted'
+                : 'EC measured / predicted',
+            _ecColor,
+          ),
       ],
     );
   }
 
-  Widget _buildLegendAndDate(bool isMobile) {
+  Widget _buildLegendAndDate(bool isMobile, bool hasFallbackHistory) {
     final generated = widget.generatedAt == null
         ? null
         : Text(
@@ -378,19 +393,19 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
             style: AppTextStyles.cardMeta,
           );
 
-    if (generated == null) return _buildLegend();
+    if (generated == null) return _buildLegend(hasFallbackHistory);
     if (isMobile) {
       return Wrap(
         spacing: 16,
         runSpacing: 8,
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
-        children: [_buildLegend(), generated],
+        children: [_buildLegend(hasFallbackHistory), generated],
       );
     }
     return Row(
       children: [
-        Expanded(child: _buildLegend()),
+        Expanded(child: _buildLegend(hasFallbackHistory)),
         const SizedBox(width: 16),
         generated,
       ],
