@@ -5,3 +5,4 @@ joblib
 scikit-learn
 supabase
 tensorflow
+pandas

@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/theme_mode_controller.dart';
+import 'apply_fix_dialog.dart';
 
 class SeverityStyle {
   final Color accent;
@@ -418,10 +419,62 @@ class PredictionInsightsCard extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: () => ActionConfirmationDialog.showApplyFix(
+                        context,
+                        onConfirm: onApplyFix,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryButton,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        'Apply fix',
+                        style: AppTextStyles.button.copyWith(fontSize: 14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: OutlinedButton(
+                      onPressed: () => ActionConfirmationDialog.showDismissFix(
+                        context,
+                        onConfirm: onDismiss,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primaryButton),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        'Dismiss',
+                        style: AppTextStyles.button.copyWith(
+                          fontSize: 14,
+                          color: AppColors.primaryButton,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               height: 40,
-              child: ElevatedButton.icon(
+              child: TextButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -432,13 +485,9 @@ class PredictionInsightsCard extends StatelessWidget {
                 icon: const Icon(Icons.notifications_outlined, size: 18),
                 label: Text(
                   'See alerts',
-                  style: AppTextStyles.button.copyWith(fontSize: 14),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryButton,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                  style: AppTextStyles.button.copyWith(
+                    color: AppColors.primaryButton,
+                    fontSize: 14,
                   ),
                 ),
               ),

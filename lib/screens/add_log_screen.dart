@@ -153,8 +153,8 @@ class RecordFixCardState extends State<RecordFixCard> {
       FixEntry(
         parameter: parameter!,
         currentValue: parameter == 'Temperature'
-          ? fromDisplayTemp(double.parse(_currentValueController.text))
-          : double.parse(_currentValueController.text),
+            ? fromDisplayTemp(double.parse(_currentValueController.text))
+            : double.parse(_currentValueController.text),
         actionType: actionType ?? 'Other',
         amount: double.tryParse(_amountController.text) ?? 0.0,
         notes: _notesController.text.trim(),

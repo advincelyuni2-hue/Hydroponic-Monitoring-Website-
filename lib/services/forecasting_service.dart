@@ -24,7 +24,9 @@ class ForecastingService {
 
     try {
       final table = parameter == 'ph' ? 'ph_readings' : 'ec_readings';
-      final cutoff = requestTime.subtract(Duration(hours: selectedHours)).subtract(sensorStoredUtcCorrection);
+      final cutoff = requestTime
+          .subtract(Duration(hours: selectedHours))
+          .subtract(sensorStoredUtcCorrection);
 
       final response = await supabase
           .from(table)
@@ -37,7 +39,9 @@ class ForecastingService {
       final rows = List<Map<String, dynamic>>.from(response).reversed.toList();
 
       for (final row in rows) {
-        final recordedAt = DateTime.parse(row['recorded_at'] as String).toUtc().add(sensorStoredUtcCorrection);
+        final recordedAt = DateTime.parse(row['recorded_at'] as String)
+            .toUtc()
+            .add(sensorStoredUtcCorrection);
         final hoursAgo = recordedAt.difference(requestTime).inSeconds / 3600.0;
 
         chartPoints.add(
@@ -48,7 +52,6 @@ class ForecastingService {
           ),
         );
       }
-
       final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
         'parameter': parameter.toLowerCase(),
         'ph': currentPh.toString(),
@@ -107,9 +110,7 @@ class ForecastingService {
           .gte('created_at', cutoff)
           .limit(1);
 
-      if (actionLog.isNotEmpty) {
-        return 'applied';
-      }
+      if (actionLog.isNotEmpty) return 'applied';
 
       final dismissedLog = await supabase
           .from('dismissed_action_logs')
@@ -118,9 +119,7 @@ class ForecastingService {
           .gte('created_at', cutoff)
           .limit(1);
 
-      if (dismissedLog.isNotEmpty) {
-        return 'dismissed';
-      }
+      if (dismissedLog.isNotEmpty) return 'dismissed';
     } catch (_) {}
     return null;
   }
@@ -134,6 +133,30 @@ class ForecastingService {
     double? predictedEc,
     int horizonHours = 12,
   }) async {
+    final recentIntervention =
+        await checkRecentIntervention(parameter, horizonHours);
+
+    if (recentIntervention != null) {
+      final isPh = parameter == 'ph';
+      final isApplied = recentIntervention == 'applied';
+      return PredictionInsightDetail(
+        statusLabel: isPh ? 'pH Level' : 'EC Level',
+        statusBadge: 'Stable',
+        warningText: isPh
+            ? 'pH levels are stable and within optimal bounds.'
+            : 'EC levels are stable and within safe parameters.',
+        temperature: '${currentTemp.toStringAsFixed(1)} °C',
+        ecLevel: isPh
+            ? '${currentEc.toStringAsFixed(1)} mS/cm'
+            : '${currentPh.toStringAsFixed(1)} pH',
+        calloutText: isApplied
+            ? 'Recent intervention logged: parameter fix applied successfully.'
+            : 'Insight dismissed by operator.',
+        currentPh: isPh ? currentPh : currentEc,
+        targetPh: isPh ? 6.5 : 1.5,
+        suggestedFixes: const ['No recommendation for now'],
+      );
+    }
 
     final insight = runFlutterDSS(
       parameter: parameter,
@@ -184,21 +207,21 @@ class ForecastingService {
         fixes = [
           'Immediate action required: Add appropriate pH-down dosing solution.',
           'Flush or re-balance nutrient solution if pH remains above 8.0.',
-          'Verify sensor calibration before secondary adjustments.'
+          'Verify sensor calibration before secondary adjustments.',
         ];
       } else if (isPhCriticalLow) {
         statusBadge = 'Critical';
         warningText = 'pH level has dropped to a critical low threshold.';
         fixes = [
           'Immediate action required: Add appropriate pH-up solution gradually.',
-          'Check root zone health and re-verify probe reading.'
+          'Check root zone health and re-verify probe reading.',
         ];
       } else if (isPhWarningHigh && isEcWarningLow) {
         statusBadge = 'Warning';
         warningText = 'pH is predicted high while EC is predicted low.';
         fixes = [
           'Correct pH condition using an appropriate pH-down solution.',
-          'Review nutrient concentration before nutrient replenishment.'
+          'Review nutrient concentration before nutrient replenishment.',
         ];
       } else if (isPhWarningHigh) {
         statusBadge = 'Warning';
@@ -208,14 +231,14 @@ class ForecastingService {
         double suggestedMl = (phDiff * 10).clamp(1.0, 15.0);
         fixes = [
           'Apply ${suggestedMl.toStringAsFixed(1)} mL of pH-down solution gradually.',
-          'Verify with sensor measurement after application.'
+          'Verify with sensor measurement after application.',
         ];
       } else if (isPhWarningLow) {
         statusBadge = 'Warning';
         warningText = 'pH is expected to drop below optimal bounds.';
         fixes = [
           'Gradual pH increase using an appropriate pH-up solution.',
-          'Verify through sensor measurement.'
+          'Verify through sensor measurement.',
         ];
       } else {
         statusBadge = 'Stable';
@@ -230,35 +253,35 @@ class ForecastingService {
         fixes = [
           'Immediate action required: Replenish concentrated nutrient solution.',
           'Check stock solution reservoirs and dosing pumps.',
-          'Re-verify pH stability after nutrient dosage.'
+          'Re-verify pH stability after nutrient dosage.',
         ];
       } else if (isEcCriticalHigh) {
         statusBadge = 'Critical';
         warningText = 'EC level is critically high; risk of nutrient burn.';
         fixes = [
           'Immediate action required: Dilute reservoir with fresh water.',
-          'Inspect system for high evaporation rates.'
+          'Inspect system for high evaporation rates.',
         ];
       } else if (isEcWarningLow && isPhWarningHigh) {
         statusBadge = 'Warning';
         warningText = 'EC is predicted low while pH is predicted high.';
         fixes = [
           'Inspect nutrient solution strength and replenish nutrients.',
-          'Reassess pH condition after nutrient replenishment.'
+          'Reassess pH condition after nutrient replenishment.',
         ];
       } else if (isEcWarningHigh) {
         statusBadge = 'Warning';
         warningText = 'EC level is predicted above ideal concentration.';
         fixes = [
           'Dilute solution with fresh water to normalize EC concentration.',
-          'Verify EC through sensor measurement.'
+          'Verify EC through sensor measurement.',
         ];
       } else if (isEcWarningLow) {
         statusBadge = 'Warning';
         warningText = 'EC level is expected to drop below ideal concentration.';
         fixes = [
           'Inspect nutrient solution strength.',
-          'Replenish nutrients according to standard procedure.'
+          'Replenish nutrients according to standard procedure.',
         ];
       } else {
         statusBadge = 'Stable';

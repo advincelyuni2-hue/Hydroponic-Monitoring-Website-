@@ -157,7 +157,7 @@ class AppHeader extends StatelessWidget {
         ] else ...[
           _iconCircle(
             Icons.search,
-            () => showMobileSearchSheet(context),
+            () => _openMobileSearch(context),
             size: iconSize,
           ),
           const SizedBox(width: 8),
@@ -243,6 +243,10 @@ class AppHeader extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  void _openMobileSearch(BuildContext context) {
+    showMobileSearchSheet(context);
   }
 
   Widget _iconCircle(IconData icon, VoidCallback onTap, {double size = 40}) {
