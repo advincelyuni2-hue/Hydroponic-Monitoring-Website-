@@ -1,0 +1,43 @@
+{
+  "features": [
+    "ph",
+    "ec",
+    "temp",
+    "std_ph",
+    "std_ec",
+    "std_temp",
+    "ph_spread",
+    "ec_spread",
+    "ph_d_1h",
+    "ec_d_1h",
+    "temp_d_1h",
+    "ph_d_6h",
+    "ec_d_6h",
+    "temp_d_6h",
+    "ph_std_1h",
+    "ec_std_1h",
+    "ec_trend_ratio",
+    "hour_sin",
+    "hour_cos",
+    "intervention",
+    "steps_since_intervention"
+  ],
+  "seq_len": 96,
+  "stride": 3,
+  "horizons": {
+    "4h": 48,
+    "8h": 96,
+    "12h": 144
+  },
+  "ec_unit": "mS/cm",
+  "ph_stable": [
+    5.5,
+    6.5
+  ],
+  "ec_stable": [
+    1.2,
+    1.8
+  ],
+  "feature_clip": 5.0,
+  "local_utc_offset_h": 8
+}

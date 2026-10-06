@@ -1,34 +1,38 @@
 import os
-from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
+import json
+import traceback
 import joblib
 import numpy as np
-from supabase import create_client, Client
+import pandas as pd
+from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
+from supabase import create_client, Client
 
-app = FastAPI(title="Hydroponics Delta-LSTM Forecasting API")
+@tf.keras.utils.register_keras_serializable()
+def se_block(x, reduction=4):
+    ch = x.shape[-1]
+    s = tf.keras.layers.GlobalAveragePooling1D()(x)
+    s = tf.keras.layers.Dense(max(ch // reduction, 4), activation="relu")(s)
+    s = tf.keras.layers.Dense(ch, activation="sigmoid")(s)
+    s = tf.keras.layers.Reshape((1, ch))(s)
+    return tf.keras.layers.Multiply()([x, s])
 
-allowed_origins = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ORIGINS", "http://localhost,http://127.0.0.1"
-    ).split(",")
-    if origin.strip()
-]
+app = FastAPI(title="Hydroponics Delta-LSTM Multi-Horizon Forecasting API")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=False,
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Use the same project selected by the Flutter app; never commit credentials.
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv(
     "SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_ANON_KEY", "")
 )
+
 supabase: Client | None = (
     create_client(SUPABASE_URL, SUPABASE_KEY)
     if SUPABASE_URL and SUPABASE_KEY
@@ -37,154 +41,212 @@ supabase: Client | None = (
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load models and scalers
+# Load Config & Artifacts
+with open(os.path.join(BASE_DIR, "model_config.json"), "r") as f:
+    model_config = json.load(f)
+
 ph_model = tf.keras.models.load_model(
-    os.path.join(BASE_DIR, "ph_lstm_model.h5"), compile=False
+    os.path.join(BASE_DIR, "ph_forecaster.keras"),
+    custom_objects={"se_block": se_block},
+    compile=False
 )
 ec_model = tf.keras.models.load_model(
-    os.path.join(BASE_DIR, "ec_lstm_model.h5"), compile=False
+    os.path.join(BASE_DIR, "ec_forecaster.keras"),
+    custom_objects={"se_block": se_block},
+    compile=False
 )
 
-kmeans_model = joblib.load(os.path.join(BASE_DIR, "kmeans_model.joblib"))
-scaler_lstm = joblib.load(os.path.join(BASE_DIR, "scaler_lstm.joblib"))
-scaler_ph_delta = joblib.load(os.path.join(BASE_DIR, "scaler_ph_delta.joblib"))
-scaler_ec_delta = joblib.load(os.path.join(BASE_DIR, "scaler_ec_delta.joblib"))
-scaler_kmeans = joblib.load(os.path.join(BASE_DIR, "scaler_kmeans.joblib"))
+feature_scaler = joblib.load(os.path.join(BASE_DIR, "feature_scaler.joblib"))
+ph_delta_scaler = joblib.load(os.path.join(BASE_DIR, "ph_delta_scaler.joblib"))
+ec_delta_scaler = joblib.load(os.path.join(BASE_DIR, "ec_delta_scaler.joblib"))
 
 
-def fetch_historical_sequence():
-    """Build a chronological 24-step sequence from the sensor reading tables."""
-    try:
-        if supabase is None:
-            raise RuntimeError("Supabase environment variables are not configured")
+def get_resilient_sequence(live_ph: float, live_ec: float, live_temp: float) -> pd.DataFrame:
+    """Builds a guaranteed 96-step 15-min downsampled DataFrame, filling missing historical points seamlessly."""
+    end_time = pd.Timestamp.now(tz="UTC")
+    times = pd.date_range(end=end_time, periods=96, freq="15min")
+    
+    df = pd.DataFrame(index=times)
+    df["ph"] = live_ph
+    df["ec"] = live_ec
+    df["temp"] = live_temp
 
-        def values(table: str, fallback: float):
-            response = (
-                supabase.from_(table)
+    if supabase is None:
+        return df
+
+    def fetch_records(table_name: str, col_name: str):
+        try:
+            res = (
+                supabase.from_(table_name)
                 .select("value, recorded_at")
                 .eq("is_average", False)
                 .order("recorded_at", desc=True)
-                .limit(24)
+                .limit(288)
                 .execute()
             )
-            result = [float(row["value"]) for row in reversed(response.data or [])]
-            if not result:
-                return [fallback] * 24
-            return [result[0]] * (24 - len(result)) + result[-24:]
+            data = res.data or []
+            if not data:
+                return None
+            sub_df = pd.DataFrame(data)
+            sub_df["recorded_at"] = pd.to_datetime(sub_df["recorded_at"], utc=True)
+            sub_df[col_name] = sub_df["value"].astype(float)
+            return sub_df[["recorded_at", col_name]].sort_values("recorded_at").set_index("recorded_at")
+        except Exception:
+            return None
 
-        ph_values = values("ph_readings", 6.5)
-        ec_values = values("ec_readings", 1.5)
-        temp_values = values("temp_readings", 24.0)
-        return np.array(
-            [
-                [ph_values[i], ec_values[i] * 500.0, temp_values[i]]
-                for i in range(24)
-            ]
-        )
+    ph_df = fetch_records("ph_readings", "ph")
+    ec_df = fetch_records("ec_readings", "ec")
+    temp_df = fetch_records("temp_readings", "temp")
 
-    except Exception as e:
-        print(f"Error fetching sensor sequence: {e}")
-        return np.tile([6.5, 750.0, 24.0], (24, 1))
+    if ph_df is not None and not ph_df.empty:
+        df["ph"] = ph_df["ph"].reindex(df.index, method="nearest").fillna(live_ph)
+    if ec_df is not None and not ec_df.empty:
+        df["ec"] = ec_df["ec"].reindex(df.index, method="nearest").fillna(live_ec)
+    if temp_df is not None and not temp_df.empty:
+        df["temp"] = temp_df["temp"].reindex(df.index, method="nearest").fillna(live_temp)
+
+    # Set current live values at t0
+    df.iloc[-1, df.columns.get_loc("ph")] = live_ph
+    df.iloc[-1, df.columns.get_loc("ec")] = live_ec
+    df.iloc[-1, df.columns.get_loc("temp")] = live_temp
+
+    return df
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "supabase_configured": supabase is not None}
-        
+def compute_21_features(df: pd.DataFrame) -> np.ndarray:
+    """Computes exact 21 features in the exact column order specified by model_config.json."""
+    f = pd.DataFrame(index=df.index)
+    f["ph"] = df["ph"]
+    f["ec"] = df["ec"]
+    f["temp"] = df["temp"]
+
+    f["std_ph"] = df["ph"].rolling(12, min_periods=1).std().fillna(0.0)
+    f["std_ec"] = df["ec"].rolling(12, min_periods=1).std().fillna(0.0)
+    f["std_temp"] = df["temp"].rolling(12, min_periods=1).std().fillna(0.0)
+
+    f["ph_spread"] = 0.0
+    f["ec_spread"] = 0.0
+
+    for lag, name in [(12, "1h"), (72, "6h")]:
+        f[f"ph_d_{name}"] = df["ph"] - df["ph"].shift(lag).bfill()
+        f[f"ec_d_{name}"] = df["ec"] - df["ec"].shift(lag).bfill()
+        f[f"temp_d_{name}"] = df["temp"] - df["temp"].shift(lag).bfill()
+
+    f["ph_std_1h"] = df["ph"].rolling(12, min_periods=1).std().fillna(0.0)
+    f["ec_std_1h"] = df["ec"].rolling(12, min_periods=1).std().fillna(0.0)
+    f["ec_trend_ratio"] = df["ec"].rolling(12, min_periods=1).mean() / (
+        df["ec"].rolling(72, min_periods=1).mean() + 1e-6
+    )
+
+    local_offset = model_config.get("local_utc_offset_h", 8)
+    local_time = df.index + pd.to_timedelta(local_offset, unit="h")
+    hrs = np.array([t.hour for t in local_time])
+    mins = np.array([t.minute for t in local_time])
+    hours = hrs + mins / 60.0
+    f["hour_sin"] = np.sin(2 * np.pi * hours / 24.0)
+    f["hour_cos"] = np.cos(2 * np.pi * hours / 24.0)
+
+    dph = df["ph"].diff().abs().fillna(0.0)
+    dec = df["ec"].diff().abs().fillna(0.0)
+    iv = ((dph > 0.5) | (dec > 0.1)).astype(float)
+    f["intervention"] = iv.rolling(3, min_periods=1).max()
+
+    pos = np.arange(len(df), dtype=float)
+    last = pd.Series(np.where(iv.values == 1.0, pos, np.nan)).ffill().values
+    since = np.where(np.isnan(last), 288.0, np.minimum(pos - last, 288.0))
+    f["steps_since_intervention"] = since / 288.0
+
+    expected_cols = model_config["features"]
+    return f[expected_cols].values.astype(np.float32)
+
+
 @app.get("/api/predict/forecast")
 def predict_forecast(
     parameter: str = Query("ph", description="ph or ec"),
-    ph: float = Query(6.5),
-    ec: float = Query(1.5),
-    temp: float = Query(24.0),
-    horizon: int = Query(12, description="Active UI horizon: 4, 8, or 12"),
+    ph: float = Query(...),
+    ec: float = Query(...),
+    temp: float = Query(...),
+    horizon: int = Query(12, description="4, 8, or 12 hours"),
 ):
     try:
         is_ph = parameter.lower() == "ph"
         model = ph_model if is_ph else ec_model
-        scaler_delta = scaler_ph_delta if is_ph else scaler_ec_delta
+        delta_scaler = ph_delta_scaler if is_ph else ec_delta_scaler
         base_val = ph if is_ph else ec
 
-        # 1. Fetch real 24-step historical sequence matrix from Supabase
-        raw_sequence = fetch_historical_sequence()  # Shape: (24, 3)
+        # 1. Fetch guaranteed 96-step sequence
+        grid_df = get_resilient_sequence(ph, ec, temp)
 
-        # Update the final sequence entry with the active live parameters
-        raw_sequence[-1] = [ph, ec * 500.0, temp]
+        # 2. Compute 21 input features
+        feature_matrix = compute_21_features(grid_df)
 
-        # 2. Add Velocity feature diff(1) in column 3
-        padded_seq = np.zeros((24, 8))
-        padded_seq[:, :3] = raw_sequence
-        padded_seq[1:, 3] = raw_sequence[1:, 0] - raw_sequence[:-1, 0]
+        # 3. Transform & Clip Features
+        scaled_features = feature_scaler.transform(feature_matrix)
+        feature_clip = model_config.get("feature_clip", 5.0)
+        clipped_features = np.clip(scaled_features, -feature_clip, feature_clip)
 
-        # 3. Scale input sequence
-        scaled_seq = scaler_lstm.transform(padded_seq)
+        # 4. Reshape for Keras Model: (1 sample, 96 timesteps, 21 features)
+        model_input = np.expand_dims(clipped_features, axis=0)
 
-        # 4. Reshape for LSTM: (1 sample, 24 timesteps, 8 features)
-        lstm_input = np.expand_dims(scaled_seq, axis=0)
-
-        # 5. Model Inference -> Generates [4h Delta, 8h Delta, 12h Delta]
-        scaled_deltas = model.predict(lstm_input)
-
-        if hasattr(scaler_delta, "inverse_transform"):
-            unscaled_deltas = scaler_delta.inverse_transform(scaled_deltas)[0]
+        # 5. Model Inference (handles both dict and list return types)
+        preds = model.predict(model_input, verbose=0)
+        
+        if isinstance(preds, dict):
+            reg_output = preds["reg_output"]
+            state_output = preds["state_output"]
+        elif isinstance(preds, list):
+            reg_output = preds[0]
+            state_output = preds[1]
         else:
-            unscaled_deltas = scaled_deltas[0]
+            reg_output = preds
+            state_output = np.array([[1.0, 0.0, 0.0]])
+
+        # Inverse transform multi-horizon deltas (4h, 8h, 12h)
+        unscaled_deltas = delta_scaler.inverse_transform(reg_output)[0]
 
         delta_4h = float(unscaled_deltas[0])
         delta_8h = float(unscaled_deltas[1])
         delta_12h = float(unscaled_deltas[2])
 
-        # Convert PPM delta back to mS/cm if parameter is EC
-        if not is_ph:
-            delta_4h /= 500.0
-            delta_8h /= 500.0
-            delta_12h /= 500.0
-
         val_4h = base_val + delta_4h
         val_8h = base_val + delta_8h
         val_12h = base_val + delta_12h
 
-        # 6. Return dynamic trajectory mapped to selected UI pill horizon
+        # 6. Build UI Trajectory Points
         if horizon == 4:
             predictions = [
-                {"hour": 1.3, "value": round(base_val + (delta_4h * 0.33), 2)},
-                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2)},
-                {"hour": 4.0, "value": round(val_4h, 2)},
+                {"hour": 1.3, "value": round(base_val + (delta_4h * 0.33), 2), "is_predicted": True},
+                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
+                {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
             ]
         elif horizon == 8:
             predictions = [
-                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2)},
-                {"hour": 5.3, "value": round(val_4h, 2)},
-                {"hour": 8.0, "value": round(val_8h, 2)},
+                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
+                {"hour": 5.3, "value": round(val_4h, 2), "is_predicted": True},
+                {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
             ]
-        else:  # 12h horizon -> Displays all 3 model outputs
+        else:
             predictions = [
-                {"hour": 4.0, "value": round(val_4h, 2)},
-                {"hour": 8.0, "value": round(val_8h, 2)},
-                {"hour": 12.0, "value": round(val_12h, 2)},
+                {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
+                {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
+                {"hour": 12.0, "value": round(val_12h, 2), "is_predicted": True},
             ]
 
-        raw_features = np.array([[ph, ec, temp]])
-        scaled_kmeans_features = scaler_kmeans.transform(raw_features)
-        cluster_id = int(kmeans_model.predict(scaled_kmeans_features)[0])
+        state_idx = int(np.argmax(state_output[0]))
+        state_labels = ["Stable", "Warning", "Critical"]
+        predicted_state = state_labels[state_idx]
 
         return {
             "parameter": parameter,
             "horizon": horizon,
             "predictions": predictions,
-            "cluster_id": cluster_id,
+            "predicted_state": predicted_state,
+            "val_4h": round(val_4h, 3),
+            "val_8h": round(val_8h, 3),
+            "val_12h": round(val_12h, 3),
         }
 
     except Exception as e:
-        base_val = ph if parameter.lower() == "ph" else ec
-        step = horizon / 3.0
-        return {
-            "parameter": parameter,
-            "horizon": horizon,
-            "predictions": [
-                {"hour": round(step, 1), "value": round(base_val + 0.1, 2)},
-                {"hour": round(step * 2, 1), "value": round(base_val + 0.2, 2)},
-                {"hour": float(horizon), "value": round(base_val + 0.3, 2)},
-            ],
-            "error_fallback": str(e),
-        }
+        print("--- FORECASTING INFERENCE ERROR TRACEBACK ---")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

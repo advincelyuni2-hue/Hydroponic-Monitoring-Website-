@@ -12,79 +12,75 @@ class ForecastingService {
   Future<List<ForecastingChartPoint>> getForecastChartData(
     String parameter, {
     required int selectedHours,
-    double currentPh = 6.5,
-    double currentEc = 1.5,
-    double currentTemp = 24.0,
+    required double currentPh,
+    required double currentEc,
+    required double currentTemp,
   }) async {
-    try {
-      final String table =
-          parameter == 'ph' ? 'ph_readings' : 'ec_readings';
-      final response = await supabase
-          .from(table)
-          .select('value, recorded_at')
-          .eq('is_average', false)
-          .order('recorded_at', ascending: false)
-          .limit(12);
+    final String table = parameter == 'ph' ? 'ph_readings' : 'ec_readings';
+    
+    // Fetch real historical points from Supabase
+    final response = await supabase
+        .from(table)
+        .select('value, recorded_at')
+        .eq('is_average', false)
+        .order('recorded_at', ascending: false)
+        .limit(12);
 
-      List<ForecastingChartPoint> chartPoints = [];
-      if (response.isNotEmpty) {
-        final rows =
-            List<Map<String, dynamic>>.from(response).reversed.toList();
-        for (int i = 0; i < rows.length; i++) {
-          double hoursAgo = (i - (rows.length - 1)).toDouble();
-          chartPoints.add(
-            ForecastingChartPoint(
-              hour: hoursAgo,
-              value: (rows[i]['value'] as num).toDouble(),
-              isPredicted: false,
-            ),
-          );
-        }
+    List<ForecastingChartPoint> chartPoints = [];
+
+    if (response.isNotEmpty) {
+      final rows = List<Map<String, dynamic>>.from(response).reversed.toList();
+      for (int i = 0; i < rows.length; i++) {
+        double hoursAgo = (i - (rows.length - 1)).toDouble();
+        chartPoints.add(
+          ForecastingChartPoint(
+            hour: hoursAgo,
+            value: (rows[i]['value'] as num).toDouble(),
+            isPredicted: false,
+          ),
+        );
       }
-
-      final double baselineVal = parameter == 'ph' ? currentPh : currentEc;
-      final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
-        'parameter': parameter.toLowerCase(),
-        'ph': currentPh.toString(),
-        'ec': currentEc.toString(),
-        'temp': currentTemp.toString(),
-        'horizon': selectedHours.toString(),
-      });
-
-      final apiResponse = await http.get(uri).timeout(
-            const Duration(seconds: 10),
-          );
-
-      if (apiResponse.statusCode == 200) {
-        final data = json.decode(apiResponse.body);
-        final List predictions = data['predictions'];
-        for (var pred in predictions) {
-          chartPoints.add(
-            ForecastingChartPoint(
-              hour: (pred['hour'] as num).toDouble(),
-              value: (pred['value'] as num).toDouble(),
-              isPredicted: true,
-            ),
-          );
-        }
-        return chartPoints;
-      } else {
-        return _getFallbackChartData(parameter, selectedHours, baselineVal);
-      }
-    } catch (e) {
-      final double baselineVal = parameter == 'ph' ? currentPh : currentEc;
-      return _getFallbackChartData(parameter, selectedHours, baselineVal);
     }
+
+    // Call ML Backend for Multi-Horizon Predictions
+    final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
+      'parameter': parameter.toLowerCase(),
+      'ph': currentPh.toString(),
+      'ec': currentEc.toString(),
+      'temp': currentTemp.toString(),
+      'horizon': selectedHours.toString(),
+    });
+
+    final apiResponse = await http.get(uri).timeout(
+      const Duration(seconds: 10),
+    );
+
+    if (apiResponse.statusCode == 200) {
+      final data = json.decode(apiResponse.body);
+      final List predictions = data['predictions'];
+      for (var pred in predictions) {
+        chartPoints.add(
+          ForecastingChartPoint(
+            hour: (pred['hour'] as num).toDouble(),
+            value: (pred['value'] as num).toDouble(),
+            isPredicted: true,
+          ),
+        );
+      }
+    } else {
+throw Exception('Backend API Error: ${apiResponse.body}');
+    }
+
+    return chartPoints;
   }
 
-  /// Checks if an intervention was applied or dismissed recently
   Future<String?> checkRecentIntervention(String parameter, int horizonHours) async {
     try {
       final cutoff = DateTime.now()
           .toUtc()
           .subtract(Duration(hours: horizonHours))
           .toIso8601String();
-
+          
       final actionLog = await supabase
           .from('action_logs')
           .select('id, created_at')
@@ -92,9 +88,7 @@ class ForecastingService {
           .gte('created_at', cutoff)
           .limit(1);
 
-      if (actionLog.isNotEmpty) {
-        return 'applied';
-      }
+      if (actionLog.isNotEmpty) return 'applied';
 
       final dismissedLog = await supabase
           .from('dismissed_action_logs')
@@ -103,30 +97,25 @@ class ForecastingService {
           .gte('created_at', cutoff)
           .limit(1);
 
-      if (dismissedLog.isNotEmpty) {
-        return 'dismissed';
-      }
+      if (dismissedLog.isNotEmpty) return 'dismissed';
     } catch (_) {}
     return null;
   }
 
   Future<PredictionInsightDetail> getPredictionInsight(
     String parameter, {
-    double currentPh = 6.5,
-    double currentEc = 1.5,
-    double currentTemp = 24.0,
+    required double currentPh,
+    required double currentEc,
+    required double currentTemp,
     double? predictedPh,
     double? predictedEc,
     int horizonHours = 12,
   }) async {
-    // Check if an intervention was already logged in Supabase
-    final recentIntervention =
-        await checkRecentIntervention(parameter, horizonHours);
+    final recentIntervention = await checkRecentIntervention(parameter, horizonHours);
 
     if (recentIntervention != null) {
       final isPh = parameter == 'ph';
       final isApplied = recentIntervention == 'applied';
-
       return PredictionInsightDetail(
         statusLabel: isPh ? 'pH Level' : 'EC Level',
         statusBadge: 'Stable',
@@ -189,26 +178,25 @@ class ForecastingService {
     if (isPh) {
       if (isPhCriticalHigh || (isPhWarningHigh && isEcCriticalLow)) {
         statusBadge = 'Critical';
-        warningText =
-            'pH level is critically elevated outside safe operating limits.';
+        warningText = 'pH level is critically elevated outside safe operating limits.';
         fixes = [
           'Immediate action required: Add appropriate pH-down dosing solution.',
           'Flush or re-balance nutrient solution if pH remains above 8.0.',
-          'Verify sensor calibration before secondary adjustments.'
+          'Verify sensor calibration before secondary adjustments.',
         ];
       } else if (isPhCriticalLow) {
         statusBadge = 'Critical';
         warningText = 'pH level has dropped to a critical low threshold.';
         fixes = [
           'Immediate action required: Add appropriate pH-up solution gradually.',
-          'Check root zone health and re-verify probe reading.'
+          'Check root zone health and re-verify probe reading.',
         ];
       } else if (isPhWarningHigh && isEcWarningLow) {
         statusBadge = 'Warning';
         warningText = 'pH is predicted high while EC is predicted low.';
         fixes = [
           'Correct pH condition using an appropriate pH-down solution.',
-          'Review nutrient concentration before nutrient replenishment.'
+          'Review nutrient concentration before nutrient replenishment.',
         ];
       } else if (isPhWarningHigh) {
         statusBadge = 'Warning';
@@ -217,14 +205,14 @@ class ForecastingService {
         double suggestedMl = (phDiff * 10).clamp(1.0, 15.0);
         fixes = [
           'Apply ${suggestedMl.toStringAsFixed(1)} mL of pH-down solution gradually.',
-          'Verify with sensor measurement after application.'
+          'Verify with sensor measurement after application.',
         ];
       } else if (isPhWarningLow) {
         statusBadge = 'Warning';
         warningText = 'pH is expected to drop below optimal bounds.';
         fixes = [
           'Gradual pH increase using an appropriate pH-up solution.',
-          'Verify through sensor measurement.'
+          'Verify through sensor measurement.',
         ];
       } else {
         statusBadge = 'Stable';
@@ -234,41 +222,39 @@ class ForecastingService {
     } else {
       if (isEcCriticalLow || (isEcWarningLow && isPhCriticalHigh)) {
         statusBadge = 'Critical';
-        warningText =
-            'EC level is critically low; severe nutrient depletion detected.';
+        warningText = 'EC level is critically low; severe nutrient depletion detected.';
         fixes = [
           'Immediate action required: Replenish concentrated nutrient solution.',
           'Check stock solution reservoirs and dosing pumps.',
-          'Re-verify pH stability after nutrient dosage.'
+          'Re-verify pH stability after nutrient dosage.',
         ];
       } else if (isEcCriticalHigh) {
         statusBadge = 'Critical';
         warningText = 'EC level is critically high; risk of nutrient burn.';
         fixes = [
           'Immediate action required: Dilute reservoir with fresh water.',
-          'Inspect system for high evaporation rates.'
+          'Inspect system for high evaporation rates.',
         ];
       } else if (isEcWarningLow && isPhWarningHigh) {
         statusBadge = 'Warning';
         warningText = 'EC is predicted low while pH is predicted high.';
         fixes = [
           'Inspect nutrient solution strength and replenish nutrients.',
-          'Reassess pH condition after nutrient replenishment.'
+          'Reassess pH condition after nutrient replenishment.',
         ];
       } else if (isEcWarningHigh) {
         statusBadge = 'Warning';
         warningText = 'EC level is predicted above ideal concentration.';
         fixes = [
           'Dilute solution with fresh water to normalize EC concentration.',
-          'Verify EC through sensor measurement.'
+          'Verify EC through sensor measurement.',
         ];
       } else if (isEcWarningLow) {
         statusBadge = 'Warning';
-        warningText =
-            'EC level is expected to drop below ideal concentration.';
+        warningText = 'EC level is expected to drop below ideal concentration.';
         fixes = [
           'Inspect nutrient solution strength.',
-          'Replenish nutrients according to standard procedure.'
+          'Replenish nutrients according to standard procedure.',
         ];
       } else {
         statusBadge = 'Stable';
@@ -278,18 +264,14 @@ class ForecastingService {
     }
 
     String calloutText = '';
-    if (currentTemp > 25.0 && (isPhCriticalHigh || isPhWarningHigh)) {
-      calloutText =
-          'High temperature (${currentTemp.toStringAsFixed(1)} °C) is accelerating chemical drift, pushing pH higher.';
-    } else if (currentTemp > 25.0 && (isEcCriticalHigh || isEcWarningHigh)) {
-      calloutText =
-          'High temperature (${currentTemp.toStringAsFixed(1)} °C) is increasing evaporation rates, raising EC concentration.';
+    if (currentTemp >= 25.0 && (isPhCriticalHigh || isPhWarningHigh)) {
+      calloutText = 'High temperature (${currentTemp.toStringAsFixed(1)} °C) is accelerating chemical drift, pushing pH higher.';
+    } else if (currentTemp >= 25.0 && (isEcCriticalHigh || isEcWarningHigh)) {
+      calloutText = 'High temperature (${currentTemp.toStringAsFixed(1)} °C) is increasing evaporation rates, raising EC concentration.';
     } else if (isEcCriticalLow || isEcWarningLow) {
-      calloutText =
-          'Active root uptake of mineral salts has depleted EC below optimal levels.';
+      calloutText = 'Active root uptake of mineral salts has depleted EC below optimal levels.';
     } else {
-      calloutText =
-          'Parameters are operating within balanced environmental thresholds.';
+      calloutText = 'Parameters are operating within balanced environmental thresholds.';
     }
 
     return PredictionInsightDetail(
@@ -297,9 +279,7 @@ class ForecastingService {
       statusBadge: statusBadge,
       warningText: warningText,
       temperature: '${currentTemp.toStringAsFixed(1)} °C',
-      ecLevel: isPh
-          ? '${currentEc.toStringAsFixed(1)} mS/cm'
-          : '${currentPh.toStringAsFixed(1)} pH',
+      ecLevel: isPh ? '${currentEc.toStringAsFixed(1)} mS/cm' : '${currentPh.toStringAsFixed(1)} pH',
       calloutText: calloutText,
       currentPh: isPh ? currentPh : currentEc,
       targetPh: isPh ? targetPh : targetEc,
@@ -371,22 +351,5 @@ class ForecastingService {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {}
-  }
-
-  List<ForecastingChartPoint> _getFallbackChartData(
-      String parameter, int hours, double baselineVal) {
-    double base = baselineVal;
-    double step = hours / 3.0;
-    return [
-      ForecastingChartPoint(
-          hour: -hours.toDouble(), value: base, isPredicted: false),
-      ForecastingChartPoint(hour: 0, value: base, isPredicted: false),
-      ForecastingChartPoint(
-          hour: step, value: base + 0.1, isPredicted: true),
-      ForecastingChartPoint(
-          hour: step * 2, value: base + 0.2, isPredicted: true),
-      ForecastingChartPoint(
-          hour: hours.toDouble(), value: base + 0.3, isPredicted: true),
-    ];
   }
 }
