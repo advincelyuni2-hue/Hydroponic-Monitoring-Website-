@@ -27,14 +27,40 @@ class SignupController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isAllowedSignupName(String name) {
+    return RegExp(
+      r"^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’ -][A-Za-zÀ-ÖØ-öø-ÿ]+)*$",
+    ).hasMatch(name.trim());
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.trim());
+  }
+
   Future<bool> createAccount() async {
     errorMessage = null;
 
-    if (nameController.text.trim().isEmpty ||
-        emailController.text.trim().isEmpty ||
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+
+    if (name.isEmpty ||
+        email.isEmpty ||
         passwordController.text.isEmpty ||
         confirmPasswordController.text.isEmpty) {
       errorMessage = 'Please fill in all fields';
+      notifyListeners();
+      return false;
+    }
+
+    if (!_isAllowedSignupName(name)) {
+      errorMessage =
+          'Name can use letters, spaces, apostrophes, and hyphens only.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!_isValidEmail(email)) {
+      errorMessage = 'Enter a valid email address.';
       notifyListeners();
       return false;
     }
@@ -55,8 +81,8 @@ class SignupController extends ChangeNotifier {
     notifyListeners();
 
     final result = await _authService.signUp(
-      name: nameController.text.trim(),
-      email: emailController.text.trim(),
+      name: name,
+      email: email,
       password: passwordController.text,
     );
 
