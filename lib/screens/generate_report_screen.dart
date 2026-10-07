@@ -6,12 +6,13 @@ import '../controllers/reports_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/manila_time.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
+import '../widgets/custom_calendar_popup.dart';
 
 class GenerateReportScreen extends StatefulWidget {
   final ReportsController controller;
-
   const GenerateReportScreen({super.key, required this.controller});
 
   @override
@@ -20,20 +21,72 @@ class GenerateReportScreen extends StatefulWidget {
 
 class GenerateReportScreenState extends State<GenerateReportScreen> {
   bool isGenerating = false;
+  DateTime selectedDate = DateTime.now();
 
   ReportsController get _c => widget.controller;
 
-  /// Changes whenever a checkbox changes, which rebuilds the preview.
+  bool get isAllSelected =>
+      _c.includeSensorLogs &&
+      _c.includeCalibrationLogs &&
+      _c.includePhOptimization &&
+      _c.includeEcOptimization &&
+      _c.includeAllAnalytics &&
+      _c.includeInsightsAndDecisionSupport;
+
   String get _previewKey => [
         _c.includeSensorLogs,
         _c.includeCalibrationLogs,
         _c.includePhOptimization,
         _c.includeEcOptimization,
         _c.includeAllAnalytics,
-        _c.includeInsightsAndDecisionSupport
+        _c.includeInsightsAndDecisionSupport,
+        selectedDate.toIso8601String(),
       ].join('-');
 
-  Future<Uint8List> _buildPreview(PdfPageFormat format) => _c.buildPdfBytes();
+  Future<Uint8List> buildPreview(PdfPageFormat format) => _c.buildPdfBytes();
+
+  void _toggleSelectAll() {
+    final newValue = !isAllSelected;
+    setState(() {
+      if (_c.includeSensorLogs != newValue) _c.toggleSensorLogs(newValue);
+      if (_c.includeCalibrationLogs != newValue) {
+        _c.toggleCalibrationLogs(newValue);
+      }
+      if (_c.includePhOptimization != newValue) {
+        _c.togglePhOptimization(newValue);
+      }
+      if (_c.includeEcOptimization != newValue) {
+        _c.toggleEcOptimization(newValue);
+      }
+      if (_c.includeAllAnalytics != newValue) _c.toggleAllAnalytics(newValue);
+      if (_c.includeInsightsAndDecisionSupport != newValue) {
+        _c.toggleInsightsAndDecisionSupport(newValue);
+      }
+    });
+  }
+
+  void _openCalendarPopup() {
+    showDialog(
+      context: context,
+      builder: (context) => CustomCalendarPopup(
+        mode: CalendarMode.daily,
+        initialDate: selectedDate,
+        onDateSelected: (date, _) {
+          setState(() {
+            selectedDate = date;
+          });
+        },
+      ),
+    );
+  }
+
+  String _formatDateLabel(DateTime date) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
 
   Future<void> onGeneratePdf() async {
     setState(() => isGenerating = true);
@@ -102,7 +155,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     );
   }
 
-  /// Live preview of the real PDF, like a print preview.
   Widget _buildPdfPreviewArea() {
     return Container(
       width: double.infinity,
@@ -118,8 +170,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.statusCardGreen,
                   borderRadius: BorderRadius.circular(12),
@@ -141,7 +192,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
               borderRadius: BorderRadius.circular(10),
               child: PdfPreview(
                 key: ValueKey(_previewKey),
-                build: _buildPreview,
+                build: buildPreview,
                 useActions: false,
                 allowPrinting: false,
                 allowSharing: false,
@@ -149,8 +200,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 canChangeOrientation: false,
                 canDebug: false,
                 maxPageWidth: 560,
-                scrollViewDecoration:
-                    BoxDecoration(color: AppColors.calloutBackground),
+                scrollViewDecoration: BoxDecoration(color: AppColors.calloutBackground),
                 pdfPreviewPageDecoration: const BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
@@ -180,7 +230,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     );
   }
 
-  /// Right Config Panel
   Widget _buildConfigSidebar(bool isMobile) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -197,38 +246,122 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             'Select items to include in your generated PDF report.',
             style: AppTextStyles.cardMeta,
           ),
-          const SizedBox(height: 20),
-          _checkboxTile(
-            title: 'Sensor history logs',
-            value: _c.includeSensorLogs,
-            onChanged: _c.toggleSensorLogs,
+          const SizedBox(height: 16),
+
+          // Date timeframe section with History Logs style date button pill
+          Text(
+            'Date timeframe',
+            style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
           ),
-          _checkboxTile(
-            title: 'Calibration history logs',
-            value: _c.includeCalibrationLogs,
-            onChanged: _c.toggleCalibrationLogs,
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: _openCalendarPopup,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.calloutBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: AppColors.primaryButton,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDateLabel(selectedDate),
+                      style: AppTextStyles.cardMeta.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          _checkboxTile(
-            title: 'pH optimization results',
-            value: _c.includePhOptimization,
-            onChanged: _c.togglePhOptimization,
+          const SizedBox(height: 16),
+          Divider(color: AppColors.cardBorder, height: 1),
+          const SizedBox(height: 14),
+
+          // Report Sections Header with Select All / Deselect All
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Report Sections',
+                style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
+              ),
+              InkWell(
+                onTap: _toggleSelectAll,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text(
+                    isAllSelected ? 'Deselect all' : 'Select all',
+                    style: AppTextStyles.cardMeta.copyWith(
+                      color: AppColors.accentGreen,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          _checkboxTile(
-            title: 'EC optimization results',
-            value: _c.includeEcOptimization,
-            onChanged: _c.toggleEcOptimization,
+          const SizedBox(height: 8),
+
+          // Checklist items
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _checkboxTile(
+                    title: 'Sensor history logs',
+                    value: _c.includeSensorLogs,
+                    onChanged: (v) => _c.toggleSensorLogs(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'Calibration history logs',
+                    value: _c.includeCalibrationLogs,
+                    onChanged: (v) => _c.toggleCalibrationLogs(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'pH optimization results',
+                    value: _c.includePhOptimization,
+                    onChanged: (v) => _c.togglePhOptimization(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'EC optimization results',
+                    value: _c.includeEcOptimization,
+                    onChanged: (v) => _c.toggleEcOptimization(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'All analytics and graphs',
+                    value: _c.includeAllAnalytics,
+                    onChanged: (v) => _c.toggleAllAnalytics(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'Insights and Decision Support',
+                    value: _c.includeInsightsAndDecisionSupport,
+                    onChanged: (v) =>
+                        _c.toggleInsightsAndDecisionSupport(v ?? false),
+                  ),
+                ],
+              ),
+            ),
           ),
-          _checkboxTile(
-            title: 'All analytics and graphs',
-            value: _c.includeAllAnalytics,
-            onChanged: _c.toggleAllAnalytics,
-          ),
-          _checkboxTile(
-            title: 'Insights and Decision Support',
-            value: _c.includeInsightsAndDecisionSupport,
-            onChanged: _c.toggleInsightsAndDecisionSupport,
-          ),
-          if (isMobile) const SizedBox(height: 24) else const Spacer(),
+          const SizedBox(height: 16),
+
+          // Bottom Action Buttons
           Row(
             children: [
               Expanded(
@@ -300,7 +433,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     required ValueChanged<bool?> onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: CheckboxListTile(
         title: Text(
           title,
