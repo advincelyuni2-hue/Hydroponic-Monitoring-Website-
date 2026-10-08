@@ -39,8 +39,27 @@ class AddLogScreen extends StatelessWidget {
                 onCancel: () => Navigator.of(context).maybePop(),
                 onSubmit: (entry) async {
                   if (notification != null) {
-                    await NotificationService()
-                        .updateAlertResolved(notification!.id, true);
+                    final saved = await NotificationService().recordFixAndResolve(
+                      notificationId: notification!.id,
+                      parameter: entry.parameter,
+                      currentValue: entry.currentValue,
+                      currentStatus: notification!.currentStatus,
+                      actionType: entry.actionType,
+                      amount: entry.amount,
+                      notes: entry.notes,
+                    );
+                    if (!saved) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Unable to save the fix. The notification remains active.',
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
                   }
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -83,7 +102,7 @@ class FixEntry {
 class RecordFixCard extends StatefulWidget {
   final AppNotificationItem? notification;
   final VoidCallback onCancel;
-  final ValueChanged<FixEntry> onSubmit;
+  final Future<void> Function(FixEntry) onSubmit;
 
   const RecordFixCard({
     super.key,
@@ -147,9 +166,9 @@ class RecordFixCardState extends State<RecordFixCard> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    widget.onSubmit(
+    await widget.onSubmit(
       FixEntry(
         parameter: parameter!,
         currentValue: parameter == 'Temperature'
@@ -415,7 +434,7 @@ class RecordFixCardState extends State<RecordFixCard> {
 Future<void> showRecordFixDialog(
   BuildContext context, {
   AppNotificationItem? notification,
-  required ValueChanged<FixEntry> onSubmit,
+  required Future<void> Function(FixEntry) onSubmit,
 }) {
   return showDialog(
     context: context,
@@ -426,9 +445,9 @@ Future<void> showRecordFixDialog(
         child: RecordFixCard(
           notification: notification,
           onCancel: () => Navigator.of(dialogContext).pop(),
-          onSubmit: (entry) {
+          onSubmit: (entry) async {
             Navigator.of(dialogContext).pop();
-            onSubmit(entry);
+            await onSubmit(entry);
           },
         ),
       ),

@@ -3,7 +3,6 @@ import 'app_state.dart';
 import 'package:http/http.dart' as http;
 import '../models/forecasting_models.dart';
 import 'supabase_client.dart';
-import '../utils/manila_time.dart';
 
 class ForecastingService {
   static const String backendApiUrl = String.fromEnvironment(
@@ -23,15 +22,12 @@ class ForecastingService {
     final baselineVal = parameter == 'ph' ? currentPh : currentEc;
 
     try {
-      final table = parameter == 'ph' ? 'ph_readings' : 'ec_readings';
-      final cutoff = requestTime
-          .subtract(Duration(hours: selectedHours))
-          .subtract(sensorStoredUtcCorrection);
+      final valueColumn = parameter == 'ph' ? 'avg_ph' : 'avg_ec';
+      final cutoff = requestTime.subtract(Duration(hours: selectedHours));
 
       final response = await supabase
-          .from(table)
-          .select('value, recorded_at')
-          .eq('is_average', false)
+          .from('sensor_history')
+          .select('$valueColumn, recorded_at')
           .gte('recorded_at', cutoff.toIso8601String())
           .order('recorded_at', ascending: false)
           .limit(500);
@@ -39,15 +35,13 @@ class ForecastingService {
       final rows = List<Map<String, dynamic>>.from(response).reversed.toList();
 
       for (final row in rows) {
-        final recordedAt = DateTime.parse(row['recorded_at'] as String)
-            .toUtc()
-            .add(sensorStoredUtcCorrection);
+        final recordedAt = DateTime.parse(row['recorded_at'] as String).toUtc();
         final hoursAgo = recordedAt.difference(requestTime).inSeconds / 3600.0;
 
         chartPoints.add(
           ForecastingChartPoint(
             hour: hoursAgo,
-            value: (row['value'] as num).toDouble(),
+            value: (row[valueColumn] as num).toDouble(),
             isPredicted: false,
           ),
         );
@@ -154,8 +148,8 @@ class ForecastingService {
             : 'EC levels are stable and within safe parameters.',
         temperature: '${currentTemp.toStringAsFixed(1)} °C',
         ecLevel: isPh
-            ? '${currentEc.toStringAsFixed(1)} mS/cm'
-            : '${currentPh.toStringAsFixed(1)} pH',
+            ? '${currentEc.toStringAsFixed(6)} mS/cm'
+            : '${currentPh.toStringAsFixed(6)} pH',
         calloutText: isApplied
             ? 'Recent intervention logged: parameter fix applied successfully.'
             : 'Insight dismissed by operator.',
@@ -189,13 +183,17 @@ class ForecastingService {
     bool isPh = parameter == 'ph';
     final cfg = appParameterRanges.value;
 
-    bool isPhCriticalHigh = predictedPh >= 8.0 || currentPh >= 8.0;
-    bool isPhCriticalLow = predictedPh <= 5.0 || currentPh <= 5.0;
+    bool isPhCriticalHigh =
+        predictedPh > cfg.phMax + 0.5 || currentPh > cfg.phMax + 0.5;
+    bool isPhCriticalLow =
+        predictedPh < cfg.phMin - 0.5 || currentPh < cfg.phMin - 0.5;
     bool isPhWarningHigh = predictedPh > cfg.phMax && !isPhCriticalHigh;
     bool isPhWarningLow = predictedPh < cfg.phMin && !isPhCriticalLow;
 
-    bool isEcCriticalLow = predictedEc <= 0.8 || currentEc <= 0.8;
-    bool isEcCriticalHigh = predictedEc >= 2.2 || currentEc >= 2.2;
+    bool isEcCriticalLow =
+        predictedEc < cfg.ecMin - 0.5 || currentEc < cfg.ecMin - 0.5;
+    bool isEcCriticalHigh =
+        predictedEc > cfg.ecMax + 0.5 || currentEc > cfg.ecMax + 0.5;
     bool isEcWarningLow = predictedEc < cfg.ecMin && !isEcCriticalLow;
     bool isEcWarningHigh = predictedEc > cfg.ecMax && !isEcCriticalHigh;
 
@@ -318,8 +316,8 @@ class ForecastingService {
       warningText: warningText,
       temperature: '${currentTemp.toStringAsFixed(1)} °C',
       ecLevel: isPh
-          ? '${currentEc.toStringAsFixed(1)} mS/cm'
-          : '${currentPh.toStringAsFixed(1)} pH',
+          ? '${currentEc.toStringAsFixed(6)} mS/cm'
+          : '${currentPh.toStringAsFixed(6)} pH',
       calloutText: calloutText,
       currentPh: isPh ? currentPh : currentEc,
       targetPh: isPh ? targetPh : targetEc,

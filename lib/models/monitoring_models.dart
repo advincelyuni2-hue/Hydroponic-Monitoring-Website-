@@ -1,3 +1,6 @@
+import '../utils/parameter_severity.dart';
+import '../utils/sensor_value_format.dart';
+
 class ParameterStatus {
   final String label;
   final String currentValue;
@@ -103,16 +106,34 @@ class HistoryValueRange {
   final double maximum;
   final double? value;
   final String unit;
+  final double warningMargin;
 
   const HistoryValueRange({
     required this.minimum,
     required this.maximum,
     required this.value,
     this.unit = '',
+    this.warningMargin = 0,
   });
 
   bool get isHigh => value != null && value! > maximum;
   bool get isLow => value != null && value! < minimum;
-  String get label =>
-      '${minimum.toStringAsFixed(unit == '°C' ? 1 : 2)}–${maximum.toStringAsFixed(unit == '°C' ? 1 : 2)}${unit.isEmpty ? '' : ' $unit'}';
+  bool get isCriticalHigh => value != null && value! > maximum + warningMargin;
+  bool get isCriticalLow => value != null && value! < minimum - warningMargin;
+  bool get isWarning =>
+      value != null && (isHigh || isLow) && !isCriticalHigh && !isCriticalLow;
+  String get severity => value == null
+      ? 'Stable'
+      : parameterSeverityLabel(
+          classifyParameterValue(
+            value: value!,
+            stableMin: minimum,
+            stableMax: maximum,
+            warningMargin: warningMargin,
+          ),
+        );
+  String get label {
+    final decimals = unit == '°C' ? 1 : sensorValueDecimalPlaces;
+    return '${minimum.toStringAsFixed(decimals)}–${maximum.toStringAsFixed(decimals)}${unit.isEmpty ? '' : ' $unit'}';
+  }
 }

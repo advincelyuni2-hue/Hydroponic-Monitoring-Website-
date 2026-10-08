@@ -227,9 +227,9 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     }
 
     final phController =
-        TextEditingController(text: initialPh.toStringAsFixed(2));
+        TextEditingController(text: initialPh.toStringAsFixed(6));
     final ecController =
-        TextEditingController(text: initialEc.toStringAsFixed(2));
+        TextEditingController(text: initialEc.toStringAsFixed(6));
     final tempController =
         TextEditingController(text: initialTemp.toStringAsFixed(1));
 
@@ -376,8 +376,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!,
-                        style: AppTextStyles.body),
+                    Text(_controller.errorMessage!, style: AppTextStyles.body),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _controller.loadData,
@@ -421,8 +420,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                                 selectedTab: _controller.selectedTab,
                                 isAdmin: isAdmin,
                                 isSelectionMode: _controller.isSelectionMode,
-                                selectedIndices:
-                                    _controller.selectedRowIndices,
+                                selectedIndices: _controller.selectedRowIndices,
                                 onSelectAll: _controller.toggleSelectAll,
                                 onToggleRow: _controller.toggleRowSelection,
                                 onDeleteRow: _confirmDeleteSingle,
@@ -634,7 +632,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -656,8 +655,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     final tabOptions = ['Sensor logs', 'Calibration logs', 'Reports logs'];
     return Wrap(
       spacing: isMobile ? 12 : 24,
-      children:
-          tabOptions.map((title) => _tab(title, isMobile)).toList(),
+      children: tabOptions.map((title) => _tab(title, isMobile)).toList(),
     );
   }
 
@@ -674,9 +672,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
               title,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: isMobile ? 15 : 18,
-                color: isActive
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -685,9 +682,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
               duration: const Duration(milliseconds: 200),
               height: 3,
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primaryButton
-                    : Colors.transparent,
+                color: isActive ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

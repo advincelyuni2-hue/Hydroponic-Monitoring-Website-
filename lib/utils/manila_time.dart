@@ -1,9 +1,9 @@
 const Duration manilaUtcOffset = Duration(hours: 8);
 
-// Current sensor rows arrive from Supabase eight hours earlier than their
-// intended UTC instant. Keep this correction isolated to sensor data so other
-// application timestamps continue to use the normal UTC -> Manila conversion.
-const Duration sensorStoredUtcCorrection = Duration(hours: 8);
+// Sensor timestamps now use the same timestamptz/UTC contract as all other
+// application records. Kept as a zero-duration compatibility constant for
+// older call sites.
+const Duration sensorStoredUtcCorrection = Duration.zero;
 
 DateTime parseSupabaseTimestamp(String value) {
   final trimmed = value.trim();
@@ -51,7 +51,7 @@ DateTime toManilaTime(DateTime timestamp) {
 }
 
 DateTime toSensorManilaTime(DateTime timestamp) {
-  return toManilaTime(timestamp.toUtc().add(sensorStoredUtcCorrection));
+  return toManilaTime(timestamp);
 }
 
 DateTime manilaNow() => toManilaTime(DateTime.now());
@@ -72,7 +72,7 @@ DateTime manilaWallTimeToUtc(DateTime manilaTime) {
 }
 
 DateTime sensorManilaWallTimeToStoredUtc(DateTime manilaTime) {
-  return manilaWallTimeToUtc(manilaTime).subtract(sensorStoredUtcCorrection);
+  return manilaWallTimeToUtc(manilaTime);
 }
 
 String formatManilaClockTime(DateTime value) {

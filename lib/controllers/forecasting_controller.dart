@@ -18,7 +18,8 @@ class ForecastingController extends ChangeNotifier {
   // Default initial view set to 'Both' so user lands on the combined graph
   String selectedTab = 'Both'; // 'pH Forecast', 'EC Forecast', or 'Both'
   int selectedHours = 12;
-  String selectedBothInsightParam = 'pH'; // Inner tab selection when in 'Both' view
+  String selectedBothInsightParam =
+      'pH'; // Inner tab selection when in 'Both' view
 
   double currentPh = 6.5;
   double currentEc = 1.5;
@@ -94,10 +95,8 @@ class ForecastingController extends ChangeNotifier {
       phPoints = results[1] as List<ForecastingChartPoint>;
       ecPoints = results[2] as List<ForecastingChartPoint>;
 
-      final predictedPhPoints =
-          phPoints.where((p) => p.isPredicted).toList();
-      final predictedEcPoints =
-          ecPoints.where((p) => p.isPredicted).toList();
+      final predictedPhPoints = phPoints.where((p) => p.isPredicted).toList();
+      final predictedEcPoints = ecPoints.where((p) => p.isPredicted).toList();
 
       final double predictedPh = predictedPhPoints.isNotEmpty
           ? predictedPhPoints.last.value
@@ -202,8 +201,8 @@ class ForecastingController extends ChangeNotifier {
           : 'EC levels are stable and within safe parameters.',
       temperature: '${currentTemp.toStringAsFixed(1)} °C',
       ecLevel: param == 'ph'
-          ? '${currentEc.toStringAsFixed(1)} mS/cm'
-          : '${currentPh.toStringAsFixed(1)} pH',
+          ? '${currentEc.toStringAsFixed(6)} mS/cm'
+          : '${currentPh.toStringAsFixed(6)} pH',
       calloutText: isApplied
           ? 'Recent intervention logged: parameter fix applied successfully.'
           : 'Insight dismissed by operator.',

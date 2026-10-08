@@ -32,6 +32,11 @@ class ParameterConfigCard extends StatelessWidget {
         children: [
           Text('pH / EC Parameter Configuration',
               style: AppTextStyles.sectionTitle),
+          const SizedBox(height: 4),
+          Text(
+            'Selected values are stable. Up to 0.5 outside either limit is a warning; beyond that is critical.',
+            style: AppTextStyles.cardMeta,
+          ),
           const SizedBox(height: 16),
           // pH Range Box
           _rangeBox(
@@ -134,10 +139,9 @@ class ParameterConfigCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label,
-                  style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
+              Text(label, style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
               Text(
-                'Ideal: ${rangeValues.start.toStringAsFixed(1)} - ${rangeValues.end.toStringAsFixed(1)} $unit',
+                'Ideal: ${rangeValues.start.toStringAsFixed(6)} - ${rangeValues.end.toStringAsFixed(6)} $unit',
                 style: AppTextStyles.cardMeta.copyWith(
                   fontWeight: FontWeight.w700,
                   color: activeColor,
@@ -156,8 +160,7 @@ class ParameterConfigCard extends StatelessWidget {
               rangeThumbShape: const RoundRangeSliderThumbShape(
                 enabledThumbRadius: 7,
               ),
-              overlayShape:
-                  const RoundSliderOverlayShape(overlayRadius: 14),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: RangeSlider(
               values: rangeValues,
@@ -171,11 +174,11 @@ class ParameterConfigCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Min Limit: ${minLimit.toStringAsFixed(1)} $unit',
+                'Min Limit: ${minLimit.toStringAsFixed(6)} $unit',
                 style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
               ),
               Text(
-                'Max Limit: ${maxLimit.toStringAsFixed(1)} $unit',
+                'Max Limit: ${maxLimit.toStringAsFixed(6)} $unit',
                 style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
               ),
             ],

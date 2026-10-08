@@ -204,7 +204,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
     final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
     bool isOut(double value) =>
-      value < widget.minThreshold || value > widget.maxThreshold;
+        value < widget.minThreshold || value > widget.maxThreshold;
     var dataMin = widget.minThreshold;
     var dataMax = widget.maxThreshold;
     for (final point in widget.points) {
@@ -256,10 +256,10 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: isMobile ? 33 : 42,
+            reservedSize: isMobile ? 62 : 72,
             interval: 0.5,
             getTitlesWidget: (val, _) => Text(
-              val.toStringAsFixed(1),
+              val.toStringAsFixed(6),
               style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
             ),
           ),
@@ -343,9 +343,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
                 ? widget.points[idx].label
                 : '';
             final unit = widget.selectedParameter == 'pH' ? '' : ' mS/cm';
-            final range =
-                '${widget.minThreshold.toStringAsFixed(1)} - '
-                '${widget.maxThreshold.toStringAsFixed(1)}';
+            final range = '${widget.minThreshold.toStringAsFixed(6)} - '
+                '${widget.maxThreshold.toStringAsFixed(6)}';
             final String verdict;
             final Color verdictColor;
             if (spot.y > widget.maxThreshold) {
@@ -364,7 +363,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
               children: [
                 TextSpan(
                   text:
-                      '${widget.selectedParameter} ${spot.y.toStringAsFixed(2)}$unit\n',
+                      '${widget.selectedParameter} ${spot.y.toStringAsFixed(6)}$unit\n',
                   style: AppTextStyles.bodyBold.copyWith(color: currentColor),
                 ),
                 TextSpan(

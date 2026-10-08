@@ -1,13 +1,14 @@
 # Forecasting backend
 
 The Flutter forecasting screen calls this FastAPI service. It uses the model
-artifacts in this directory and reads recent raw sensor values from the same
+artifacts in this directory and reads recent five-minute averages from the same
 Supabase project as the app.
 
 1. Create and activate a Python virtual environment.
 2. Install dependencies with `pip install -r requirements.txt`.
-3. Copy `.env.example` to `.env` and supply the same Supabase URL and
-   publishable key used by Flutter.
+3. Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the backend
+   environment. Keep the service-role key on the server and never expose it to
+   Flutter or the browser.
 4. Export those environment variables, then run:
 
    ```text

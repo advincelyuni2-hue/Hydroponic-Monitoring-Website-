@@ -57,10 +57,8 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
 
     // Compute dynamic Y-axis min/max
     final allValues = filteredPoints.map((p) => p.value).toList();
-    final dataMin =
-        allValues.isNotEmpty ? allValues.reduce(math.min) : 5.0;
-    final dataMax =
-        allValues.isNotEmpty ? allValues.reduce(math.max) : 7.5;
+    final dataMin = allValues.isNotEmpty ? allValues.reduce(math.min) : 5.0;
+    final dataMax = allValues.isNotEmpty ? allValues.reduce(math.max) : 7.5;
     final spread = dataMax - dataMin;
     final padding = math.max(spread * 0.18, 0.15);
 
@@ -68,9 +66,8 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
     final chartMaxY = dataMax + padding;
 
     // Current & Forecast Reading values
-    final currentVal = historical.isNotEmpty
-        ? historical.last.value.toStringAsFixed(2)
-        : '--';
+    final currentVal =
+        historical.isNotEmpty ? historical.last.value.toStringAsFixed(6) : '--';
     final forecastVal = predicted.isNotEmpty
         ? predicted
             .reduce((a, b) =>
@@ -78,7 +75,7 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                     ? a
                     : b)
             .value
-            .toStringAsFixed(2)
+            .toStringAsFixed(6)
         : '--';
 
     return Container(
@@ -125,26 +122,30 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                       topTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false)),
                       rightTitles: AxisTitles(
-                        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+                        axisNameWidget:
+                            Text('Value', style: AppTextStyles.cardMeta),
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: isMobile ? 33 : 42,
                           interval: (chartMaxY - chartMinY) / 4,
                           getTitlesWidget: (val, _) => Text(
-                            val.toStringAsFixed(1),
-                            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                            val.toStringAsFixed(6),
+                            style:
+                                AppTextStyles.cardMeta.copyWith(fontSize: 10),
                           ),
                         ),
                       ),
                       leftTitles: AxisTitles(
-                        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+                        axisNameWidget:
+                            Text('Value', style: AppTextStyles.cardMeta),
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: isMobile ? 33 : 42,
                           interval: (chartMaxY - chartMinY) / 4,
                           getTitlesWidget: (val, _) => Text(
-                            val.toStringAsFixed(1),
-                            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                            val.toStringAsFixed(6),
+                            style:
+                                AppTextStyles.cardMeta.copyWith(fontSize: 10),
                           ),
                         ),
                       ),
@@ -187,10 +188,11 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                         getTooltipColor: (_) => AppColors.cardBackground,
                         tooltipRoundedRadius: 8,
                         getTooltipItems: (spots) => spots.map((spot) {
-                          final isConnector = spot.x <= 0 && spot.barIndex.isOdd;
+                          final isConnector =
+                              spot.x <= 0 && spot.barIndex.isOdd;
                           if (isConnector) return null;
                           return LineTooltipItem(
-                            'Value ${spot.y.toStringAsFixed(2)}',
+                            'Value ${spot.y.toStringAsFixed(6)}',
                             AppTextStyles.bodyBold.copyWith(
                               color: chartLineColor,
                             ),
@@ -300,9 +302,8 @@ class _ForecastChartCardState extends State<ForecastChartCard> {
                 vertical: 7,
               ),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryButton
-                    : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/notification_models.dart';
 import '../screens/notifications_screen.dart';
+import '../screens/add_log_screen.dart';
 import '../screens/settings_screen.dart';
 import '../services/notification_service.dart';
 import '../services/supabase_client.dart';
@@ -60,6 +61,32 @@ class AppHeader extends StatelessWidget {
                   notifications: notifications,
                   onNotificationTap: (item) {
                     overlayEntry.remove();
+                    showRecordFixDialog(
+                      context,
+                      notification: item,
+                      onSubmit: (entry) async {
+                        final saved = await NotificationService()
+                            .recordFixAndResolve(
+                          notificationId: item.id,
+                          parameter: entry.parameter,
+                          currentValue: entry.currentValue,
+                          currentStatus: item.currentStatus,
+                          actionType: entry.actionType,
+                          amount: entry.amount,
+                          notes: entry.notes,
+                        );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              saved
+                                  ? 'Fix recorded successfully.'
+                                  : 'Unable to save the fix. The notification remains active.',
+                            ),
+                          ),
+                        );
+                      },
+                    );
                   },
                   onViewAllTap: () {
                     overlayEntry.remove();

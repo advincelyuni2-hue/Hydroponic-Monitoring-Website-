@@ -246,7 +246,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             final unit = isPh ? '' : ' mS/cm';
 
             return LineTooltipItem(
-              '$label ${spot.y.toStringAsFixed(2)}$unit',
+              '$label ${spot.y.toStringAsFixed(6)}$unit',
               AppTextStyles.bodyBold.copyWith(color: color),
             );
           }).toList(),
@@ -357,7 +357,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   FlTitlesData _buildTitlesData(_ChartRange range, bool isMobile) {
     final interval =
         math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
-    final decimals = widget.activeTab == 'EC' ? 2 : 1;
+    const decimals = 6;
     final centerTime = widget.generatedAt ?? manilaNow();
     final horizontalInterval =
         isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
@@ -368,7 +368,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 38 : 46,
+          reservedSize: isMobile ? 62 : 72,
           interval: interval,
           getTitlesWidget: (val, _) => Text(
             val.toStringAsFixed(decimals),
@@ -380,7 +380,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 38 : 46,
+          reservedSize: isMobile ? 62 : 72,
           interval: interval,
           getTitlesWidget: (val, _) => Text(
             val.toStringAsFixed(decimals),
@@ -545,7 +545,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               ? a
               : b)
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
-      return point.value.toStringAsFixed(2);
+      return point.value.toStringAsFixed(6);
     }
 
     final values = <String>[];

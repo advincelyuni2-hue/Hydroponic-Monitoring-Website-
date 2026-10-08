@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/notification_models.dart';
-import '../screens/add_log_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
-import '../utils/responsive.dart';
 
 class NotificationOverlayWidget extends StatelessWidget {
   final List<AppNotificationItem> notifications;
@@ -90,20 +88,6 @@ class NotificationOverlayWidget extends StatelessWidget {
                     return GestureDetector(
                       onTap: () {
                         onNotificationTap(item);
-                        if (Responsive.isMobile(context)) {
-                          showRecordFixDialog(
-                            context,
-                            notification: item,
-                            onSubmit: (_) {},
-                          );
-                        } else {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AddLogScreen(notification: item),
-                            ),
-                          );
-                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12),
