@@ -38,7 +38,8 @@ class NotificationController extends ChangeNotifier {
   List<AppNotificationItem> get resolvedNotifications =>
       notifications.where((n) => n.isResolved).toList();
 
-  /// Updates status in Supabase to 'resolved' and moves card to Resolved tab
+  /// Retained for manual notifications. Sensor alerts use Record Fix and are
+  /// resolved automatically after three stable five-minute readings.
   Future<void> toggleResolve(AppNotificationItem item, bool? value) async {
     bool resolved = value ?? false;
     item.isResolved = resolved;
@@ -59,8 +60,9 @@ class NotificationController extends ChangeNotifier {
     required String parameter,
     required double currentValue,
     required String actionType,
-    required double amount,
+    double? amount,
     required String notes,
+    double? reservoirVolumeL,
   }) async {
     final saved = await _notificationService.recordFixAndResolve(
       notificationId: item.id,
@@ -70,14 +72,14 @@ class NotificationController extends ChangeNotifier {
       actionType: actionType,
       amount: amount,
       notes: notes,
+      reservoirVolumeL: reservoirVolumeL,
     );
 
     if (saved) {
-      item.isResolved = true;
       errorMessage = null;
     } else {
-      errorMessage =
-          'Unable to save the fix log. The notification was not resolved.';
+      errorMessage = _notificationService.lastInterventionError ??
+          'Unable to save the intervention. The alert remains open.';
     }
     notifyListeners();
     return saved;

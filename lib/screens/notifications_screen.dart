@@ -46,6 +46,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
     await showRecordFixDialog(
       context,
       notification: item,
+      submissionError: () => _controller.errorMessage,
       onSubmit: (entry) async {
         final saved = await _controller.recordFixAndResolve(
           item,
@@ -54,14 +55,19 @@ class NotificationsScreenState extends State<NotificationsScreen> {
           actionType: entry.actionType,
           amount: entry.amount,
           notes: entry.notes,
+          reservoirVolumeL: entry.reservoirVolumeL,
         );
-        if (!mounted) return;
+        if (!mounted) return saved;
         if (saved) {
-          setState(() => selectedTab = 'Resolved');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Fix recorded successfully.')),
+            const SnackBar(
+              content: Text(
+                'Intervention recorded. The alert will resolve after three stable readings.',
+              ),
+            ),
           );
         }
+        return saved;
       },
     );
   }
@@ -149,8 +155,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                   else
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        int crossAxisCount =
-                            isDesktop ? 3 : (isMobile ? 1 : 2);
+                        int crossAxisCount = isDesktop ? 3 : (isMobile ? 1 : 2);
                         return GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -198,9 +203,8 @@ class NotificationsScreenState extends State<NotificationsScreen> {
               title,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: 16,
-                color: isActive
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -209,9 +213,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
               duration: const Duration(milliseconds: 200),
               height: 3,
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primaryButton
-                    : Colors.transparent,
+                color: isActive ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

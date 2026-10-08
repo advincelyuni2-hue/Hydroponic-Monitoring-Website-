@@ -7,7 +7,6 @@ import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
 import '../utils/sensor_value_format.dart';
 import 'app_state.dart';
-import 'pdf_report_output.dart';
 
 const _primaryGreen = PdfColor(0.15, 0.39, 0.08);
 const borderColor = PdfColor(0.72, 0.74, 0.72);

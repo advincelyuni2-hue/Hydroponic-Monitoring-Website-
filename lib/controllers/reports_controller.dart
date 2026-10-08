@@ -339,11 +339,12 @@ class ReportsController extends ChangeNotifier {
         horizonHours: selectedPredictionHorizon,
       );
       if (modelEvaluation.samples.isEmpty) {
-        evaluationError =
-            'No model predictions could be compared yet. Make sure the '
-            'forecast model service is running (FORECAST_API_URL) and that '
-            'it returns valid predictions for the selected '
-            '${selectedPredictionHorizon}h horizon.';
+        evaluationError = modelEvaluation.records.isNotEmpty
+            ? 'No un-intervened comparisons are ready yet. Pending and '
+                'intervened forecasts are listed below.'
+            : 'No stored predictions are available for the selected '
+                '${selectedPredictionHorizon}h horizon yet. New forecasts are '
+                'saved and compared automatically when their target time arrives.';
       }
     } catch (error) {
       modelEvaluation = ModelEvaluation.empty;

@@ -8,6 +8,8 @@ class ParameterStatus {
   final String idealRange;
   final String lastUpdated;
   final String status;
+  final bool isOffline;
+  final DateTime? latestRecordedAt;
 
   ParameterStatus({
     required this.label,
@@ -16,6 +18,20 @@ class ParameterStatus {
     required this.idealRange,
     required this.lastUpdated,
     this.status = 'Normal',
+    this.isOffline = false,
+    this.latestRecordedAt,
+  });
+}
+
+class TelemetrySnapshot {
+  final List<ParameterStatus> statuses;
+  final DateTime? latestRecordedAt;
+  final bool isOffline;
+
+  const TelemetrySnapshot({
+    required this.statuses,
+    required this.latestRecordedAt,
+    required this.isOffline,
   });
 }
 

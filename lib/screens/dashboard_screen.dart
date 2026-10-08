@@ -137,13 +137,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryButton,
+                decoration: BoxDecoration(
+                  color: _controller.isSensorOffline
+                      ? AppColors.textSecondary
+                      : AppColors.primaryButton,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 6),
-              Text('Live', style: AppTextStyles.cardMeta),
+              Text(
+                _controller.isSensorOffline ? 'Offline' : 'Live',
+                style: AppTextStyles.cardMeta,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -180,6 +185,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ecPoints: _controller.ecForecast,
           summaries: _controller.forecastSummaries,
           generatedAt: _controller.forecastGeneratedAt,
+          isOffline: _controller.isSensorOffline,
+          latestSensorRecordedAt: _controller.latestSensorRecordedAt,
           onViewDetails: _openForecastingScreen,
         ),
       ],

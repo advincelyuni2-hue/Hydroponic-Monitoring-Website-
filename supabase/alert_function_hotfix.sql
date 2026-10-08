@@ -1,6 +1,6 @@
--- Function-only alert hotfix.
--- Safe to run after stopping ESP32 uploads and closing active dashboard tabs.
--- It avoids ALTER TABLE, policy, publication, and trigger replacement locks.
+-- Function-only alert hotfix. Run forecast_intervention_setup.sql first so the
+-- lifecycle columns exist. Safe to run after stopping ESP32 uploads and
+-- closing active dashboard tabs.
 
 set lock_timeout = '10s';
 set statement_timeout = '60s';
@@ -32,9 +32,15 @@ declare
 begin
   if measured_value between stable_min and stable_max then
     update public.notifications
-    set is_resolved = true,
-        status = 'read',
-        is_read = true,
+    set stable_reading_count = stable_reading_count + 1,
+        recovery_started_at = coalesce(recovery_started_at, now()),
+        lifecycle_state = case
+          when stable_reading_count + 1 >= 3 then 'resolved'
+          else 'recovering'
+        end,
+        is_resolved = stable_reading_count + 1 >= 3,
+        status = case when stable_reading_count + 1 >= 3 then 'read' else status end,
+        is_read = case when stable_reading_count + 1 >= 3 then true else is_read end,
         timestamp = now()
     where source = 'sensor'
       and parameter = parameter_name
@@ -75,6 +81,7 @@ begin
 
   update public.notifications
   set is_resolved = true,
+      lifecycle_state = 'resolved',
       status = 'read',
       is_read = true,
       timestamp = now()
@@ -105,6 +112,11 @@ begin
       ),
       recommendation = recommendation_text,
       timestamp = now(),
+      stable_reading_count = 0,
+      recovery_started_at = null,
+      lifecycle_state = case
+        when action_log_id is null then 'open' else 'action_taken'
+      end,
       status = case
         when type is distinct from severity_name then 'unread'
         else status
@@ -133,7 +145,9 @@ begin
     recommendation,
     status,
     is_read,
-    is_resolved
+    is_resolved,
+    lifecycle_state,
+    stable_reading_count
   ) values (
     null,
     'sensor',
@@ -161,7 +175,9 @@ begin
     recommendation_text,
     'unread',
     false,
-    false
+    false,
+    'open',
+    0
   )
   on conflict do nothing;
 end;

@@ -16,6 +16,8 @@ class ForecastingChartCard extends StatefulWidget {
   final List<ForecastPoint> points;
   final List<ForecastPoint>? ecPoints;
   final DateTime? generatedAt;
+  final bool isOffline;
+  final DateTime? latestSensorRecordedAt;
 
   const ForecastingChartCard({
     super.key,
@@ -26,6 +28,8 @@ class ForecastingChartCard extends StatefulWidget {
     required this.points,
     this.ecPoints,
     this.generatedAt,
+    this.isOffline = false,
+    this.latestSensorRecordedAt,
   });
 
   @override
@@ -41,6 +45,45 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   Widget build(BuildContext context) {
     final isDesktop = Responsive.isDesktop(context);
     final isMobile = Responsive.isMobile(context);
+
+    if (widget.isOffline) {
+      final lastReceived = widget.latestSensorRecordedAt == null
+          ? 'No sensor data received'
+          : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
+      return Container(
+        width: double.infinity,
+        height: isDesktop ? 689 : 420,
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(isMobile),
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_off,
+                        size: 46, color: AppColors.textSecondary),
+                    const SizedBox(height: 12),
+                    Text('Sensor offline', style: AppTextStyles.sectionTitle),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Forecasting requires a recent five-minute sensor reading.',
+                      style: AppTextStyles.cardMeta,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(lastReceived, style: AppTextStyles.cardMeta),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final showPh = widget.activeTab == 'pH' || widget.activeTab == 'Both';
     final showEc = widget.activeTab == 'EC' || widget.activeTab == 'Both';

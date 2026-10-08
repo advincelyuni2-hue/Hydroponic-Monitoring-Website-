@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/forecasting_models.dart';
 import '../services/app_state.dart';
 import '../services/forecasting_service.dart';
@@ -30,9 +33,18 @@ class ForecastingController extends ChangeNotifier {
 
   PredictionInsightDetail? phInsightDetail;
   PredictionInsightDetail? ecInsightDetail;
+  bool isSensorOffline = false;
+  DateTime? latestSensorRecordedAt;
+  Timer? _freshnessTimer;
+  RealtimeChannel? _parameterChannel;
 
   ForecastingController() {
     loadData();
+    _parameterChannel = monitoringService.subscribeToParameterChanges(loadData);
+    _freshnessTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshFreshness(),
+    );
   }
 
   String get parameterKey => selectedTab.startsWith('pH')
@@ -58,23 +70,34 @@ class ForecastingController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final statuses = await monitoringService.getParameterStatuses();
-      for (var status in statuses) {
-        if (status.label.contains('pH')) {
-          currentPh = double.tryParse(status.currentValue) ?? 6.5;
-        } else if (status.label.contains('EC')) {
-          currentEc = double.tryParse(status.currentValue) ?? 1.5;
-        } else if (status.label.contains('Temp')) {
-          currentTemp = double.tryParse(status.currentValue) ?? 24.0;
-        }
-      }
+      final snapshot = await monitoringService.getTelemetrySnapshot();
+      final statuses = snapshot.statuses;
+      isSensorOffline = snapshot.isOffline;
+      latestSensorRecordedAt = snapshot.latestRecordedAt;
 
       final userId = supabaseClient?.auth.currentUser?.id ??
           appProfile.value?.id ??
           'mock-user-id';
+      profile = await userService.getProfile(userId);
+
+      if (isSensorOffline) {
+        _clearForecastData();
+        isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      for (var status in statuses) {
+        if (status.label.contains('pH')) {
+          currentPh = double.parse(status.currentValue);
+        } else if (status.label.contains('EC')) {
+          currentEc = double.parse(status.currentValue);
+        } else if (status.label.contains('Temp')) {
+          currentTemp = double.parse(status.currentValue);
+        }
+      }
 
       final results = await Future.wait([
-        userService.getProfile(userId),
         forecastingService.getForecastChartData(
           'ph',
           selectedHours: selectedHours,
@@ -91,9 +114,8 @@ class ForecastingController extends ChangeNotifier {
         ),
       ]);
 
-      profile = results[0] as UserProfile;
-      phPoints = results[1] as List<ForecastingChartPoint>;
-      ecPoints = results[2] as List<ForecastingChartPoint>;
+      phPoints = results[0];
+      ecPoints = results[1];
 
       final predictedPhPoints = phPoints.where((p) => p.isPredicted).toList();
       final predictedEcPoints = ecPoints.where((p) => p.isPredicted).toList();
@@ -139,11 +161,42 @@ class ForecastingController extends ChangeNotifier {
 
       isLoading = false;
       notifyListeners();
+    } on SensorOfflineException catch (error) {
+      isSensorOffline = true;
+      latestSensorRecordedAt = error.lastRecordedAt ?? latestSensorRecordedAt;
+      _clearForecastData();
+      errorMessage = null;
+      isLoading = false;
+      notifyListeners();
     } catch (e) {
       errorMessage = 'Failed to load forecasting data';
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _refreshFreshness() async {
+    try {
+      final snapshot = await monitoringService.getTelemetrySnapshot();
+      final wasOffline = isSensorOffline;
+      isSensorOffline = snapshot.isOffline;
+      latestSensorRecordedAt = snapshot.latestRecordedAt;
+      if (isSensorOffline) {
+        _clearForecastData();
+        notifyListeners();
+      } else if (wasOffline) {
+        await loadData();
+      }
+    } catch (_) {
+      // A database/network error is not proof that the sensor is offline.
+    }
+  }
+
+  void _clearForecastData() {
+    phPoints = [];
+    ecPoints = [];
+    phInsightDetail = null;
+    ecInsightDetail = null;
   }
 
   void selectTab(String tab) {
@@ -217,5 +270,15 @@ class ForecastingController extends ChangeNotifier {
       ecInsightDetail = updatedDetail;
     }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _freshnessTimer?.cancel();
+    final channel = _parameterChannel;
+    if (channel != null) {
+      monitoringService.unsubscribe(channel);
+    }
+    super.dispose();
   }
 }

@@ -119,15 +119,47 @@ class EvaluationSample {
   });
 }
 
+class ForecastEvaluationRecord {
+  final String parameter;
+  final String targetLabel;
+  final double predictedValue;
+  final double? actualValue;
+  final String status;
+  final int interventionCount;
+  final String? actionType;
+  final String? actionTimeLabel;
+
+  const ForecastEvaluationRecord({
+    required this.parameter,
+    required this.targetLabel,
+    required this.predictedValue,
+    required this.actualValue,
+    required this.status,
+    required this.interventionCount,
+    this.actionType,
+    this.actionTimeLabel,
+  });
+}
+
 class ModelEvaluation {
   final List<EvaluationSample> samples;
+  final List<ForecastEvaluationRecord> records;
   final int horizonHours;
   final String modelName;
+  final int pendingCount;
+  final int evaluatedCount;
+  final int intervenedCount;
+  final int missingActualCount;
 
   const ModelEvaluation({
     required this.samples,
+    this.records = const [],
     required this.horizonHours,
     required this.modelName,
+    this.pendingCount = 0,
+    this.evaluatedCount = 0,
+    this.intervenedCount = 0,
+    this.missingActualCount = 0,
   });
 
   static const empty = ModelEvaluation(
@@ -135,6 +167,9 @@ class ModelEvaluation {
     horizonHours: 12,
     modelName: 'Forecast model',
   );
+
+  int get storedPredictionCount =>
+      pendingCount + evaluatedCount + intervenedCount + missingActualCount;
 
   /// 100 minus the mean absolute percentage error, for 'pH', 'EC' or 'Both'.
   double? accuracyFor(String parameter) {

@@ -14,6 +14,8 @@ class DashboardForecastOverview extends StatefulWidget {
   final List<ForecastPoint> ecPoints;
   final List<ForecastHorizonSummary> summaries;
   final DateTime? generatedAt;
+  final bool isOffline;
+  final DateTime? latestSensorRecordedAt;
   final VoidCallback onViewDetails;
 
   const DashboardForecastOverview({
@@ -22,6 +24,8 @@ class DashboardForecastOverview extends StatefulWidget {
     required this.ecPoints,
     required this.summaries,
     required this.generatedAt,
+    this.isOffline = false,
+    this.latestSensorRecordedAt,
     required this.onViewDetails,
   });
 
@@ -40,6 +44,44 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 600;
+    if (widget.isOffline) {
+      final lastReceived = widget.latestSensorRecordedAt == null
+          ? 'No sensor data received'
+          : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: AppDecorations.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(isMobile),
+            SizedBox(
+              height: isMobile ? 230 : 350,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_off,
+                        size: 42, color: AppColors.textSecondary),
+                    const SizedBox(height: 12),
+                    Text('Sensor offline', style: AppTextStyles.sectionTitle),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Forecasting requires a recent five-minute sensor reading.',
+                      style: AppTextStyles.cardMeta,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(lastReceived, style: AppTextStyles.cardMeta),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final ph = _filtered(widget.phPoints);
     final ec = _filtered(widget.ecPoints);
     final phRange = _rangeFor(ph, fallback: const _ChartRange(5, 7));

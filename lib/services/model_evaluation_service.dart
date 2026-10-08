@@ -1,183 +1,119 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import '../models/reports_models.dart';
 import '../utils/manila_time.dart';
-import 'forecasting_service.dart';
 import 'supabase_client.dart';
 
-/// The ONE place where the Reports screen connects to the forecast model.
-/// It calls the same endpoint as the Forecasting screen
-/// (ForecastingService.backendApiUrl, set with --dart-define FORECAST_API_URL).
-/// When a new model is deployed behind that URL, nothing here has to change.
-/// Optionally set --dart-define=FORECAST_MODEL_NAME=... to show its name.
+/// Compares forecasts saved when they were generated with the sensor reading
+/// recorded at their target time. This avoids evaluating a fresh prediction
+/// against old data and keeps intervention-affected samples identifiable.
 class ModelEvaluationService {
   static const String modelName = String.fromEnvironment(
     'FORECAST_MODEL_NAME',
     defaultValue: 'Forecast model',
   );
 
-  static const int sampleCount = 8; // how many past moments are tested
-  static const Duration _tolerance = Duration(minutes: 45);
-
   Future<ModelEvaluation> evaluate({int horizonHours = 12}) async {
-    final readings = await Future.wait([
-      _loadReadings('avg_ph'),
-      _loadReadings('avg_ec'),
-      _loadReadings('avg_temp'),
-    ]);
-    final ph = readings[0];
-    final ec = readings[1];
-    final temp = readings[2];
+    Future<dynamic> loadRows(String columns) => supabase
+        .from('forecast_prediction_evaluations')
+        .select(columns)
+        .eq('horizon_hours', horizonHours)
+        .order('target_at', ascending: false)
+        .limit(500);
 
-    if (ph.isEmpty || ec.isEmpty) {
-      return ModelEvaluation(
-        samples: const [],
-        horizonHours: horizonHours,
-        modelName: modelName,
-      );
+    const baseColumns =
+        'parameter, horizon_hours, predicted_value, actual_value, '
+        'target_at, evaluation_status, model_version, intervention_count';
+    dynamic rows;
+    try {
+      rows = await loadRows('$baseColumns, intervention_action_type, '
+          'intervention_performed_at');
+    } catch (_) {
+      // Older deployments may not yet have the action-detail view columns.
+      rows = await loadRows(baseColumns);
     }
 
-    final latest = ph.first.time;
-    final jobs = <Future<EvaluationSample?>>[];
+    var pendingCount = 0;
+    var evaluatedCount = 0;
+    var intervenedCount = 0;
+    var missingActualCount = 0;
+    var storedModelName = modelName;
+    final samplesByTarget = <String, _MutableEvaluationSample>{};
+    final records = <ForecastEvaluationRecord>[];
 
-    for (var i = sampleCount; i >= 1; i--) {
-      final testTime = latest.subtract(Duration(hours: horizonHours * i));
-      final targetTime = testTime.add(Duration(hours: horizonHours));
+    for (final raw in (rows as List).cast<Map<String, dynamic>>()) {
+      final status = raw['evaluation_status']?.toString() ?? 'pending';
+      if (status == 'evaluated') {
+        evaluatedCount++;
+      } else if (status == 'intervened') {
+        intervenedCount++;
+      } else if (status == 'missing_actual') {
+        missingActualCount++;
+      } else {
+        pendingCount++;
+      }
 
-      jobs.add(
-        _evaluateOne(
-          testTime,
-          targetTime,
-          ph,
-          ec,
-          temp,
-          horizonHours,
+      final version = raw['model_version']?.toString().trim();
+      if (version != null && version.isNotEmpty) storedModelName = version;
+
+      final predicted = (raw['predicted_value'] as num?)?.toDouble();
+      final actual = (raw['actual_value'] as num?)?.toDouble();
+      final targetRaw = raw['target_at']?.toString();
+      final actionRaw = raw['intervention_performed_at']?.toString();
+      if (predicted != null && targetRaw != null) {
+        records.add(ForecastEvaluationRecord(
+          parameter: raw['parameter']?.toString() ?? '',
+          targetLabel: formatManilaDateTime(
+            toManilaTime(parseSupabaseTimestamp(targetRaw)),
+          ),
+          predictedValue: predicted,
+          actualValue: actual,
+          status: status,
+          interventionCount: (raw['intervention_count'] as num?)?.toInt() ?? 0,
+          actionType: raw['intervention_action_type']?.toString(),
+          actionTimeLabel: actionRaw == null
+              ? null
+              : formatManilaDateTime(
+                  toManilaTime(parseSupabaseTimestamp(actionRaw)),
+                ),
+        ));
+      }
+
+      // Intervention-affected forecasts remain counted, but are excluded from
+      // accuracy so a farmer's corrective action is not scored as model error.
+      if (status != 'evaluated') continue;
+      if (predicted == null || actual == null || targetRaw == null) continue;
+
+      final target = parseSupabaseTimestamp(targetRaw);
+      final key = target.toUtc().toIso8601String();
+      final sample = samplesByTarget.putIfAbsent(
+        key,
+        () => _MutableEvaluationSample(
+          target: target,
+          label: _label(target),
         ),
       );
+      if (raw['parameter'] == 'ph') {
+        sample.phActual = actual;
+        sample.phPredicted = predicted;
+      } else if (raw['parameter'] == 'ec') {
+        sample.ecActual = actual;
+        sample.ecPredicted = predicted;
+      }
     }
 
-    final results = await Future.wait(jobs);
+    final orderedSamples = samplesByTarget.values.toList()
+      ..sort((a, b) => a.target.compareTo(b.target));
+    final samples = orderedSamples.map((sample) => sample.freeze()).toList();
 
     return ModelEvaluation(
-      samples: results.whereType<EvaluationSample>().toList(),
+      samples: samples,
+      records: records,
       horizonHours: horizonHours,
-      modelName: modelName,
+      modelName: storedModelName,
+      pendingCount: pendingCount,
+      evaluatedCount: evaluatedCount,
+      intervenedCount: intervenedCount,
+      missingActualCount: missingActualCount,
     );
-  }
-
-  Future<EvaluationSample?> _evaluateOne(
-    DateTime testTime,
-    DateTime targetTime,
-    List<_Reading> ph,
-    List<_Reading> ec,
-    List<_Reading> temp,
-    int horizonHours,
-  ) async {
-    final phNow = _nearest(ph, testTime);
-    final ecNow = _nearest(ec, testTime);
-    if (phNow == null || ecNow == null) return null;
-
-    final tempNow = _nearest(temp, testTime)?.value ?? 24.0;
-
-    final phThen = _nearest(ph, targetTime);
-    final ecThen = _nearest(ec, targetTime);
-    if (phThen == null && ecThen == null) return null;
-
-    final predicted = await Future.wait([
-      _predict('ph', phNow.value, ecNow.value, tempNow, horizonHours),
-      _predict('ec', phNow.value, ecNow.value, tempNow, horizonHours),
-    ]);
-
-    if (predicted[0] == null && predicted[1] == null) return null;
-
-    return EvaluationSample(
-      label: _label(targetTime),
-      phActual: phThen?.value,
-      phPredicted: predicted[0],
-      ecActual: ecThen?.value,
-      ecPredicted: predicted[1],
-    );
-  }
-
-  /// Same request the Forecasting screen makes.
-  Future<double?> _predict(
-    String parameter,
-    double ph,
-    double ec,
-    double temp,
-    int horizonHours,
-  ) async {
-    try {
-      final uri = Uri.parse(ForecastingService.backendApiUrl).replace(
-        queryParameters: {
-          'parameter': parameter,
-          'ph': ph.toString(),
-          'ec': ec.toString(),
-          'temp': temp.toString(),
-          'horizon': horizonHours.toString(),
-        },
-      );
-
-      final response = await http.get(uri).timeout(
-            const Duration(seconds: 10),
-          );
-
-      if (response.statusCode != 200) return null;
-
-      final body = json.decode(response.body) as Map<String, dynamic>;
-
-      if (body['error_fallback'] != null) {
-        debugPrint('Model returned a fallback: ${body['error_fallback']}');
-        return null;
-      }
-
-      final raw = body['predictions'] as List;
-      final predictions =
-          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-
-      if (predictions.isEmpty) return null;
-
-      predictions.sort(
-        (a, b) => ((a['hour'] as num) - horizonHours)
-            .abs()
-            .compareTo(((b['hour'] as num) - horizonHours).abs()),
-      );
-
-      return (predictions.first['value'] as num).toDouble();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<List<_Reading>> _loadReadings(String valueColumn) async {
-    final rows = await supabase
-        .from('sensor_history')
-        .select('$valueColumn, recorded_at')
-        .order('recorded_at', ascending: false)
-        .limit(1000);
-    return [
-      for (final row in rows)
-        if (row[valueColumn] is num && row['recorded_at'] is String)
-          _Reading(
-            parseSupabaseTimestamp(row['recorded_at'] as String),
-            (row[valueColumn] as num).toDouble(),
-          ),
-    ];
-  }
-
-  _Reading? _nearest(List<_Reading> readings, DateTime target) {
-    _Reading? best;
-    var bestGap = _tolerance;
-    for (final reading in readings) {
-      final gap = reading.time.difference(target).abs();
-      if (gap <= bestGap) {
-        best = reading;
-        bestGap = gap;
-      }
-    }
-    return best;
   }
 
   String _label(DateTime time) {
@@ -202,8 +138,21 @@ class ModelEvaluationService {
   }
 }
 
-class _Reading {
-  final DateTime time;
-  final double value;
-  const _Reading(this.time, this.value);
+class _MutableEvaluationSample {
+  final DateTime target;
+  final String label;
+  double? phActual;
+  double? phPredicted;
+  double? ecActual;
+  double? ecPredicted;
+
+  _MutableEvaluationSample({required this.target, required this.label});
+
+  EvaluationSample freeze() => EvaluationSample(
+        label: label,
+        phActual: phActual,
+        phPredicted: phPredicted,
+        ecActual: ecActual,
+        ecPredicted: ecPredicted,
+      );
 }

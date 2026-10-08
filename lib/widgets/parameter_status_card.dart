@@ -21,68 +21,71 @@ class ParameterStatusCard extends StatelessWidget {
       builder: (context, units, _) {
         final display = _displayValue(data, units);
         return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // SizedBox(width: double.infinity) so spaceBetween actually has
-          // room to spread the label and value apart, and Wrap so long
-          // text drops to a second line on narrow phones instead of
-          // clipping.
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(data.label, style: AppTextStyles.cardLabel),
-                Text(
-                  'Current value: $display →',
-                  style: AppTextStyles.cardValue,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text('Ideal range: ${data.idealRange}', style: AppTextStyles.cardMeta),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // SizedBox(width: double.infinity) so spaceBetween actually has
+              // room to spread the label and value apart, and Wrap so long
+              // text drops to a second line on narrow phones instead of
+              // clipping.
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const LivePulseDot(size: 6),
-                    const SizedBox(width: 6),
-                    Text('Last updated: ${data.lastUpdated}', style: AppTextStyles.cardMeta),
+                    Text(data.label, style: AppTextStyles.cardLabel),
+                    Text(
+                      'Current value: $display →',
+                      style: AppTextStyles.cardValue,
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text('Ideal range: ${data.idealRange}',
+                        style: AppTextStyles.cardMeta),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const LivePulseDot(size: 6),
+                        const SizedBox(width: 6),
+                        Text('Last updated: ${data.lastUpdated}',
+                            style: AppTextStyles.cardMeta),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
   }
 
   String _displayValue(ParameterStatus value, String units) {
+    if (value.isOffline) return 'No data';
     if (value.label == 'Temperature') {
       final celsius = double.tryParse(value.currentValue);
       if (celsius != null) {

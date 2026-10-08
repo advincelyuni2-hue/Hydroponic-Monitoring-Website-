@@ -97,6 +97,9 @@ class _ForecastingDashboardScreenState
                       onHoursChanged: _controller.selectHours,
                       points: phPointsMapped,
                       ecPoints: ecPointsMapped,
+                      isOffline: _controller.isSensorOffline,
+                      latestSensorRecordedAt:
+                          _controller.latestSensorRecordedAt,
                     ),
                     const SizedBox(height: 16),
                     if (insight != null)
@@ -159,6 +162,9 @@ class _ForecastingDashboardScreenState
                             onHoursChanged: _controller.selectHours,
                             points: phPointsMapped,
                             ecPoints: ecPointsMapped,
+                            isOffline: _controller.isSensorOffline,
+                            latestSensorRecordedAt:
+                                _controller.latestSensorRecordedAt,
                           ),
                         ),
                       ],

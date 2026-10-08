@@ -32,8 +32,11 @@ class DashboardController extends ChangeNotifier {
   List<ForecastPoint> ecForecast = [];
   List<ForecastHorizonSummary> forecastSummaries = [];
   DateTime? forecastGeneratedAt;
+  bool isSensorOffline = false;
+  DateTime? latestSensorRecordedAt;
   RealtimeChannel? _parameterChannel;
   StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
+  Timer? _freshnessTimer;
   bool _refreshingParameters = false;
 
   DashboardController() {
@@ -49,15 +52,25 @@ class DashboardController extends ChangeNotifier {
           .toList();
       notifyListeners();
     });
+    _freshnessTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshParameterStatuses(),
+    );
   }
 
   Future<void> _refreshParameterStatuses() async {
     if (_refreshingParameters) return;
     _refreshingParameters = true;
     try {
-      parameterStatuses = await _monitoringService.getParameterStatuses();
+      final snapshot = await _monitoringService.getTelemetrySnapshot();
+      parameterStatuses = snapshot.statuses;
+      isSensorOffline = snapshot.isOffline;
+      latestSensorRecordedAt = snapshot.latestRecordedAt;
+      if (isSensorOffline) {
+        _clearPredictiveData();
+      }
       notifyListeners();
-      await _refreshPredictiveData();
+      if (!isSensorOffline) await _refreshPredictiveData();
     } catch (_) {
       // Keep the last known dashboard values during a transient refresh error.
     } finally {
@@ -77,14 +90,21 @@ class DashboardController extends ChangeNotifier {
               appProfile.value?.id ??
               'mock-user-id',
         ),
-        _monitoringService.getParameterStatuses(),
+        _monitoringService.getTelemetrySnapshot(),
         _notificationService.getNotificationItems(limit: 3, activeOnly: true),
       ]);
 
       profile = results[0] as UserProfile;
-      parameterStatuses = results[1] as List<ParameterStatus>;
+      final snapshot = results[1] as TelemetrySnapshot;
+      parameterStatuses = snapshot.statuses;
+      isSensorOffline = snapshot.isOffline;
+      latestSensorRecordedAt = snapshot.latestRecordedAt;
       notifications = results[2] as List<AppNotificationItem>;
-      await _refreshPredictiveData(notify: false);
+      if (isSensorOffline) {
+        _clearPredictiveData();
+      } else {
+        await _refreshPredictiveData(notify: false);
+      }
     } catch (e) {
       errorMessage = 'Could not load dashboard data';
     }
@@ -94,26 +114,47 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<void> _refreshPredictiveData({bool notify = true}) async {
-    final currentPh = _currentValue('pH', 6.5);
-    final currentEc = _currentValue('EC', 1.5);
-    final currentTemp = _currentValue('Temp', 24.0);
+    if (isSensorOffline) {
+      _clearPredictiveData();
+      if (notify) notifyListeners();
+      return;
+    }
 
-    final results = await Future.wait([
-      _forecastingService.getForecastChartData(
-        'ph',
-        selectedHours: 12,
-        currentPh: currentPh,
-        currentEc: currentEc,
-        currentTemp: currentTemp,
-      ),
-      _forecastingService.getForecastChartData(
-        'ec',
-        selectedHours: 12,
-        currentPh: currentPh,
-        currentEc: currentEc,
-        currentTemp: currentTemp,
-      ),
-    ]);
+    final currentPh = _currentValue('pH');
+    final currentEc = _currentValue('EC');
+    final currentTemp = _currentValue('Temp');
+    if (currentPh == null || currentEc == null || currentTemp == null) {
+      isSensorOffline = true;
+      _clearPredictiveData();
+      if (notify) notifyListeners();
+      return;
+    }
+
+    late final List<List<forecasting.ForecastingChartPoint>> results;
+    try {
+      results = await Future.wait([
+        _forecastingService.getForecastChartData(
+          'ph',
+          selectedHours: 12,
+          currentPh: currentPh,
+          currentEc: currentEc,
+          currentTemp: currentTemp,
+        ),
+        _forecastingService.getForecastChartData(
+          'ec',
+          selectedHours: 12,
+          currentPh: currentPh,
+          currentEc: currentEc,
+          currentTemp: currentTemp,
+        ),
+      ]);
+    } on SensorOfflineException catch (error) {
+      isSensorOffline = true;
+      latestSensorRecordedAt = error.lastRecordedAt ?? latestSensorRecordedAt;
+      _clearPredictiveData();
+      if (notify) notifyListeners();
+      return;
+    }
 
     final phPoints = results[0];
     final ecPoints = results[1];
@@ -161,13 +202,24 @@ class DashboardController extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  double _currentValue(String labelFragment, double fallback) {
+  double? _currentValue(String labelFragment) {
     for (final status in parameterStatuses) {
       if (status.label.contains(labelFragment)) {
-        return double.tryParse(status.currentValue) ?? fallback;
+        if (status.isOffline) return null;
+        return double.tryParse(status.currentValue);
       }
     }
-    return fallback;
+    return null;
+  }
+
+  void _clearPredictiveData() {
+    phForecast = [];
+    ecForecast = [];
+    forecastSummaries = [];
+    forecastGeneratedAt = null;
+    latestInsight = null;
+    phPredictionInsight = null;
+    ecPredictionInsight = null;
   }
 
   ForecastPoint _toDashboardPoint(forecasting.ForecastingChartPoint point) {
@@ -222,6 +274,7 @@ class DashboardController extends ChangeNotifier {
       _monitoringService.unsubscribe(channel);
     }
     _notificationSubscription?.cancel();
+    _freshnessTimer?.cancel();
     super.dispose();
   }
 }

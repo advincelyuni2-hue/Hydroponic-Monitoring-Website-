@@ -62,6 +62,50 @@ void main() {
     expect(selections, ['EC', 'pH']);
   });
 
+  testWidgets('intervened forecast remains visible outside accuracy',
+      (tester) async {
+    const evaluation = ModelEvaluation(
+      samples: [],
+      horizonHours: 4,
+      modelName: 'Forecast model',
+      intervenedCount: 1,
+      records: [
+        ForecastEvaluationRecord(
+          parameter: 'ph',
+          targetLabel: 'Oct 9, 2026, 4:00 PM',
+          predictedValue: 7.2,
+          actualValue: 6.3,
+          status: 'intervened',
+          interventionCount: 1,
+          actionType: 'pH Down',
+          actionTimeLabel: 'Oct 9, 2026, 2:00 PM',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ReportPredictionCard(
+              evaluation: evaluation,
+              selectedParameter: 'Both',
+              selectedHorizon: 4,
+              onHorizonChanged: (_) {},
+              isLoading: false,
+              errorMessage: null,
+              onParameterChanged: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Intervened'), findsOneWidget);
+    expect(find.textContaining('pH Down'), findsOneWidget);
+    expect(evaluation.accuracyFor('Both'), isNull);
+  });
+
   testWidgets('frequency distribution parameter control responds',
       (tester) async {
     final selections = <String>[];

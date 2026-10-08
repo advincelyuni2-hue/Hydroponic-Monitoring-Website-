@@ -134,6 +134,24 @@ class DashboardParameterGauge extends StatelessWidget {
     required double height,
     required double valueFontSize,
   }) {
+    if (data.isOffline) {
+      return SizedBox(
+        width: double.infinity,
+        height: height,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sensors_off, color: AppColors.textSecondary, size: 34),
+              const SizedBox(height: 8),
+              Text('No data', style: AppTextStyles.title),
+              const SizedBox(height: 4),
+              Text('Sensor offline', style: AppTextStyles.cardMeta),
+            ],
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: double.infinity,
       height: height,
@@ -288,6 +306,8 @@ class DashboardParameterGauge extends StatelessWidget {
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'offline':
+        return AppColors.textSecondary;
       case 'critical':
         return AppColors.alertText;
       case 'warning':

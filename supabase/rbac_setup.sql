@@ -96,7 +96,11 @@ alter table public.notifications
   add column if not exists is_resolved boolean not null default false,
   add column if not exists resolved_at timestamptz,
   add column if not exists resolved_by uuid references auth.users(id) on delete set null,
-  add column if not exists resolved_by_name text;
+  add column if not exists resolved_by_name text,
+  add column if not exists lifecycle_state text not null default 'open',
+  add column if not exists action_taken_at timestamptz,
+  add column if not exists recovery_started_at timestamptz,
+  add column if not exists stable_reading_count integer not null default 0;
 
 -- Sensor alerts are system-wide, so they do not belong to one employee.
 alter table public.notifications alter column employee_id drop not null;
@@ -124,6 +128,27 @@ create table if not exists public.forecast_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.forecast_predictions (
+  id uuid primary key default gen_random_uuid(),
+  baseline_history_id bigint not null references public.sensor_history(id) on delete cascade,
+  baseline_recorded_at timestamptz not null,
+  parameter text not null check (parameter in ('ph', 'ec')),
+  horizon_hours integer not null check (horizon_hours in (4, 8, 12)),
+  baseline_value numeric not null,
+  predicted_value numeric not null,
+  generated_at timestamptz not null default now(),
+  target_at timestamptz not null,
+  model_version text not null,
+  actual_history_id bigint references public.sensor_history(id) on delete set null,
+  actual_value numeric,
+  actual_recorded_at timestamptz,
+  evaluated_at timestamptz,
+  evaluation_status text not null default 'pending'
+    check (evaluation_status in ('pending', 'evaluated', 'intervened', 'missing_actual')),
+  intervention_count integer not null default 0 check (intervention_count >= 0),
+  unique (baseline_history_id, parameter, horizon_hours, model_version)
+);
+
 create table if not exists public.action_logs (
   id uuid primary key default gen_random_uuid(),
   created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -134,6 +159,17 @@ create table if not exists public.action_logs (
   current_ec numeric not null,
   current_temp numeric not null,
   suggested_fixes text[] not null default '{}',
+  notification_id uuid references public.notifications(id) on delete set null,
+  forecast_prediction_id uuid references public.forecast_predictions(id) on delete set null,
+  source text not null default 'manual',
+  action_type text,
+  amount numeric,
+  amount_unit text not null default 'mL',
+  notes text,
+  performed_at timestamptz not null default now(),
+  affected_parameters text[] not null default '{}',
+  reservoir_volume_l numeric,
+  sensor_history_id_before bigint references public.sensor_history(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -164,6 +200,34 @@ alter table public.action_logs
   add column if not exists created_by uuid references auth.users(id) on delete cascade;
 alter table public.action_logs
   alter column created_by set default auth.uid();
+alter table public.action_logs
+  add column if not exists notification_id uuid references public.notifications(id) on delete set null,
+  add column if not exists forecast_prediction_id uuid references public.forecast_predictions(id) on delete set null,
+  add column if not exists source text not null default 'manual',
+  add column if not exists action_type text,
+  add column if not exists amount numeric,
+  add column if not exists amount_unit text not null default 'mL',
+  add column if not exists notes text,
+  add column if not exists performed_at timestamptz not null default now(),
+  add column if not exists affected_parameters text[] not null default '{}',
+  add column if not exists reservoir_volume_l numeric,
+  add column if not exists sensor_history_id_before bigint references public.sensor_history(id) on delete set null;
+
+alter table public.notifications
+  add column if not exists action_log_id uuid references public.action_logs(id) on delete set null;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'notifications_lifecycle_state_check'
+      and conrelid = 'public.notifications'::regclass
+  ) then
+    alter table public.notifications
+      add constraint notifications_lifecycle_state_check
+      check (lifecycle_state in ('open', 'action_taken', 'recovering', 'resolved'));
+  end if;
+end $$;
 
 alter table public.dismissed_action_logs
   add column if not exists created_by uuid references auth.users(id) on delete cascade;
@@ -171,10 +235,13 @@ alter table public.dismissed_action_logs
   alter column created_by set default auth.uid();
 
 alter table public.forecast_logs enable row level security;
+alter table public.forecast_predictions enable row level security;
 alter table public.action_logs enable row level security;
 alter table public.dismissed_action_logs enable row level security;
 
 grant select, insert on public.forecast_logs to authenticated;
+grant select on public.forecast_predictions to authenticated;
+revoke insert, update, delete on public.forecast_predictions from anon, authenticated;
 grant select, insert on public.action_logs to authenticated;
 grant select, insert on public.dismissed_action_logs to authenticated;
 
@@ -186,6 +253,10 @@ drop policy if exists "Users can read relevant forecast logs" on public.forecast
 create policy "Users can read relevant forecast logs"
 on public.forecast_logs for select to authenticated
 using (created_by = auth.uid() or public.is_admin());
+
+drop policy if exists "Authenticated users can read forecast predictions" on public.forecast_predictions;
+create policy "Authenticated users can read forecast predictions"
+on public.forecast_predictions for select to authenticated using (true);
 
 drop policy if exists "Users can create action logs" on public.action_logs;
 create policy "Users can create action logs"
@@ -304,10 +375,14 @@ begin
       );
       new.status := 'read';
       new.is_read := true;
+      new.lifecycle_state := 'resolved';
     else
       new.resolved_at := null;
       new.resolved_by := null;
       new.resolved_by_name := null;
+      new.lifecycle_state := case
+        when new.action_log_id is null then 'open' else 'action_taken'
+      end;
     end if;
   end if;
   return new;
@@ -362,9 +437,15 @@ declare
 begin
   if measured_value between stable_min and stable_max then
     update public.notifications
-    set is_resolved = true,
-        status = 'read',
-        is_read = true,
+    set stable_reading_count = stable_reading_count + 1,
+        recovery_started_at = coalesce(recovery_started_at, now()),
+        lifecycle_state = case
+          when stable_reading_count + 1 >= 3 then 'resolved'
+          else 'recovering'
+        end,
+        is_resolved = stable_reading_count + 1 >= 3,
+        status = case when stable_reading_count + 1 >= 3 then 'read' else status end,
+        is_read = case when stable_reading_count + 1 >= 3 then true else is_read end,
         timestamp = now()
     where source = 'sensor'
       and parameter = parameter_name
@@ -400,6 +481,7 @@ begin
   -- current incident.
   update public.notifications
   set is_resolved = true,
+      lifecycle_state = 'resolved',
       status = 'read',
       is_read = true,
       timestamp = now()
@@ -420,6 +502,11 @@ begin
       ideal_range = format('%s - %s %s', stable_min_text, stable_max_text, unit_name),
       recommendation = recommendation_text,
       timestamp = now(),
+      stable_reading_count = 0,
+      recovery_started_at = null,
+      lifecycle_state = case
+        when action_log_id is null then 'open' else 'action_taken'
+      end,
       status = case when type is distinct from severity_name then 'unread' else status end,
       is_read = case when type is distinct from severity_name then false else is_read end
   where alert_key = alert_key_value
@@ -431,7 +518,8 @@ begin
 
   insert into public.notifications (
     employee_id, source, alert_key, parameter, title, message, type,
-    current_value, ideal_range, recommendation, status, is_read, is_resolved
+    current_value, ideal_range, recommendation, status, is_read, is_resolved,
+    lifecycle_state, stable_reading_count
   ) values (
     null,
     'sensor',
@@ -449,7 +537,9 @@ begin
     recommendation_text,
     'unread',
     false,
-    false
+    false,
+    'open',
+    0
   ) on conflict do nothing;
 end;
 $$;
@@ -619,6 +709,171 @@ begin
     alter publication supabase_realtime add table public.notifications;
   end if;
 end $$;
+
+-- Record an intervention and move its sensor alert into action_taken without
+-- prematurely resolving it. The five-minute alert trigger resolves it only
+-- after three consecutive stable readings.
+create or replace function public.record_notification_intervention(
+  notification_id_value uuid,
+  parameter_value text,
+  current_value_value numeric,
+  current_status_value text,
+  action_type_value text,
+  amount_value numeric default 0,
+  notes_value text default '',
+  reservoir_volume_l_value numeric default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  latest_history public.sensor_history%rowtype;
+  action_id uuid;
+  affected text[];
+begin
+  if actor is null then
+    raise exception 'Authentication is required.';
+  end if;
+
+  if not exists (
+    select 1 from public.notifications n
+    where n.id = notification_id_value
+      and (n.source = 'sensor' or n.employee_id = actor or public.is_admin())
+  ) then
+    raise exception 'Notification is not available.';
+  end if;
+
+  select * into latest_history
+  from public.sensor_history
+  order by recorded_at desc
+  limit 1;
+
+  affected := case lower(action_type_value)
+    when 'ph up' then array['ph', 'ec']
+    when 'ph down' then array['ph', 'ec']
+    when 'add nutrient' then array['ph', 'ec']
+    when 'add water' then array['ph', 'ec']
+    else array[lower(parameter_value)]
+  end;
+
+  insert into public.action_logs (
+    created_by, parameter, forecast_condition, horizon_hours,
+    current_ph, current_ec, current_temp, suggested_fixes,
+    notification_id, source, action_type, amount, amount_unit, notes,
+    performed_at, affected_parameters, reservoir_volume_l,
+    sensor_history_id_before
+  ) values (
+    actor, parameter_value, current_status_value, 0,
+    case when lower(parameter_value) in ('ph', 'ph level')
+      then current_value_value else coalesce(latest_history.avg_ph, 0) end,
+    case when lower(parameter_value) in ('ec', 'ec level')
+      then current_value_value else coalesce(latest_history.avg_ec, 0) end,
+    case when lower(parameter_value) in ('temperature', 'temp')
+      then current_value_value else coalesce(latest_history.avg_temp, 0) end,
+    array[
+      'Action: ' || action_type_value,
+      case when coalesce(amount_value, 0) > 0
+        then 'Amount: ' || amount_value || ' mL' else 'Amount: not recorded' end,
+      case when coalesce(notes_value, '') <> ''
+        then 'Notes: ' || notes_value else 'Notes: not recorded' end,
+      'Notification: ' || notification_id_value::text
+    ],
+    notification_id_value, 'notification_fix', action_type_value,
+    amount_value, 'mL', nullif(trim(notes_value), ''), now(), affected,
+    reservoir_volume_l_value, latest_history.id
+  ) returning id into action_id;
+
+  update public.notifications
+  set lifecycle_state = 'action_taken',
+      action_taken_at = now(),
+      action_log_id = action_id,
+      stable_reading_count = 0,
+      recovery_started_at = null,
+      status = 'read',
+      is_read = true
+  where id = notification_id_value;
+
+  return action_id;
+end;
+$$;
+
+grant execute on function public.record_notification_intervention(
+  uuid, text, numeric, text, text, numeric, text, numeric
+) to authenticated;
+
+-- Match a saved forecast to the first five-minute reading at or just after
+-- its target. Any intervention between baseline and actual is preserved as a
+-- separate evaluation status rather than counted against model accuracy.
+create or replace function public.evaluate_due_forecasts()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.forecast_predictions prediction
+  set actual_history_id = new.id,
+      actual_value = case prediction.parameter
+        when 'ph' then new.avg_ph else new.avg_ec end,
+      actual_recorded_at = new.recorded_at,
+      evaluated_at = now(),
+      intervention_count = (
+        select count(*)::integer from public.action_logs action
+        where action.performed_at > prediction.baseline_recorded_at
+          and action.performed_at <= new.recorded_at
+          and (
+            prediction.parameter = any(action.affected_parameters)
+            or lower(action.parameter) = prediction.parameter
+            or lower(action.parameter) = prediction.parameter || ' level'
+          )
+      ),
+      evaluation_status = case when exists (
+        select 1 from public.action_logs action
+        where action.performed_at > prediction.baseline_recorded_at
+          and action.performed_at <= new.recorded_at
+          and (
+            prediction.parameter = any(action.affected_parameters)
+            or lower(action.parameter) = prediction.parameter
+            or lower(action.parameter) = prediction.parameter || ' level'
+          )
+      ) then 'intervened' else 'evaluated' end
+  where prediction.evaluation_status = 'pending'
+    and prediction.target_at <= new.recorded_at
+    and new.recorded_at <= prediction.target_at + interval '15 minutes';
+
+  update public.forecast_predictions
+  set evaluation_status = 'missing_actual', evaluated_at = now()
+  where evaluation_status = 'pending'
+    and target_at < new.recorded_at - interval '15 minutes';
+  return new;
+end;
+$$;
+
+drop trigger if exists evaluate_due_forecasts on public.sensor_history;
+create trigger evaluate_due_forecasts
+after insert on public.sensor_history
+for each row execute function public.evaluate_due_forecasts();
+
+create or replace view public.forecast_prediction_evaluations
+with (security_invoker = true)
+as
+select
+  prediction.*,
+  case when actual_value is null then null
+    else actual_value - predicted_value end as signed_error,
+  case when actual_value is null then null
+    else abs(actual_value - predicted_value) end as absolute_error,
+  case when actual_value is null or actual_value = 0 then null
+    else abs(actual_value - predicted_value) / abs(actual_value) * 100 end
+    as percentage_error,
+  case when actual_value is null then null
+    else power(actual_value - predicted_value, 2) end as squared_error
+from public.forecast_predictions prediction;
+
+grant select on public.forecast_prediction_evaluations to authenticated;
 
 -- Promote an administrator manually, never from the public signup flow:
 -- update public.profiles set role = 'admin' where email = 'admin@example.com';

@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+from datetime import datetime, timedelta, timezone
 import joblib
 import numpy as np
 import pandas as pd
@@ -38,6 +39,8 @@ SUPABASE_KEY = os.getenv(
     "SUPABASE_SERVICE_ROLE_KEY",
     os.getenv("SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_ANON_KEY", "")),
 )
+FORECAST_MODEL_VERSION = os.getenv("FORECAST_MODEL_VERSION", "delta-lstm-v1")
+SENSOR_OFFLINE_AFTER_MINUTES = int(os.getenv("SENSOR_OFFLINE_AFTER_MINUTES", "10"))
 
 supabase: Client | None = (
     create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -116,6 +119,92 @@ def get_resilient_sequence(live_ph: float, live_ec: float, live_temp: float) -> 
     return df
 
 
+def get_latest_sensor_baseline():
+    if supabase is None:
+        return None
+    try:
+        response = (
+            supabase.from_("sensor_history")
+            .select("id,avg_ph,avg_ec,avg_temp,recorded_at")
+            .order("recorded_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "sensor_offline",
+                    "message": "No five-minute sensor reading is available.",
+                    "last_recorded_at": None,
+                },
+            )
+        row = response.data[0]
+        recorded_at = pd.Timestamp(row["recorded_at"])
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.tz_localize("UTC")
+        age = pd.Timestamp.now(tz="UTC") - recorded_at.tz_convert("UTC")
+        if age > pd.Timedelta(minutes=SENSOR_OFFLINE_AFTER_MINUTES):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "sensor_offline",
+                    "message": "The latest five-minute sensor reading is stale.",
+                    "last_recorded_at": recorded_at.isoformat(),
+                },
+            )
+        row["recorded_at"] = recorded_at.to_pydatetime()
+        return row
+    except HTTPException:
+        raise
+    except Exception:
+        return None
+
+
+def persist_forecast_predictions(
+    baseline,
+    parameter: str,
+    values_by_horizon: dict[int, float],
+):
+    if supabase is None or baseline is None:
+        return []
+
+    generated_at = datetime.now(timezone.utc)
+    baseline_at = baseline["recorded_at"]
+    if baseline_at.tzinfo is None:
+        baseline_at = baseline_at.replace(tzinfo=timezone.utc)
+    baseline_value = float(
+        baseline["avg_ph"] if parameter == "ph" else baseline["avg_ec"]
+    )
+    rows = [
+        {
+            "baseline_history_id": baseline["id"],
+            "baseline_recorded_at": baseline_at.isoformat(),
+            "parameter": parameter,
+            "horizon_hours": hours,
+            "baseline_value": baseline_value,
+            "predicted_value": round(value, 6),
+            "generated_at": generated_at.isoformat(),
+            "target_at": (baseline_at + timedelta(hours=hours)).isoformat(),
+            "model_version": FORECAST_MODEL_VERSION,
+        }
+        for hours, value in values_by_horizon.items()
+    ]
+    try:
+        response = (
+            supabase.from_("forecast_predictions")
+            .upsert(
+                rows,
+                on_conflict="baseline_history_id,parameter,horizon_hours,model_version",
+            )
+            .execute()
+        )
+        return [row.get("id") for row in (response.data or []) if row.get("id")]
+    except Exception:
+        traceback.print_exc()
+        return []
+
+
 def compute_21_features(df: pd.DataFrame) -> np.ndarray:
     """Computes exact 21 features in the exact column order specified by model_config.json."""
     f = pd.DataFrame(index=df.index)
@@ -172,7 +261,14 @@ def predict_forecast(
     horizon: int = Query(12, description="4, 8, or 12 hours"),
 ):
     try:
+        baseline = get_latest_sensor_baseline()
+        if baseline is not None:
+            ph = float(baseline["avg_ph"])
+            ec = float(baseline["avg_ec"])
+            temp = float(baseline["avg_temp"])
+
         is_ph = parameter.lower() == "ph"
+        parameter_key = "ph" if is_ph else "ec"
         model = ph_model if is_ph else ec_model
         delta_scaler = ph_delta_scaler if is_ph else ec_delta_scaler
         base_val = ph if is_ph else ec
@@ -215,6 +311,12 @@ def predict_forecast(
         val_8h = base_val + delta_8h
         val_12h = base_val + delta_12h
 
+        saved_prediction_ids = persist_forecast_predictions(
+            baseline,
+            parameter_key,
+            {4: val_4h, 8: val_8h, 12: val_12h},
+        )
+
         # 6. Build UI Trajectory Points
         if horizon == 4:
             predictions = [
@@ -247,8 +349,16 @@ def predict_forecast(
             "val_4h": round(val_4h, 3),
             "val_8h": round(val_8h, 3),
             "val_12h": round(val_12h, 3),
+            "model_version": FORECAST_MODEL_VERSION,
+            "baseline_history_id": baseline["id"] if baseline else None,
+            "baseline_recorded_at": (
+                baseline["recorded_at"].isoformat() if baseline else None
+            ),
+            "saved_prediction_ids": saved_prediction_ids,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("--- FORECASTING INFERENCE ERROR TRACEBACK ---")
         traceback.print_exc()

@@ -54,7 +54,8 @@ class NotificationCardWidget extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: AppDecorations.card().copyWith(
           border: Border.all(
-            color: isHighlighted ? AppColors.primaryButton : severityBorderColor,
+            color:
+                isHighlighted ? AppColors.primaryButton : severityBorderColor,
             width: isHighlighted ? 2.0 : 1.5,
           ),
           boxShadow: isHighlighted
@@ -75,18 +76,33 @@ class NotificationCardWidget extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: Checkbox(
-                    value: item.isResolved,
-                    onChanged: onResolveChanged,
-                    activeColor: AppColors.primaryButton,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+                if (item.isSensorAlert)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Icon(
+                      item.isResolved
+                          ? Icons.check_circle
+                          : Icons.sensors_outlined,
+                      size: 20,
+                      color: item.isResolved
+                          ? AppColors.accentGreen
+                          : AppColors.primaryButton,
+                    ),
+                  )
+                else
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Checkbox(
+                      value: item.isResolved,
+                      onChanged: onResolveChanged,
+                      activeColor: AppColors.primaryButton,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -185,6 +201,25 @@ class NotificationCardWidget extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 10),
+            if (item.isSensorAlert) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.calloutBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  item.lifecycleLabel,
+                  style: AppTextStyles.cardMeta.copyWith(
+                    color: item.isResolved
+                        ? AppColors.accentGreen
+                        : AppColors.primaryButton,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             // DSS Recommendation Box
             Text(
               'Recommendation:',

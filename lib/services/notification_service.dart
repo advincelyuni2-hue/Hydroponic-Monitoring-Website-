@@ -6,6 +6,20 @@ import '../utils/sensor_value_format.dart';
 import 'supabase_client.dart';
 
 class NotificationService {
+  String? lastInterventionError;
+
+  String _saveError(Object error) {
+    if (error is PostgrestException) {
+      if (error.code == 'PGRST202') {
+        return 'The intervention database function is missing. Run '
+            'supabase/forecast_intervention_setup.sql in the SQL Editor.';
+      }
+      final code = error.code;
+      return code == null ? error.message : '${error.message} ($code)';
+    }
+    return error.toString();
+  }
+
   Future<List<AppNotificationItem>> getNotificationItems({
     int limit = 10,
     bool activeOnly = false,
@@ -107,6 +121,12 @@ class NotificationService {
           ? storedRecommendation
           : liveDetail?.recommendation ??
               _legacyRecommendation(parameter, message),
+      source: row['source']?.toString() ?? 'manual',
+      lifecycleState: row['lifecycle_state']?.toString() ??
+          (row['is_resolved'] == true ? 'resolved' : 'open'),
+      actionTakenAt: _formatTimestamp(row['action_taken_at']),
+      recoveryStartedAt: _formatTimestamp(row['recovery_started_at']),
+      stableReadingCount: (row['stable_reading_count'] as num?)?.toInt() ?? 0,
       isRead: row['status'] == 'read' || row['is_read'] == true,
       isResolved: row['is_resolved'] == true,
       resolvedByName: row['resolved_by_name'] as String?,
@@ -372,59 +392,78 @@ class NotificationService {
     required double currentValue,
     required String currentStatus,
     required String actionType,
-    required double amount,
+    double? amount,
     required String notes,
+    double? reservoirVolumeL,
   }) async {
     final client = supabaseClient;
     final user = client?.auth.currentUser;
-    if (client == null || user == null) return false;
+    if (client == null || user == null) {
+      lastInterventionError = 'Sign in before recording an intervention.';
+      return false;
+    }
 
     try {
-      final latest = await client
-          .from('sensor_history')
-          .select('avg_ph, avg_ec, avg_temp')
-          .order('recorded_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-
-      var currentPh = (latest?['avg_ph'] as num?)?.toDouble() ?? 0.0;
-      var currentEc = (latest?['avg_ec'] as num?)?.toDouble() ?? 0.0;
-      var currentTemp = (latest?['avg_temp'] as num?)?.toDouble() ?? 0.0;
-
-      if (parameter == 'pH') {
-        currentPh = currentValue;
-      } else if (parameter == 'EC') {
-        currentEc = currentValue;
-      } else if (parameter == 'Temperature') {
-        currentTemp = currentValue;
+      lastInterventionError = null;
+      final actionId = await client.rpc(
+        'record_notification_intervention',
+        params: {
+          'notification_id_value': notificationId,
+          'parameter_value': parameter,
+          'current_value_value': currentValue,
+          'current_status_value': currentStatus,
+          'action_type_value': actionType,
+          'amount_value': amount,
+          'notes_value': notes,
+          'reservoir_volume_l_value': reservoirVolumeL,
+        },
+      );
+      if (actionId == null) {
+        lastInterventionError = 'The database did not return an action log ID.';
+        return false;
       }
+      return true;
+    } catch (error) {
+      lastInterventionError = _saveError(error);
+      return false;
+    }
+  }
 
-      final fixDetails = <String>[
-        'Action: $actionType',
-        if (amount > 0) 'Amount: ${amount.toStringAsFixed(2)} mL',
-        if (notes.isNotEmpty) 'Notes: $notes',
-        'Notification: $notificationId',
-      ];
+  Future<bool> recordManualIntervention({
+    required String parameter,
+    required double currentValue,
+    required String actionType,
+    double? amount,
+    required String notes,
+    double? reservoirVolumeL,
+  }) async {
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) {
+      lastInterventionError = 'Sign in before recording an intervention.';
+      return false;
+    }
 
-      await client.from('action_logs').insert({
-        'parameter': parameter,
-        'forecast_condition': currentStatus,
-        'horizon_hours': 0,
-        'current_ph': currentPh,
-        'current_ec': currentEc,
-        'current_temp': currentTemp,
-        'suggested_fixes': fixDetails,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      });
-
-      final updated = await client
-          .from('notifications')
-          .update({'is_resolved': true})
-          .eq('id', notificationId)
-          .select('id')
-          .maybeSingle();
-      return updated != null;
-    } catch (_) {
+    try {
+      lastInterventionError = null;
+      final actionId = await client.rpc(
+        'record_manual_intervention',
+        params: {
+          'parameter_value': parameter,
+          'current_value_value': currentValue,
+          'action_type_value': actionType,
+          'amount_value': amount,
+          'notes_value': notes,
+          'reservoir_volume_l_value': reservoirVolumeL,
+        },
+      );
+      if (actionId == null) {
+        lastInterventionError = 'The database did not return an action log ID.';
+        return false;
+      }
+      return true;
+    } catch (error) {
+      lastInterventionError = _saveError(error);
       return false;
     }
   }

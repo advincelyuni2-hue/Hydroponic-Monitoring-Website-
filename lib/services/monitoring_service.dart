@@ -10,6 +10,19 @@ import '../utils/sensor_value_format.dart';
 enum HistoryAggregation { fiveMinutes, eightHours, daily }
 
 class MonitoringService {
+  static const Duration sensorOfflineAfter = Duration(minutes: 10);
+
+  static bool isSensorReadingOffline(
+    DateTime? latestRecordedAt, {
+    DateTime? now,
+  }) {
+    if (latestRecordedAt == null) return true;
+    return (now ?? DateTime.now().toUtc())
+            .toUtc()
+            .difference(latestRecordedAt.toUtc()) >
+        sensorOfflineAfter;
+  }
+
   /// Column headers for the "Sensor logs" tab on the History Logs screen.
   static const List<String> sensorLogColumns = [
     'Time',
@@ -33,12 +46,34 @@ class MonitoringService {
 
   /// Powers the "Parameter Status" cards (pH / EC / Temperature).
   Future<List<ParameterStatus>> getParameterStatuses() async {
-    final ranges = await _getParameterRanges();
-    final reading = await _getLatestFiveMinuteReading();
-    final rawTimestamp = reading['recorded_at'] as String;
-    final timestamp = toManilaTime(parseSupabaseTimestamp(rawTimestamp));
+    return (await getTelemetrySnapshot()).statuses;
+  }
 
-    return [
+  Future<TelemetrySnapshot> getTelemetrySnapshot() async {
+    final ranges = await _getParameterRanges();
+    final reading = await _getLatestFiveMinuteReadingOrNull();
+    if (reading == null) {
+      return TelemetrySnapshot(
+        statuses: _offlineStatuses(ranges, null),
+        latestRecordedAt: null,
+        isOffline: true,
+      );
+    }
+
+    final timestampUtc =
+        parseSupabaseTimestamp(reading['recorded_at'] as String).toUtc();
+    final isOffline = isSensorReadingOffline(timestampUtc);
+    final timestamp = toManilaTime(timestampUtc);
+
+    if (isOffline) {
+      return TelemetrySnapshot(
+        statuses: _offlineStatuses(ranges, timestampUtc),
+        latestRecordedAt: timestampUtc,
+        isOffline: true,
+      );
+    }
+
+    final statuses = [
       _toParameterStatus(
         'pH Level',
         (reading['avg_ph'] as num).toDouble(),
@@ -70,6 +105,11 @@ class MonitoringService {
         1,
       ),
     ];
+    return TelemetrySnapshot(
+      statuses: statuses,
+      latestRecordedAt: timestampUtc,
+      isOffline: false,
+    );
   }
 
   Future<_ParameterRanges> _getParameterRanges() async {
@@ -100,17 +140,51 @@ class MonitoringService {
     return const _ParameterRanges();
   }
 
-  Future<Map<String, dynamic>> _getLatestFiveMinuteReading() async {
+  Future<Map<String, dynamic>?> _getLatestFiveMinuteReadingOrNull() async {
     final rows = await supabase
         .from('sensor_history')
-        .select('avg_ph, avg_ec, avg_temp, recorded_at')
+        .select('id, avg_ph, avg_ec, avg_temp, recorded_at')
         .order('recorded_at', ascending: false)
         .limit(1);
 
-    if (rows.isEmpty) {
-      throw StateError('No five-minute sensor history is available.');
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  List<ParameterStatus> _offlineStatuses(
+    _ParameterRanges ranges,
+    DateTime? latestRecordedAt,
+  ) {
+    final lastUpdated = latestRecordedAt == null
+        ? 'No sensor data received'
+        : formatManilaDateTime(toManilaTime(latestRecordedAt));
+
+    ParameterStatus offline(
+      String label,
+      String unit,
+      double minimum,
+      double maximum,
+      int decimals,
+    ) {
+      return ParameterStatus(
+        label: label,
+        currentValue: 'No data',
+        unit: unit,
+        idealRange:
+            '${minimum.toStringAsFixed(decimals)} - ${maximum.toStringAsFixed(decimals)}',
+        lastUpdated: lastUpdated,
+        status: 'Offline',
+        isOffline: true,
+        latestRecordedAt: latestRecordedAt,
+      );
     }
-    return rows.first;
+
+    return [
+      offline(
+          'pH Level', '', ranges.phMin, ranges.phMax, sensorValueDecimalPlaces),
+      offline('EC Level', 'mS/cm', ranges.ecMin, ranges.ecMax,
+          sensorValueDecimalPlaces),
+      offline('Temperature', '°C', 18, 24, 1),
+    ];
   }
 
   ParameterStatus _toParameterStatus(
@@ -131,6 +205,7 @@ class MonitoringService {
           '${minimum.toStringAsFixed(decimals)} - ${maximum.toStringAsFixed(decimals)}',
       lastUpdated: formatManilaDateTime(timestamp),
       status: _severityLabel(value, minimum, maximum, warningMargin),
+      latestRecordedAt: manilaWallTimeToUtc(timestamp),
     );
   }
 

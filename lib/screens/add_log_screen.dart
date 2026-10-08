@@ -7,6 +7,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/theme_mode_controller.dart';
 import '../utils/responsive.dart';
+import '../utils/manila_time.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import 'notifications_screen.dart';
@@ -38,8 +39,10 @@ class AddLogScreen extends StatelessWidget {
                 notification: notification,
                 onCancel: () => Navigator.of(context).maybePop(),
                 onSubmit: (entry) async {
+                  final notificationService = NotificationService();
+                  bool saved;
                   if (notification != null) {
-                    final saved = await NotificationService().recordFixAndResolve(
+                    saved = await notificationService.recordFixAndResolve(
                       notificationId: notification!.id,
                       parameter: entry.parameter,
                       currentValue: entry.currentValue,
@@ -47,32 +50,41 @@ class AddLogScreen extends StatelessWidget {
                       actionType: entry.actionType,
                       amount: entry.amount,
                       notes: entry.notes,
+                      reservoirVolumeL: entry.reservoirVolumeL,
                     );
-                    if (!saved) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Unable to save the fix. The notification remains active.',
-                            ),
-                          ),
-                        );
-                      }
-                      return;
+                  } else {
+                    saved = await notificationService.recordManualIntervention(
+                      parameter: entry.parameter,
+                      currentValue: entry.currentValue,
+                      actionType: entry.actionType,
+                      amount: entry.amount,
+                      notes: entry.notes,
+                      reservoirVolumeL: entry.reservoirVolumeL,
+                    );
+                  }
+                  if (!saved) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(notificationService.lastInterventionError ??
+                              'Unable to save the intervention. The alert remains active.'),
+                        ),
+                      );
                     }
+                    return false;
                   }
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Fix recorded successfully.')),
+                      const SnackBar(
+                          content: Text('Fix recorded successfully.')),
                     );
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (_) => const NotificationsScreen(
-                          initialTab: 'Resolved',
-                        ),
+                        builder: (_) => const NotificationsScreen(),
                       ),
                     );
                   }
+                  return true;
                 },
               ),
             ],
@@ -87,7 +99,8 @@ class FixEntry {
   final String parameter;
   final double currentValue;
   final String actionType;
-  final double amount;
+  final double? amount;
+  final double? reservoirVolumeL;
   final String notes;
 
   const FixEntry({
@@ -95,6 +108,7 @@ class FixEntry {
     required this.currentValue,
     required this.actionType,
     required this.amount,
+    this.reservoirVolumeL,
     required this.notes,
   });
 }
@@ -102,13 +116,15 @@ class FixEntry {
 class RecordFixCard extends StatefulWidget {
   final AppNotificationItem? notification;
   final VoidCallback onCancel;
-  final Future<void> Function(FixEntry) onSubmit;
+  final Future<bool> Function(FixEntry) onSubmit;
+  final String? Function()? submissionError;
 
   const RecordFixCard({
     super.key,
     this.notification,
     required this.onCancel,
     required this.onSubmit,
+    this.submissionError,
   });
 
   @override
@@ -127,16 +143,19 @@ class RecordFixCardState extends State<RecordFixCard> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _currentValueController;
   final _amountController = TextEditingController();
+  final _reservoirVolumeController = TextEditingController();
   late final TextEditingController _notesController;
 
   String? parameter;
   String? actionType;
   late final String dateTimestamp;
+  bool _submitting = false;
+  String? _submissionError;
 
   @override
   void initState() {
     super.initState();
-    dateTimestamp = widget.notification?.timestamp ?? 'Oct 4, 2026, 2:13 PM';
+    dateTimestamp = formatManilaDateTime(manilaNow());
 
     String prefilledParam = 'pH';
     if (widget.notification != null) {
@@ -149,9 +168,9 @@ class RecordFixCardState extends State<RecordFixCard> {
     }
     parameter = prefilledParam;
 
-    final rawVal = widget.notification?.currentValue
-            .replaceAll(RegExp(r'[^0-9.]'), '') ??
-        '7.2';
+    final rawVal =
+        widget.notification?.currentValue.replaceAll(RegExp(r'[^0-9.]'), '') ??
+            '';
     _currentValueController = TextEditingController(text: rawVal);
     _notesController = TextEditingController(
       text: widget.notification?.recommendation ?? '',
@@ -162,23 +181,40 @@ class RecordFixCardState extends State<RecordFixCard> {
   void dispose() {
     _currentValueController.dispose();
     _amountController.dispose();
+    _reservoirVolumeController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    await widget.onSubmit(
-      FixEntry(
+    if (_submitting || !_formKey.currentState!.validate()) return;
+    setState(() {
+      _submitting = true;
+      _submissionError = null;
+    });
+    try {
+      final saved = await widget.onSubmit(FixEntry(
         parameter: parameter!,
         currentValue: parameter == 'Temperature'
             ? fromDisplayTemp(double.parse(_currentValueController.text))
             : double.parse(_currentValueController.text),
         actionType: actionType ?? 'Other',
-        amount: double.tryParse(_amountController.text) ?? 0.0,
+        amount: double.tryParse(_amountController.text.trim()),
+        reservoirVolumeL:
+            double.tryParse(_reservoirVolumeController.text.trim()),
         notes: _notesController.text.trim(),
-      ),
-    );
+      ));
+      if (!saved && mounted) {
+        setState(() => _submissionError = widget.submissionError?.call() ??
+            'Unable to save the intervention. Please try again.');
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _submissionError = 'Unable to save: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -213,7 +249,8 @@ class RecordFixCardState extends State<RecordFixCard> {
       _textField(
         controller: _currentValueController,
         hint: '7.2',
-        suffix: parameter == 'Temperature' ? tempUnit : (units[parameter] ?? ''),
+        suffix:
+            parameter == 'Temperature' ? tempUnit : (units[parameter] ?? ''),
         numeric: true,
       ),
     );
@@ -229,12 +266,24 @@ class RecordFixCardState extends State<RecordFixCard> {
     );
 
     final amountField = _labeled(
-      'Amount / volume',
+      'Amount / volume (optional)',
       _textField(
         controller: _amountController,
         hint: '250',
         suffix: 'mL',
         numeric: true,
+        required: false,
+      ),
+    );
+
+    final reservoirVolumeField = _labeled(
+      'Reservoir volume (optional)',
+      _textField(
+        controller: _reservoirVolumeController,
+        hint: '100',
+        suffix: 'L',
+        numeric: true,
+        required: false,
       ),
     );
 
@@ -267,10 +316,14 @@ class RecordFixCardState extends State<RecordFixCard> {
               actionField,
               const SizedBox(height: 16),
               amountField,
+              const SizedBox(height: 16),
+              reservoirVolumeField,
             ] else ...[
               _twoColumns(parameterField, currentValueField),
               const SizedBox(height: 16),
               _twoColumns(actionField, amountField),
+              const SizedBox(height: 16),
+              reservoirVolumeField,
             ],
             const SizedBox(height: 16),
             _labeled(
@@ -283,6 +336,13 @@ class RecordFixCardState extends State<RecordFixCard> {
               ),
             ),
             const SizedBox(height: 20),
+            if (_submissionError != null) ...[
+              Text(
+                _submissionError!,
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.criticalRed),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -310,7 +370,7 @@ class RecordFixCardState extends State<RecordFixCard> {
                 SizedBox(
                   height: 38,
                   child: ElevatedButton(
-                    onPressed: _submit,
+                    onPressed: _submitting ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryButton,
                       elevation: 0,
@@ -320,7 +380,7 @@ class RecordFixCardState extends State<RecordFixCard> {
                       ),
                     ),
                     child: Text(
-                      'Record fix',
+                      _submitting ? 'Saving...' : 'Record fix',
                       style: AppTextStyles.button.copyWith(fontSize: 13),
                     ),
                   ),
@@ -363,14 +423,12 @@ class RecordFixCardState extends State<RecordFixCard> {
 
     return InputDecoration(
       hintText: hint,
-      hintStyle:
-          AppTextStyles.input.copyWith(color: AppColors.textSecondary),
+      hintStyle: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
       suffixText: (suffix == null || suffix.isEmpty) ? null : suffix,
       suffixStyle: AppTextStyles.cardMeta,
       filled: true,
       fillColor: _fill,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: border(AppColors.inputBorder),
       enabledBorder: border(AppColors.inputBorder),
       focusedBorder: border(AppColors.primaryButton),
@@ -396,9 +454,13 @@ class RecordFixCardState extends State<RecordFixCard> {
           : TextInputType.multiline,
       decoration: _decoration(hint: hint, suffix: suffix),
       validator: (value) {
-        if (!required) return null;
-        if (value == null || value.trim().isEmpty) return 'Required';
-        if (numeric && double.tryParse(value) == null) return 'Enter a number';
+        final trimmed = value?.trim() ?? '';
+        if (trimmed.isEmpty) return required ? 'Required' : null;
+        if (numeric) {
+          final number = double.tryParse(trimmed);
+          if (number == null) return 'Enter a number';
+          if (number < 0) return 'Cannot be negative';
+        }
         return null;
       },
     );
@@ -422,9 +484,8 @@ class RecordFixCardState extends State<RecordFixCard> {
       dropdownColor: AppColors.cardBackground,
       iconEnabledColor: AppColors.textPrimary,
       decoration: _decoration(),
-      items: items
-          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-          .toList(),
+      items:
+          items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
       onChanged: onChanged,
       validator: (v) => v == null ? 'Required' : null,
     );
@@ -434,7 +495,8 @@ class RecordFixCardState extends State<RecordFixCard> {
 Future<void> showRecordFixDialog(
   BuildContext context, {
   AppNotificationItem? notification,
-  required Future<void> Function(FixEntry) onSubmit,
+  required Future<bool> Function(FixEntry) onSubmit,
+  String? Function()? submissionError,
 }) {
   return showDialog(
     context: context,
@@ -444,10 +506,12 @@ Future<void> showRecordFixDialog(
       child: SingleChildScrollView(
         child: RecordFixCard(
           notification: notification,
+          submissionError: submissionError,
           onCancel: () => Navigator.of(dialogContext).pop(),
           onSubmit: (entry) async {
-            Navigator.of(dialogContext).pop();
-            await onSubmit(entry);
+            final saved = await onSubmit(entry);
+            if (saved && dialogContext.mounted) Navigator.of(dialogContext).pop();
+            return saved;
           },
         ),
       ),

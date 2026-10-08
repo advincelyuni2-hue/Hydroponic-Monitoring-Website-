@@ -61,12 +61,15 @@ class AppHeader extends StatelessWidget {
                   notifications: notifications,
                   onNotificationTap: (item) {
                     overlayEntry.remove();
+                    final interventionService = NotificationService();
                     showRecordFixDialog(
                       context,
                       notification: item,
+                      submissionError: () =>
+                          interventionService.lastInterventionError,
                       onSubmit: (entry) async {
-                        final saved = await NotificationService()
-                            .recordFixAndResolve(
+                        final saved =
+                            await interventionService.recordFixAndResolve(
                           notificationId: item.id,
                           parameter: entry.parameter,
                           currentValue: entry.currentValue,
@@ -74,17 +77,20 @@ class AppHeader extends StatelessWidget {
                           actionType: entry.actionType,
                           amount: entry.amount,
                           notes: entry.notes,
+                          reservoirVolumeL: entry.reservoirVolumeL,
                         );
-                        if (!context.mounted) return;
+                        if (!context.mounted) return saved;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
                               saved
-                                  ? 'Fix recorded successfully.'
-                                  : 'Unable to save the fix. The notification remains active.',
+                                  ? 'Intervention recorded. Waiting for three stable readings.'
+                                  : interventionService.lastInterventionError ??
+                                      'Unable to save the intervention. The alert remains active.',
                             ),
                           ),
                         );
+                        return saved;
                       },
                     );
                   },

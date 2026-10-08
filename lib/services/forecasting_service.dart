@@ -5,10 +5,16 @@ import '../models/forecasting_models.dart';
 import 'supabase_client.dart';
 import '../utils/manila_time.dart';
 
+class SensorOfflineException implements Exception {
+  final DateTime? lastRecordedAt;
+  const SensorOfflineException({this.lastRecordedAt});
+}
+
 class ForecastingService {
   static const String backendApiUrl = String.fromEnvironment(
     'FORECAST_API_URL',
-    defaultValue: 'http://hydroponics-monitoring.onrender.com/api/predict/forecast',
+    defaultValue:
+        'http://127.0.0.1:8000/api/predict/forecast',
   );
 
   Future<List<ForecastingChartPoint>> getForecastChartData(
@@ -23,15 +29,14 @@ class ForecastingService {
     final baselineVal = parameter == 'ph' ? currentPh : currentEc;
 
     try {
-      final table = parameter == 'ph' ? 'ph_readings' : 'ec_readings';
+      final valueColumn = parameter == 'ph' ? 'avg_ph' : 'avg_ec';
       final cutoff = requestTime
           .subtract(Duration(hours: selectedHours))
           .subtract(sensorStoredUtcCorrection);
 
       final response = await supabase
-          .from(table)
-          .select('value, recorded_at')
-          .eq('is_average', false)
+          .from('sensor_history')
+          .select('$valueColumn, recorded_at')
           .gte('recorded_at', cutoff.toIso8601String())
           .order('recorded_at', ascending: false)
           .limit(500);
@@ -47,7 +52,7 @@ class ForecastingService {
         chartPoints.add(
           ForecastingChartPoint(
             hour: hoursAgo,
-            value: (row['value'] as num).toDouble(),
+            value: (row[valueColumn] as num).toDouble(),
             isPredicted: false,
           ),
         );
@@ -87,11 +92,25 @@ class ForecastingService {
         return chartPoints;
       }
 
+      if (apiResponse.statusCode == 409) {
+        DateTime? lastRecordedAt;
+        try {
+          final body = json.decode(apiResponse.body) as Map<String, dynamic>;
+          final detail = body['detail'];
+          if (detail is Map && detail['code'] == 'sensor_offline') {
+            lastRecordedAt = DateTime.tryParse('${detail['last_recorded_at']}');
+          }
+        } catch (_) {}
+        throw SensorOfflineException(lastRecordedAt: lastRecordedAt);
+      }
+
       return _withFallbackPredictions(
         chartPoints,
         selectedHours,
         baselineVal,
       );
+    } on SensorOfflineException {
+      rethrow;
     } catch (_) {
       return _withFallbackPredictions(
         chartPoints,
