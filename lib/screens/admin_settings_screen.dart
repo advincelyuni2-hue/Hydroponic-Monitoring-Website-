@@ -11,6 +11,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/parameter_config_card.dart';
 
+
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
 
@@ -95,7 +96,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-    Future<void> _saveConfiguration() async {
+  Future<void> _saveConfiguration() async {
     final client = supabaseClient;
     if (client == null) return;
 
@@ -145,12 +146,13 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  void _revertConfiguration() {
+  Future<void> _revertConfiguration() async {
     setState(() {
-      _phRange = _initialPhRange;
-      _ecRange = _initialEcRange;
+      _phRange = const RangeValues(5.5, 6.5);
+      _ecRange = const RangeValues(1.2, 1.8);
     });
-    _message('Configuration reverted to saved values.');
+
+    await _saveConfiguration();
   }
 
   Future<void> _changeRole(Map<String, dynamic> user, String role) async {
@@ -158,10 +160,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     if (client == null) return;
 
     try {
-      await client
-          .from('profiles')
-          .update({'role': role})
-          .eq('id', user['id']);
+      await client.from('profiles').update({'role': role}).eq('id', user['id']);
       setState(() => user['role'] = role);
       _message('Role updated to ${role.toUpperCase()}.');
     } catch (_) {
@@ -169,9 +168,8 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _toggleUserActive(
-      Map<String, dynamic> user, bool active) async {
-        if (_isSelf(user)) {
+  Future<void> _toggleUserActive(Map<String, dynamic> user, bool active) async {
+    if (_isSelf(user)) {
       _message('You cannot deactivate your own account.');
       return;
     }
@@ -181,8 +179,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     try {
       await client
           .from('profiles')
-          .update({'is_active': active})
-          .eq('id', user['id']);
+          .update({'is_active': active}).eq('id', user['id']);
       setState(() => user['is_active'] = active);
       _message(active ? 'User activated.' : 'User deactivated.');
     } catch (_) {
@@ -273,15 +270,15 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
       _message('Unable to delete this user.');
     }
   }
-    bool _isSelf(Map<String, dynamic> user) {
+
+  bool _isSelf(Map<String, dynamic> user) {
     final currentId =
         supabaseClient?.auth.currentUser?.id ?? appProfile.value?.id;
     return currentId != null && user['id'] == currentId;
   }
 
   void _message(String text) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -296,13 +293,12 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppHeader(
-                  title: 'Admin settings', profile: appProfile.value),
+              AppHeader(title: 'Admin settings', profile: appProfile.value),
               const SizedBox(height: 24),
               if (!isAdmin || _loading)
                 Center(
-                    child: Text(_error ?? 'Loading...',
-                        style: AppTextStyles.body))
+                    child:
+                        Text(_error ?? 'Loading...', style: AppTextStyles.body))
               else if (_error != null)
                 Text(_error!, style: AppTextStyles.body)
               else ...[
@@ -377,8 +373,8 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.calloutBackground,
                       borderRadius: BorderRadius.circular(12),
@@ -391,12 +387,11 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       style: AppTextStyles.bodySmall
                           .copyWith(fontWeight: FontWeight.w600),
                       items: const [
-                        DropdownMenuItem(
-                            value: 'admin', child: Text('Admin')),
+                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
                         DropdownMenuItem(
                             value: 'employee', child: Text('Employee')),
                       ],
-                        onChanged: _isSelf(user)
+                      onChanged: _isSelf(user)
                           ? null
                           : (role) {
                               if (role != null) _changeRole(user, role);
@@ -416,7 +411,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     tooltip: 'Delete user account',
                     icon: const Icon(Icons.delete_outline_rounded,
                         color: AppColors.alertText, size: 20),
-                     onPressed: _isSelf(user) ? null : () => _deleteUser(user),
+                    onPressed: _isSelf(user) ? null : () => _deleteUser(user),
                   ),
                 ],
               ),

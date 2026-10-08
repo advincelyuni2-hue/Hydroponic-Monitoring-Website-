@@ -148,8 +148,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           value: appNotificationsEnabled.value,
           activeThumbColor: AppColors.primaryButton,
-          onChanged: (value) {
-            appNotificationsEnabled.value = value;
+          onChanged: (value) async {
+            await saveNotificationPreference(value);
+            if (!mounted) return;
             setState(() {});
           },
         ),
@@ -172,12 +173,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               DropdownMenuItem(value: 'Metric', child: Text('Metric')),
               DropdownMenuItem(value: 'Imperial', child: Text('Imperial')),
             ],
-            onChanged: (value) {
-              if (value != null) {
-                appMeasurementUnits.value = value;
-                setState(() {});
-              }
-            },
+            onChanged: (value) async {
+              if (value == null) return;
+              await saveMeasurementUnitsPreference(value);
+              if (!mounted) return;
+              setState(() {});
+              },
           ),
         ),
         Divider(color: AppColors.cardBorder, height: 1),
@@ -194,8 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               value: isDark,
               activeThumbColor: AppColors.primaryButton,
-              onChanged: (value) {
-                appThemeMode.value = value ? ThemeMode.dark : ThemeMode.light;
+              onChanged: (value) async {
+                await saveDarkModePreference(value);
               },
             );
           },
@@ -292,7 +293,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
-   Future<void> _openCredentialDialog(_CredentialMode mode) async {
+
+  Future<void> _openCredentialDialog(_CredentialMode mode) async {
     final message = await showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -300,7 +302,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (message != null && mounted) _showMessage(message);
   }
+
   Future<void> _saveProfile() async {
+    final name = _nameController.text.trim();
+
+    if (name.isEmpty) {
+      _showMessage('Please enter your full name.');
+      return;
+    }
+
+    final allowedName = RegExp(
+      r"^[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[' -][A-Za-zÀ-ÖØ-öø-ÿ]+)*$",
+    );
+
+    if (!allowedName.hasMatch(name)) {
+      _showMessage(
+        'Name can use letters, spaces, apostrophes, and hyphens only.',
+      );
+      return;
+    }
+
     final existing = appProfile.value ??
         UserProfile(
           id: 'local-user',
@@ -308,14 +329,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           email: '',
           role: 'Employee',
         );
-    await UserService().updateProfile(UserProfile(
-      id: existing.id,
-      name: _nameController.text.trim(),
-      email: existing.email,
-      role: existing.role,
-      isActive: existing.isActive,
-    ));
-    if (mounted) _showMessage('Profile changes saved.');
+
+    try {
+      await UserService().updateProfile(
+        UserProfile(
+          id: existing.id,
+          name: name,
+          email: existing.email,
+          role: existing.role,
+          isActive: existing.isActive,
+        ),
+      );
+
+      if (mounted) _showMessage('Profile changes saved.');
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Could not save profile changes. Please try again.');
+      }
+    }
   }
 
   Future<void> _confirmLogout() async {
@@ -434,8 +465,7 @@ class _SettingsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
+          Text(title, style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
           if (description != null) ...[
             const SizedBox(height: 6),
             Text(description!,
@@ -479,8 +509,7 @@ class _ChangeCredentialDialogState extends State<_ChangeCredentialDialog> {
 
   String? _validate() {
     final current = _currentController.text;
-    final next =
-        _isPassword ? _newController.text : _newController.text.trim();
+    final next = _isPassword ? _newController.text : _newController.text.trim();
 
     if (current.isEmpty) return 'Enter your current password.';
     if (_isPassword) {
@@ -607,8 +636,7 @@ class _ChangeCredentialDialogState extends State<_ChangeCredentialDialog> {
                   onChanged: _busy
                       ? null
                       : (v) => setState(() => _showPasswords = v ?? false),
-                  title:
-                      Text('Show passwords', style: AppTextStyles.bodySmall),
+                  title: Text('Show passwords', style: AppTextStyles.bodySmall),
                 ),
               if (_error != null) ...[
                 const SizedBox(height: 4),

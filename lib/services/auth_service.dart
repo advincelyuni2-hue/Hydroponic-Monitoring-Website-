@@ -199,7 +199,8 @@ class AuthService {
       );
     }
   }
-    /// False for Google-only accounts, which have no password to change.
+
+  /// False for Google-only accounts, which have no password to change.
   bool get hasPasswordLogin {
     final user = supabaseClient?.auth.currentUser;
     if (user == null) return true;
@@ -274,8 +275,8 @@ class AuthService {
           success: false, message: 'Unable to change email right now.');
     }
   }
-  
-    /// Called on app start. Returns true if the user should skip the login screen.
+
+  /// Called on app start. Returns true if the user should skip the login screen.
   Future<bool> restoreSession() async {
     final client = supabaseClient;
     final user = client?.auth.currentUser;
@@ -305,36 +306,62 @@ class AuthService {
   /// Step 1 of "forgot password": emails a one-time code.
   Future<AuthResult> resetPassword({required String email}) async {
     final value = email.trim();
+
     if (value.isEmpty) {
       return AuthResult(
-          success: false, message: 'Please enter your email address');
+        success: false,
+        message: 'Please enter your email address',
+      );
     }
-    if (!value.contains('@')) {
+
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) {
       return AuthResult(
-          success: false, message: 'Please enter a valid email address');
+        success: false,
+        message: 'Please enter a valid email address',
+      );
     }
 
     final client = supabaseClient;
-    if (client != null) {
-      try {
-        // No redirectTo: the email carries a code, not a link.
-        await client.auth.resetPasswordForEmail(value);
-      } on AuthException catch (error) {
-        return AuthResult(success: false, message: error.message);
-      } catch (_) {
-        return AuthResult(
-          success: false,
-          message: 'Unable to send the code right now.',
-        );
-      }
-    } else {
-      await Future.delayed(const Duration(seconds: 1));
+    if (client == null) {
+      return AuthResult(
+        success: false,
+        message: 'Password reset is unavailable right now.',
+      );
     }
 
-    return AuthResult(
-      success: true,
-      message: 'Verification code sent! Check your inbox.',
-    );
+    try {
+      final check = await client.functions.invoke(
+        'check-reset-email',
+        body: {'email': value},
+      );
+
+      final data = check.data;
+      final accountExists = data is Map && data['exists'] == true;
+
+      if (!accountExists) {
+        return AuthResult(
+          success: false,
+          message: 'No account found with this email.',
+        );
+      }
+
+      await client.auth.resetPasswordForEmail(value);
+
+      return AuthResult(
+        success: true,
+        message: 'Verification code sent! Check your inbox.',
+      );
+    } on AuthException {
+      return AuthResult(
+        success: false,
+        message: 'Unable to send the reset code right now.',
+      );
+    } catch (_) {
+      return AuthResult(
+        success: false,
+        message: 'Unable to verify this email right now. Please try again.',
+      );
+    }
   }
 
   /// Step 2: checks the code, then sets the new password.

@@ -18,12 +18,14 @@ class UserService {
         row = null;
       }
       if (row != null) {
+        final authUser = client.auth.currentUser;
+        final signedInEmail = authUser?.id == userId ? authUser?.email : null;
         final profile = UserProfile(
           id: row['id'] as String,
           name: (row['full_name'] as String?)?.trim().isNotEmpty == true
               ? row['full_name'] as String
               : 'User',
-          email: row['email'] as String? ?? '',
+          email: signedInEmail ?? (row['email'] as String? ?? ''),
           role: ((row['role'] as String?) ?? 'employee').toLowerCase(),
           isActive: row['is_active'] as bool? ?? true,
         );
@@ -46,13 +48,25 @@ class UserService {
 
   Future<bool> updateProfile(UserProfile profile) async {
     final client = supabaseClient;
+
     if (client != null) {
+      final updatedRows = await client
+          .from('profiles')
+          .update({'full_name': profile.name})
+          .eq('id', profile.id)
+          .select('id');
+
+      if (updatedRows.isEmpty) {
+        throw StateError('Your profile name was not saved.');
+      }
+
       await client.auth.updateUser(
         UserAttributes(data: {'full_name': profile.name}),
       );
     } else {
       await Future.delayed(const Duration(milliseconds: 500));
     }
+
     setAppProfile(profile);
     return true;
   }

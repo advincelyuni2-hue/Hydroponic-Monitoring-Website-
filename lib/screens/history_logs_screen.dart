@@ -118,11 +118,20 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-      await _controller.deleteSingleRow(index);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Log entry deleted.')),
-        );
+      try {
+        await _controller.deleteSingleRow(index);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Log entry deleted.')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not delete the log entry: $error')),
+          );
+        }
       }
     }
   }
@@ -198,11 +207,25 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-      await _controller.deleteSelectedRows();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$count log records deleted.')),
-        );
+      try {
+        await _controller.deleteSelectedRows();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$count log records deleted.')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not delete every selected log. Refresh the table and '
+                'check which rows remain. Details: $error',
+              ),
+            ),
+          );
+        }
       }
     }
   }
@@ -349,11 +372,24 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
       final newEc = double.tryParse(ecController.text) ?? initialEc;
       final newTemp = double.tryParse(tempController.text) ?? initialTemp;
 
-      await _controller.updateRowValues(index, newPh, newEc, newTemp);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Log record updated successfully.')),
-        );
+      try {
+        await _controller.updateRowValues(index, newPh, newEc, newTemp);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Log record updated successfully.'),
+            ),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not save the log record: $error'),
+            ),
+          );
+        }
       }
     }
   }

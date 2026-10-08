@@ -29,14 +29,27 @@ class ForgotPasswordController extends ChangeNotifier {
 
   /// Step 1 (also used by "Resend code"): email the code.
   Future<bool> sendCode() async {
-    isLoading = true;
     errorMessage = null;
     successMessage = null;
+
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      errorMessage = 'Please enter your email address.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+
+    isLoading = true;
     notifyListeners();
 
-    final result = await _authService.resetPassword(
-      email: emailController.text.trim(),
-    );
+    final result = await _authService.resetPassword(email: email);
 
     isLoading = false;
     if (result.success) {

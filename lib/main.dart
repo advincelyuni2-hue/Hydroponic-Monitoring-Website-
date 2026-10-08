@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
+import 'services/app_state.dart';
 import 'screens/auth_gate.dart';
 import 'services/supabase_client.dart';
 import 'theme/theme_mode_controller.dart';
@@ -7,6 +8,7 @@ import 'theme/theme_mode_controller.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initSupabase();
+  await loadSavedPreferences();
   runApp(const MyApp());
 }
 
