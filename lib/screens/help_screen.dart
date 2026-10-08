@@ -25,6 +25,7 @@ class _HelpScreenState extends State<HelpScreen> {
   bool _busy = false;
   String? _loadError;
   String _category = _all;
+  String _searchQuery = '';
 
   bool get _isAdmin => appProfile.value?.isAdmin == true;
 
@@ -184,11 +185,23 @@ class _HelpScreenState extends State<HelpScreen> {
       _category = _all;
     }
 
-    final visible = _articles
-        .where((a) => _category == _all || a.category == _category)
-        .toList();
-    final tutorials = visible.where((a) => a.type == 'tutorial').toList();
-    final faqs = visible.where((a) => a.type == 'faq').toList();
+    final query = _searchQuery.trim().toLowerCase();
+
+    final visible = _articles.where((article) {
+      final matchesCategory =
+          _category == _all || article.category == _category;
+
+      final matchesSearch = query.isEmpty ||
+          article.title.toLowerCase().contains(query) ||
+          article.body.toLowerCase().contains(query) ||
+          article.category.toLowerCase().contains(query);
+
+      return matchesCategory && matchesSearch;
+    }).toList();
+
+    final tutorials =
+        visible.where((article) => article.type == 'tutorial').toList();
+    final faqs = visible.where((article) => article.type == 'faq').toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -206,6 +219,18 @@ class _HelpScreenState extends State<HelpScreen> {
                 style: AppTextStyles.body,
               ),
               const SizedBox(height: 16),
+              TextField(
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search tutorials and FAQs',
+                  prefixIcon: const Icon(Icons.search),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               if (_isAdmin) _buildAdminActions(),
               if (_isAdmin && _loadError != null) _buildLoadError(),
               if (_busy || _loading) ...[
@@ -218,22 +243,51 @@ class _HelpScreenState extends State<HelpScreen> {
                 width: double.infinity,
                 padding: EdgeInsets.all(isMobile ? 16 : 20),
                 decoration: AppDecorations.card(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSection(
-                      'Tutorials',
-                      tutorials,
-                      'No tutorials in this category yet.',
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSection(
-                      'FAQs',
-                      faqs,
-                      'No FAQs in this category yet.',
-                    ),
-                  ],
-                ),
+                child: isMobile
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSection(
+                            'Tutorials',
+                            tutorials,
+                            query.isEmpty
+                                ? 'No tutorials in this category yet.'
+                                : 'No tutorials match your search.',
+                          ),
+                          const SizedBox(height: 24),
+                          _buildSection(
+                            'FAQs',
+                            faqs,
+                            query.isEmpty
+                                ? 'No FAQs in this category yet.'
+                                : 'No FAQs match your search.',
+                          ),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildSection(
+                              'Tutorials',
+                              tutorials,
+                              query.isEmpty
+                                  ? 'No tutorials in this category yet.'
+                                  : 'No tutorials match your search.',
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildSection(
+                              'FAQs',
+                              faqs,
+                              query.isEmpty
+                                  ? 'No FAQs in this category yet.'
+                                  : 'No FAQs match your search.',
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
