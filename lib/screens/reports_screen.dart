@@ -91,14 +91,14 @@ class ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 12),
               _buildMetricCard(
                 title: 'AVG PH',
-                value: summary.avgPh.toStringAsFixed(1),
+                value: summary.avgPh.toStringAsFixed(6),
                 status: summary.phStatus,
                 isWarning: summary.phStatus.toLowerCase() != 'in range',
               ),
               const SizedBox(height: 12),
               _buildMetricCard(
                 title: 'AVG EC',
-                value: '${summary.avgEc.toStringAsFixed(1)} mS/cm',
+                value: '${summary.avgEc.toStringAsFixed(6)} mS/cm',
                 status: summary.ecStatus,
                 isWarning: summary.ecStatus.toLowerCase() != 'stable',
               ),
@@ -185,14 +185,14 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 12),
         _buildMetricCard(
           title: 'AVG PH',
-          value: summary.avgPh.toStringAsFixed(1),
+          value: summary.avgPh.toStringAsFixed(6),
           status: summary.phStatus,
           isWarning: summary.phStatus.toLowerCase() != 'in range',
         ),
         const SizedBox(height: 12),
         _buildMetricCard(
           title: 'AVG EC',
-          value: '${summary.avgEc.toStringAsFixed(1)} mS/cm',
+          value: '${summary.avgEc.toStringAsFixed(6)} mS/cm',
           status: summary.ecStatus,
           isWarning: summary.ecStatus.toLowerCase() != 'stable',
         ),

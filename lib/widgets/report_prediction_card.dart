@@ -316,10 +316,10 @@ class ReportPredictionCard extends StatelessWidget {
             axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: isMobile ? 33 : 42,
+              reservedSize: isMobile ? 62 : 72,
               interval: maxY / 4,
               getTitlesWidget: (value, _) => Text(
-                value.toStringAsFixed(1),
+                value.toStringAsFixed(6),
                 style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
               ),
             ),
@@ -357,7 +357,7 @@ class ReportPredictionCard extends StatelessWidget {
                 LineTooltipItem(
                   '${i == 0 ? '${samples[touched[i].x.toInt()].label}\n' : ''}'
                   '${series[touched[i].barIndex].name}: '
-                  '${touched[i].y.toStringAsFixed(2)}'
+                  '${touched[i].y.toStringAsFixed(6)}'
                   '${series[touched[i].barIndex].name.startsWith('EC') ? ' mS/cm' : ''}',
                   AppTextStyles.bodyBold.copyWith(
                     color: series[touched[i].barIndex].color,

@@ -83,8 +83,6 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
-<<<<<<< HEAD
-=======
 alter table public.notifications
   add column if not exists title text,
   add column if not exists parameter text,
@@ -206,8 +204,6 @@ drop policy if exists "Users can read relevant dismissed action logs" on public.
 create policy "Users can read relevant dismissed action logs"
 on public.dismissed_action_logs for select to authenticated
 using (created_by = auth.uid() or public.is_admin());
-
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 create table if not exists public.calibration_logs (
   id uuid primary key default gen_random_uuid(),
   recorded_at timestamptz not null default now(),
@@ -254,20 +250,13 @@ on public.help_articles for all to authenticated
 using (public.is_admin()) with check (public.is_admin());
 
 alter table public.notifications enable row level security;
-<<<<<<< HEAD
-grant select, insert, update, delete on public.notifications to authenticated;
-=======
 grant select, insert, delete on public.notifications to authenticated;
 revoke update on public.notifications from authenticated;
 grant update (is_resolved, status, is_read) on public.notifications to authenticated;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
 drop policy if exists "Employees can create alerts" on public.notifications;
 create policy "Employees can create alerts"
 on public.notifications for insert to authenticated
-<<<<<<< HEAD
-with check (employee_id = auth.uid() and not public.is_admin());
-=======
 with check (
   employee_id = auth.uid()
   and not public.is_admin()
@@ -275,20 +264,10 @@ with check (
   and alert_key is null
   and is_resolved = false
 );
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
 drop policy if exists "Users can read relevant alerts" on public.notifications;
 create policy "Users can read relevant alerts"
 on public.notifications for select to authenticated
-<<<<<<< HEAD
-using (employee_id = auth.uid() or public.is_admin());
-
-drop policy if exists "Admins can update alerts" on public.notifications;
-create policy "Admins can update alerts"
-on public.notifications for update to authenticated
-using (public.is_admin())
-with check (public.is_admin());
-=======
 using (source = 'sensor' or employee_id = auth.uid() or public.is_admin());
 
 drop policy if exists "Admins can update alerts" on public.notifications;
@@ -297,7 +276,6 @@ create policy "Users can update relevant alerts"
 on public.notifications for update to authenticated
 using (source = 'sensor' or employee_id = auth.uid() or public.is_admin())
 with check (source = 'sensor' or employee_id = auth.uid() or public.is_admin());
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 
 drop policy if exists "Admins can delete alerts" on public.notifications;
 drop policy if exists "Users can delete relevant alerts" on public.notifications;
@@ -305,8 +283,6 @@ create policy "Admins can delete alerts"
 on public.notifications for delete to authenticated
 using (public.is_admin());
 
-<<<<<<< HEAD
-=======
 create or replace function public.stamp_notification_resolution()
 returns trigger
 language plpgsql
@@ -322,7 +298,10 @@ begin
       into new.resolved_by_name
       from public.profiles
       where id = auth.uid();
-      new.resolved_by_name := coalesce(new.resolved_by_name, 'User');
+      new.resolved_by_name := coalesce(
+        new.resolved_by_name,
+        case when auth.uid() is null then 'System recovery' else 'User' end
+      );
       new.status := 'read';
       new.is_read := true;
     else
@@ -340,8 +319,142 @@ create trigger stamp_notification_resolution
 before update of is_resolved on public.notifications
 for each row execute function public.stamp_notification_resolution();
 
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-create or replace function public.create_parameter_alert()
+-- The alert trigger depends on this singleton configuration row. Create it
+-- before installing the trigger so this script also works on a new project.
+create table if not exists public.parameter_configurations (
+  id integer primary key default 1 check (id = 1),
+  ph_min numeric not null default 5.5,
+  ph_max numeric not null default 6.5,
+  ec_min numeric not null default 1.2,
+  ec_max numeric not null default 1.8,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users(id)
+);
+
+insert into public.parameter_configurations (id)
+values (1)
+on conflict (id) do nothing;
+
+create or replace function public.apply_sensor_alert(
+  parameter_key text,
+  parameter_name text,
+  measured_value numeric,
+  stable_min numeric,
+  stable_max numeric,
+  warning_margin numeric,
+  unit_name text,
+  low_recommendation text,
+  high_recommendation text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  direction_name text;
+  severity_name text;
+  recommendation_text text;
+  alert_key_value text;
+  measured_text text;
+  stable_min_text text;
+  stable_max_text text;
+begin
+  if measured_value between stable_min and stable_max then
+    update public.notifications
+    set is_resolved = true,
+        status = 'read',
+        is_read = true,
+        timestamp = now()
+    where source = 'sensor'
+      and parameter = parameter_name
+      and is_resolved = false;
+    return;
+  end if;
+
+  direction_name := case when measured_value < stable_min then 'Low' else 'High' end;
+  severity_name := case
+    when measured_value < stable_min - warning_margin
+      or measured_value > stable_max + warning_margin then 'critical'
+    else 'warning'
+  end;
+  recommendation_text := case
+    when measured_value < stable_min then low_recommendation
+    else high_recommendation
+  end;
+  alert_key_value := format('sensor_history:%s:%s', parameter_key, lower(direction_name));
+  measured_text := case
+    when parameter_key = 'temp' then to_char(measured_value, 'FM999990.0')
+    else to_char(measured_value, 'FM999990.000000')
+  end;
+  stable_min_text := case
+    when parameter_key = 'temp' then to_char(stable_min, 'FM999990.0')
+    else to_char(stable_min, 'FM999990.000000')
+  end;
+  stable_max_text := case
+    when parameter_key = 'temp' then to_char(stable_max, 'FM999990.0')
+    else to_char(stable_max, 'FM999990.000000')
+  end;
+
+  -- Close an unresolved alert in the opposite direction before opening the
+  -- current incident.
+  update public.notifications
+  set is_resolved = true,
+      status = 'read',
+      is_read = true,
+      timestamp = now()
+  where source = 'sensor'
+    and parameter = parameter_name
+    and alert_key <> alert_key_value
+    and is_resolved = false;
+
+  update public.notifications
+  set title = format('%s %s', parameter_name, direction_name),
+      message = format(
+        '%s five-minute average is %s at %s %s. Stable range: %s - %s %s.',
+        parameter_name, lower(direction_name), measured_text, unit_name,
+        stable_min_text, stable_max_text, unit_name
+      ),
+      type = severity_name,
+      current_value = format('%s %s', measured_text, unit_name),
+      ideal_range = format('%s - %s %s', stable_min_text, stable_max_text, unit_name),
+      recommendation = recommendation_text,
+      timestamp = now(),
+      status = case when type is distinct from severity_name then 'unread' else status end,
+      is_read = case when type is distinct from severity_name then false else is_read end
+  where alert_key = alert_key_value
+    and is_resolved = false;
+
+  if found then
+    return;
+  end if;
+
+  insert into public.notifications (
+    employee_id, source, alert_key, parameter, title, message, type,
+    current_value, ideal_range, recommendation, status, is_read, is_resolved
+  ) values (
+    null,
+    'sensor',
+    alert_key_value,
+    parameter_name,
+    format('%s %s', parameter_name, direction_name),
+    format(
+      '%s five-minute average is %s at %s %s. Stable range: %s - %s %s.',
+      parameter_name, lower(direction_name), measured_text, unit_name,
+      stable_min_text, stable_max_text, unit_name
+    ),
+    severity_name,
+    format('%s %s', measured_text, unit_name),
+    format('%s - %s %s', stable_min_text, stable_max_text, unit_name),
+    recommendation_text,
+    'unread',
+    false,
+    false
+  ) on conflict do nothing;
+end;
+$$;
+
+create or replace function public.evaluate_five_minute_alerts()
 returns trigger
 language plpgsql
 security definer
@@ -349,131 +462,39 @@ set search_path = public
 as $$
 declare
   config record;
-  minimum_value numeric;
-  maximum_value numeric;
-  parameter_name text;
-<<<<<<< HEAD
-=======
-  unit_name text;
-  direction_name text;
-  severity_name text;
-  recommendation_text text;
-  alert_key_value text;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
 begin
-  if coalesce(new.is_average, false) then
-    return new;
-  end if;
-
-  select ph_min, ph_max, ec_min, ec_max
+  select
+    coalesce((select ph_min from public.parameter_configurations where id = 1), 5.5) as ph_min,
+    coalesce((select ph_max from public.parameter_configurations where id = 1), 6.5) as ph_max,
+    coalesce((select ec_min from public.parameter_configurations where id = 1), 1.2) as ec_min,
+    coalesce((select ec_max from public.parameter_configurations where id = 1), 1.8) as ec_max
   into config
-  from public.parameter_configurations
-  where id = 1;
+  ;
 
-  if tg_table_name = 'ph_readings' then
-    parameter_name := 'pH Level';
-<<<<<<< HEAD
-=======
-    unit_name := 'pH';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-    minimum_value := coalesce(config.ph_min, 5.5);
-    maximum_value := coalesce(config.ph_max, 6.5);
-  elsif tg_table_name = 'ec_readings' then
-    parameter_name := 'EC Level';
-<<<<<<< HEAD
-=======
-    unit_name := 'mS/cm';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-    minimum_value := coalesce(config.ec_min, 1.2);
-    maximum_value := coalesce(config.ec_max, 1.8);
-  else
-    parameter_name := 'Temperature';
-<<<<<<< HEAD
-=======
-    unit_name := '°C';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-    minimum_value := 18;
-    maximum_value := 28;
-  end if;
-
-  if new.value < minimum_value or new.value > maximum_value then
-<<<<<<< HEAD
-    insert into public.notifications (employee_id, message, status)
-    select id,
-      format('%s reading %s is outside the configured range (%s - %s).',
-        parameter_name, new.value, minimum_value, maximum_value),
-      'unread'
-    from public.profiles
-    where role = 'admin' and is_active;
-=======
-    direction_name := case when new.value < minimum_value then 'Low' else 'High' end;
-    alert_key_value := format('%s:%s', tg_table_name, lower(direction_name));
-
-    if tg_table_name = 'ph_readings' then
-      severity_name := case when new.value < 5.0 or new.value > 7.0 then 'critical' else 'warning' end;
-      recommendation_text := case
-        when new.value < minimum_value then 'Add pH-up solution gradually, circulate the solution, and verify the reading before adding more.'
-        else 'Add pH-down solution gradually, circulate the solution, and verify the reading before adding more.'
-      end;
-    elsif tg_table_name = 'ec_readings' then
-      severity_name := case when new.value < 0.8 or new.value > 2.2 then 'critical' else 'warning' end;
-      recommendation_text := case
-        when new.value < minimum_value then 'Check the nutrient mixture and replenish nutrients gradually, then verify the EC reading.'
-        else 'Check water level and nutrient concentration; dilute gradually with clean water, then verify the EC reading.'
-      end;
-    else
-      severity_name := case when new.value < 15 or new.value > 30 then 'critical' else 'warning' end;
-      recommendation_text := case
-        when new.value < minimum_value then 'Inspect the heater and environment, raise the temperature gradually, and verify the sensor reading.'
-        else 'Improve cooling or ventilation, inspect the reservoir, and verify the temperature sensor reading.'
-      end;
-    end if;
-
-    -- Keep the existing unresolved alert current without creating or sending
-    -- another notification for the same parameter and direction.
-    update public.notifications
-    set message = format('%s is %s at %s %s. The configured range is %s - %s %s.',
-          parameter_name, lower(direction_name), new.value, unit_name,
-          minimum_value, maximum_value, unit_name),
-        type = severity_name,
-        current_value = format('%s %s', new.value, unit_name),
-        ideal_range = format('%s - %s %s', minimum_value, maximum_value, unit_name),
-        recommendation = recommendation_text,
-        timestamp = now()
-    where alert_key = alert_key_value
-      and is_resolved = false;
-
-    if found then
-      return new;
-    end if;
-
-    insert into public.notifications (
-      employee_id, source, alert_key, parameter, title, message, type,
-      current_value, ideal_range, recommendation, status, is_read, is_resolved
-    ) values (
-      null,
-      'sensor',
-      alert_key_value,
-      parameter_name,
-      format('%s %s', parameter_name, direction_name),
-      format('%s is %s at %s %s. The configured range is %s - %s %s.',
-        parameter_name, lower(direction_name), new.value, unit_name,
-        minimum_value, maximum_value, unit_name),
-      severity_name,
-      format('%s %s', new.value, unit_name),
-      format('%s - %s %s', minimum_value, maximum_value, unit_name),
-      recommendation_text,
-      'unread',
-      false,
-      false
-    )
-    on conflict do nothing;
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
-  end if;
+  perform public.apply_sensor_alert(
+    'ph', 'pH Level', new.avg_ph::numeric,
+    coalesce(config.ph_min, 5.5), coalesce(config.ph_max, 6.5), 0.5, 'pH',
+    'Add pH-up solution gradually, circulate the solution, and verify the next five-minute average.',
+    'Add pH-down solution gradually, circulate the solution, and verify the next five-minute average.'
+  );
+  perform public.apply_sensor_alert(
+    'ec', 'EC Level', new.avg_ec::numeric,
+    coalesce(config.ec_min, 1.2), coalesce(config.ec_max, 1.8), 0.5, 'mS/cm',
+    'Check the nutrient mixture and replenish nutrients gradually, then verify the next five-minute average.',
+    'Check water level and concentration; dilute gradually with clean water, then verify the next five-minute average.'
+  );
+  perform public.apply_sensor_alert(
+    'temp', 'Temperature', new.avg_temp::numeric,
+    18, 24, 5, '°C',
+    'Inspect the heater and environment, raise temperature gradually, and verify the next five-minute average.',
+    'Improve cooling or ventilation, inspect the reservoir, and verify the next five-minute average.'
+  );
   return new;
 end;
 $$;
 
+-- Remove the legacy per-parameter triggers so alerts are evaluated once from
+-- the atomic five-minute sensor_history row.
 do $$
 declare
   table_name text;
@@ -482,13 +503,14 @@ begin
   loop
     if to_regclass(format('public.%s', table_name)) is not null then
       execute format('drop trigger if exists create_parameter_alert on public.%I', table_name);
-      execute format(
-        'create trigger create_parameter_alert after insert on public.%I for each row execute function public.create_parameter_alert()',
-        table_name
-      );
     end if;
   end loop;
 end $$;
+
+drop trigger if exists evaluate_five_minute_alerts on public.sensor_history;
+create trigger evaluate_five_minute_alerts
+after insert on public.sensor_history
+for each row execute function public.evaluate_five_minute_alerts();
 
 create table if not exists public.parameter_configurations (
   id integer primary key default 1 check (id = 1),
@@ -532,11 +554,13 @@ do $$
 begin
   if to_regclass('public.sensor_history') is not null then
     execute 'alter table public.sensor_history enable row level security';
-    execute 'grant select, delete on table public.sensor_history to authenticated';
+    execute 'grant select, update, delete on table public.sensor_history to authenticated';
     execute 'drop policy if exists "Authenticated users can read history" on public.sensor_history';
     execute 'create policy "Authenticated users can read history" on public.sensor_history for select to authenticated using (true)';
     execute 'drop policy if exists "Admins can delete history" on public.sensor_history';
     execute 'create policy "Admins can delete history" on public.sensor_history for delete to authenticated using (public.is_admin())';
+    execute 'drop policy if exists "Admins can update history" on public.sensor_history';
+    execute 'create policy "Admins can update history" on public.sensor_history for update to authenticated using (public.is_admin()) with check (public.is_admin())';
   end if;
   if to_regclass('public.history_logs') is not null then
     execute 'alter table public.history_logs enable row level security';
@@ -597,8 +621,4 @@ begin
 end $$;
 
 -- Promote an administrator manually, never from the public signup flow:
-<<<<<<< HEAD
 -- update public.profiles set role = 'admin' where email = 'admin@example.com';
-=======
--- update public.profiles set role = 'admin' where email = 'admin@example.com';
->>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df

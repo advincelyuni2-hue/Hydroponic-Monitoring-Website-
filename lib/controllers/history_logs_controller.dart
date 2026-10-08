@@ -184,7 +184,7 @@ class HistoryLogsController extends ChangeNotifier {
       final aggregation = switch (selectedRange) {
         'Weekly' => HistoryAggregation.eightHours,
         'Monthly' => HistoryAggregation.daily,
-        _ => HistoryAggregation.tenMinutes,
+        _ => HistoryAggregation.fiveMinutes,
       };
 
       final sensorRows = await monitoringService.getSensorHistory(
@@ -269,6 +269,24 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   Future<void> deleteSelectedRows() async {
+    final selectedEntries = selectedRowIndices
+        .where((index) => index >= 0 && index < rows.length)
+        .map((index) => rows[index])
+        .toList();
+    for (final entry in selectedEntries) {
+      final start = entry.recordStart;
+      if (start == null) continue;
+      if (selectedTab == 'Calibration logs') {
+        await monitoringService.deleteCalibrationLog(start);
+      } else if (selectedTab == 'Sensor logs') {
+        await monitoringService.deleteHistoryLogs(
+          start: start,
+          end: start.add(
+            entry.recordDuration ?? const Duration(minutes: 5),
+          ),
+        );
+      }
+    }
     final sortedIndices = selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
 
@@ -349,10 +367,24 @@ class HistoryLogsController extends ChangeNotifier {
       final valueStart = selectedRange == 'Monthly' ? 1 : 2;
 
       if (newValues.length > valueStart + 2) {
-        newValues[valueStart] = newPh.toStringAsFixed(2);
-        newValues[valueStart + 1] = '${newEc.toStringAsFixed(2)} mS/cm';
+        newValues[valueStart] = newPh.toStringAsFixed(6);
+        newValues[valueStart + 1] = '${newEc.toStringAsFixed(6)} mS/cm';
         newValues[valueStart + 2] = '${newTemp.toStringAsFixed(1)} °C';
       }
+
+      final start = oldEntry.recordStart;
+      if (start == null) {
+        throw StateError('This log does not have a database timestamp.');
+      }
+      await monitoringService.updateSensorHistoryBucket(
+        start: start,
+        end: start.add(
+          oldEntry.recordDuration ?? const Duration(minutes: 5),
+        ),
+        ph: newPh,
+        ec: newEc,
+        temperature: newTemp,
+      );
 
       rows[index] = HistoryLogEntry(
         newValues,

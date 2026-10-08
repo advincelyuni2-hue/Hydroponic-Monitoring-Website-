@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_state.dart';
 import '../models/notification_models.dart';
 import '../utils/manila_time.dart';
+import '../utils/sensor_value_format.dart';
 import 'supabase_client.dart';
 
 class NotificationService {
@@ -35,7 +36,7 @@ class NotificationService {
     return client
         .from('notifications')
         .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
+        .order('timestamp', ascending: false)
         .asyncMap(_mapNotificationRows);
   }
 
@@ -54,18 +55,23 @@ class NotificationService {
     final storedTitle = _nonEmpty(row['title']);
     final parameter = _nonEmpty(row['parameter']) ??
         _legacyParameter('${storedTitle ?? ''} $message');
+    final displayMessage = _formatStoredSensorText(message, parameter);
     final liveDetail = liveDetails[parameter];
     final legacyCurrent = _legacyCurrentValue(message);
     final legacyRange = _legacyIdealRange(message);
-    final currentValue = _nonEmpty(row['current_value']) ??
+    final rawCurrentValue = _nonEmpty(row['current_value']) ??
         (legacyCurrent == 'Not recorded'
             ? liveDetail?.currentValue ?? legacyCurrent
             : legacyCurrent);
-    final idealRange = _nonEmpty(row['ideal_range']) ??
+    final rawIdealRange = _nonEmpty(row['ideal_range']) ??
         (legacyRange == 'Not recorded'
             ? liveDetail?.idealRange ?? legacyRange
             : legacyRange);
+    final currentValue = _formatStoredSensorText(rawCurrentValue, parameter);
+    final idealRange = _formatStoredSensorText(rawIdealRange, parameter);
     final storedRecommendation = _nonEmpty(row['recommendation']);
+    final hasStoredSnapshot = _nonEmpty(row['current_value']) != null &&
+        _nonEmpty(row['ideal_range']) != null;
     final typeText = (row['type'] as String? ?? '').toLowerCase();
     final isCritical =
         typeText == 'critical' || message.toLowerCase().contains('critical');
@@ -75,9 +81,9 @@ class NotificationService {
     return AppNotificationItem(
       id: row['id'].toString(),
       title: _displayTitle(storedTitle, parameter),
-      subtitle: message.isEmpty
+      subtitle: displayMessage.isEmpty
           ? liveDetail?.summary ?? 'Review this notification.'
-          : message,
+          : displayMessage,
       timestamp: parsed == null
           ? 'Recent'
           : formatManilaDateTime(toManilaTime(parsed)),
@@ -86,8 +92,10 @@ class NotificationService {
           : typeText == 'info'
               ? NotificationType.info
               : NotificationType.warning,
-      currentStatus: liveDetail?.statusLabel ??
-          _legacyStatus('${storedTitle ?? ''} $message'),
+      currentStatus: hasStoredSnapshot
+          ? _storedAlertStatus(typeText, '${storedTitle ?? ''} $message')
+          : liveDetail?.statusLabel ??
+              _legacyStatus('${storedTitle ?? ''} $message'),
       currentValue: currentValue,
       idealRange: idealRange,
       recommendation: storedRecommendation != null &&
@@ -109,6 +117,14 @@ class NotificationService {
   String? _nonEmpty(dynamic value) {
     final text = value?.toString().trim();
     return text == null || text.isEmpty ? null : text;
+  }
+
+  String _formatStoredSensorText(String text, String parameter) {
+    if (parameter != 'pH Level' && parameter != 'EC Level') return text;
+    return text.replaceAllMapped(RegExp(r'-?\d+\.\d+'), (match) {
+      final value = double.tryParse(match.group(0)!);
+      return value == null ? match.group(0)! : formatSensorValue(value);
+    });
   }
 
   String _legacyParameter(String message) {
@@ -143,6 +159,14 @@ class NotificationService {
     if (lower.contains('low')) return 'Low';
     if (lower.contains('drift')) return 'Drifting';
     return 'Status unavailable';
+  }
+
+  String _storedAlertStatus(String type, String text) {
+    final direction = _legacyStatus(text);
+    final severity = type == 'critical' ? 'Critical' : 'Warning';
+    return direction == 'Status unavailable'
+        ? severity
+        : '$direction · $severity';
   }
 
   bool _isGenericRecommendation(
@@ -225,18 +249,25 @@ class NotificationService {
       // Fall back to the same ranges used by the realtime dashboard.
     }
 
-    final values = await Future.wait([
-      _latestRawValue('ph_readings'),
-      _latestRawValue('ec_readings'),
-      _latestRawValue('temp_readings'),
-    ]);
+    Map<String, dynamic>? latest;
+    try {
+      latest = await client
+          .from('sensor_history')
+          .select('avg_ph, avg_ec, avg_temp')
+          .order('recorded_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+    } catch (_) {
+      latest = null;
+    }
 
     return {
       'pH Level': _detail(
         parameter: 'pH',
-        value: values[0],
+        value: (latest?['avg_ph'] as num?)?.toDouble(),
         minimum: phMin,
         maximum: phMax,
+        warningMargin: 0.5,
         unit: 'pH',
         lowRecommendation:
             'Add pH-up solution gradually, circulate, and verify the reading.',
@@ -245,9 +276,10 @@ class NotificationService {
       ),
       'EC Level': _detail(
         parameter: 'EC',
-        value: values[1],
+        value: (latest?['avg_ec'] as num?)?.toDouble(),
         minimum: ecMin,
         maximum: ecMax,
+        warningMargin: 0.5,
         unit: 'mS/cm',
         lowRecommendation:
             'Check the nutrient mixture and replenish gradually, then verify EC.',
@@ -256,9 +288,10 @@ class NotificationService {
       ),
       'Temperature': _detail(
         parameter: 'Temperature',
-        value: values[2],
+        value: (latest?['avg_temp'] as num?)?.toDouble(),
         minimum: 18,
-        maximum: 28,
+        maximum: 24,
+        warningMargin: 5,
         unit: '°C',
         lowRecommendation:
             'Inspect heating and raise temperature gradually, then verify the sensor.',
@@ -268,51 +301,40 @@ class NotificationService {
     };
   }
 
-  Future<double?> _latestRawValue(String table) async {
-    final client = supabaseClient;
-    if (client == null) return null;
-    try {
-      final row = await client
-          .from(table)
-          .select('value')
-          .eq('is_average', false)
-          .order('recorded_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      return (row?['value'] as num?)?.toDouble();
-    } catch (_) {
-      return null;
-    }
-  }
-
   _LiveNotificationDetail _detail({
     required String parameter,
     required double? value,
     required double minimum,
     required double maximum,
+    required double warningMargin,
     required String unit,
     required String lowRecommendation,
     required String highRecommendation,
   }) {
-    final displayValue = value == null ? 'Not recorded' : '$value $unit';
+    final isTemperature = parameter == 'Temperature';
+    final displayValue = value == null
+        ? 'Not recorded'
+        : '${isTemperature ? value.toStringAsFixed(1) : formatSensorValue(value)} $unit';
     final direction = value == null
-        ? 'unknown'
-        : value < minimum
-            ? 'low'
-            : value > maximum
-                ? 'high'
-                : 'within range';
-    final statusLabel = value == null
-        ? 'No live reading'
+        ? null
         : value < minimum
             ? 'Low'
             : value > maximum
                 ? 'High'
-                : 'Within range';
+                : null;
+    final critical = value != null &&
+        (value < minimum - warningMargin || value > maximum + warningMargin);
+    final statusLabel = value == null
+        ? 'No five-minute average'
+        : direction == null
+            ? 'Stable'
+            : '$direction · ${critical ? 'Critical' : 'Warning'}';
     return _LiveNotificationDetail(
       statusLabel: statusLabel,
       currentValue: displayValue,
-      idealRange: '$minimum - $maximum $unit',
+      idealRange: isTemperature
+          ? '${minimum.toStringAsFixed(1)} - ${maximum.toStringAsFixed(1)} $unit'
+          : '${formatSensorRange(minimum, maximum)} $unit',
       recommendation: value == null
           ? 'Verify the sensor connection and wait for a new reading.'
           : value < minimum
@@ -320,7 +342,8 @@ class NotificationService {
               : value > maximum
                   ? highRecommendation
                   : 'The latest reading is within the configured range. Continue monitoring.',
-      summary: '$parameter is $direction at $displayValue.',
+      summary: '$parameter five-minute average is '
+          '${direction?.toLowerCase() ?? 'stable'} at $displayValue.',
     );
   }
 
@@ -338,6 +361,69 @@ class NotificationService {
           .from('notifications')
           .update({'is_resolved': isResolved}).eq('id', id);
       return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> recordFixAndResolve({
+    required String notificationId,
+    required String parameter,
+    required double currentValue,
+    required String currentStatus,
+    required String actionType,
+    required double amount,
+    required String notes,
+  }) async {
+    final client = supabaseClient;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) return false;
+
+    try {
+      final latest = await client
+          .from('sensor_history')
+          .select('avg_ph, avg_ec, avg_temp')
+          .order('recorded_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      var currentPh = (latest?['avg_ph'] as num?)?.toDouble() ?? 0.0;
+      var currentEc = (latest?['avg_ec'] as num?)?.toDouble() ?? 0.0;
+      var currentTemp = (latest?['avg_temp'] as num?)?.toDouble() ?? 0.0;
+
+      if (parameter == 'pH') {
+        currentPh = currentValue;
+      } else if (parameter == 'EC') {
+        currentEc = currentValue;
+      } else if (parameter == 'Temperature') {
+        currentTemp = currentValue;
+      }
+
+      final fixDetails = <String>[
+        'Action: $actionType',
+        if (amount > 0) 'Amount: ${amount.toStringAsFixed(2)} mL',
+        if (notes.isNotEmpty) 'Notes: $notes',
+        'Notification: $notificationId',
+      ];
+
+      await client.from('action_logs').insert({
+        'parameter': parameter,
+        'forecast_condition': currentStatus,
+        'horizon_hours': 0,
+        'current_ph': currentPh,
+        'current_ec': currentEc,
+        'current_temp': currentTemp,
+        'suggested_fixes': fixDetails,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      final updated = await client
+          .from('notifications')
+          .update({'is_resolved': true})
+          .eq('id', notificationId)
+          .select('id')
+          .maybeSingle();
+      return updated != null;
     } catch (_) {
       return false;
     }
@@ -440,8 +526,8 @@ class NotificationService {
           databaseId: row['id'].toString(),
           title: critical ? 'Critical alert' : 'Notification',
           detail: row['message'] as String? ?? '',
-          timeAgo: _timeAgo(
-              DateTime.tryParse((row['timestamp'] ?? row['created_at']) as String? ?? '')),
+          timeAgo: _timeAgo(DateTime.tryParse(
+              (row['timestamp'] ?? row['created_at']) as String? ?? '')),
           isCritical: critical,
         );
       }).toList();
@@ -457,6 +543,7 @@ class NotificationService {
     if (difference.inDays < 1) return '${difference.inHours}h ago';
     return '${difference.inDays}d ago';
   }
+
   Future<bool> markAsRead(String notificationId) async {
     final client = supabaseClient;
     if (client == null) return false;

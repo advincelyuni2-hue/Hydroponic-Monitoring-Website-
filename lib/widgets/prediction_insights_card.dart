@@ -338,7 +338,7 @@ class PredictionInsightsCard extends StatelessWidget {
                                 ],
                                 Flexible(
                                   child: Text(
-                                    '${detail.currentPh.toStringAsFixed(1)}$mainUnit',
+                                    '${detail.currentPh.toStringAsFixed(6)}$mainUnit',
                                     style: AppTextStyles.sectionTitle.copyWith(
                                       fontSize: 18,
                                       color: severity.isAlert
@@ -369,7 +369,7 @@ class PredictionInsightsCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${detail.targetPh.toStringAsFixed(1)}$mainUnit',
+                              '${detail.targetPh.toStringAsFixed(6)}$mainUnit',
                               style: AppTextStyles.sectionTitle.copyWith(
                                 fontSize: 18,
                                 color: AppColors.accentGreen,

@@ -41,24 +41,36 @@ class NotificationsScreenState extends State<NotificationsScreen> {
     super.dispose();
   }
 
-  void _handleCardTap(AppNotificationItem item) {
-    if (Responsive.isMobile(context)) {
-      showRecordFixDialog(
-        context,
-        notification: item,
-        onSubmit: (entry) async {
-          await _controller.toggleResolve(item, true);
-          setState(() {
-            selectedTab = 'Resolved';
-          });
-        },
-      );
+  Future<void> _showFixLog(AppNotificationItem item) async {
+    if (item.isResolved) return;
+    await showRecordFixDialog(
+      context,
+      notification: item,
+      onSubmit: (entry) async {
+        final saved = await _controller.recordFixAndResolve(
+          item,
+          parameter: entry.parameter,
+          currentValue: entry.currentValue,
+          actionType: entry.actionType,
+          amount: entry.amount,
+          notes: entry.notes,
+        );
+        if (!mounted) return;
+        if (saved) {
+          setState(() => selectedTab = 'Resolved');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fix recorded successfully.')),
+          );
+        }
+      },
+    );
+  }
+
+  void _handleResolveChange(AppNotificationItem item, bool? value) {
+    if (value == true) {
+      _showFixLog(item);
     } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AddLogScreen(notification: item),
-        ),
-      );
+      _controller.toggleResolve(item, false);
     }
   }
 
@@ -156,9 +168,9 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                               item: item,
                               isHighlighted:
                                   item.id == highlightedNotificationId,
-                              onTap: () => _handleCardTap(item),
+                              onTap: () => _showFixLog(item),
                               onResolveChanged: (val) =>
-                                  _controller.toggleResolve(item, val),
+                                  _handleResolveChange(item, val),
                             );
                           },
                         );

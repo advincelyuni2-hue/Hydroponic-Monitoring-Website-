@@ -250,9 +250,9 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     }
 
     final phController =
-        TextEditingController(text: initialPh.toStringAsFixed(2));
+        TextEditingController(text: initialPh.toStringAsFixed(6));
     final ecController =
-        TextEditingController(text: initialEc.toStringAsFixed(2));
+        TextEditingController(text: initialEc.toStringAsFixed(6));
     final tempController =
         TextEditingController(text: initialTemp.toStringAsFixed(1));
 

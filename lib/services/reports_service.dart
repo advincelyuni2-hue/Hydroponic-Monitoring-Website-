@@ -156,11 +156,9 @@ class ReportsService {
           : null;
       final limits = log.ranges[valueIndex];
       if (value == null || limits == null) continue;
-      final margin = (limits.maximum - limits.minimum).abs() * 0.1;
-      if (value < limits.minimum || value > limits.maximum) {
+      if (limits.severity == 'Critical') {
         critical++;
-      } else if (value <= limits.minimum + margin ||
-          value >= limits.maximum - margin) {
+      } else if (limits.severity == 'Warning') {
         warning++;
       } else {
         optimal++;
@@ -181,12 +179,11 @@ class ReportsService {
       criticalPercentage: critical * 100 / total,
     );
   }
-    /// Critical alerts from the notifications table (last [days] days).
+
+  /// Critical alerts from the notifications table (last [days] days).
   Future<AlertStats> getAlertStats({int days = 30}) async {
-    final since = DateTime.now()
-        .toUtc()
-        .subtract(Duration(days: days))
-        .toIso8601String();
+    final since =
+        DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
     final rows = await supabase
         .from('notifications')
         .select()
@@ -194,14 +191,20 @@ class ReportsService {
         .order('created_at', ascending: false)
         .limit(1000);
 
-    final counts = <String, int>{'pH': 0, 'EC': 0, 'Temperature': 0, 'Other': 0};
+    final counts = <String, int>{
+      'pH': 0,
+      'EC': 0,
+      'Temperature': 0,
+      'Other': 0
+    };
     var critical = 0;
     var active = 0;
     var resolved = 0;
 
     for (final row in rows) {
       final type = (row['type'] ?? '').toString().toLowerCase();
-      final text = '${row['title'] ?? ''} ${row['message'] ?? ''}'.toLowerCase();
+      final text =
+          '${row['title'] ?? ''} ${row['message'] ?? ''}'.toLowerCase();
       if (type != 'critical' && !text.contains('critical')) continue;
 
       critical++;
@@ -323,8 +326,9 @@ class ReportsService {
       collectionRange.start.month,
       collectionRange.start.day,
     );
-    final start =
-        requestedStart.isBefore(collectionStart) ? collectionStart : requestedStart;
+    final start = requestedStart.isBefore(collectionStart)
+        ? collectionStart
+        : requestedStart;
     return DateTimeRange(start: start, end: end);
   }
 
@@ -336,7 +340,8 @@ class ReportsService {
       };
 
   List<double> _values(List<HistoryLogEntry> logs, int index) => logs
-      .map((log) => index < log.values.length ? _parseValue(log.values[index]) : null)
+      .map((log) =>
+          index < log.values.length ? _parseValue(log.values[index]) : null)
       .whereType<double>()
       .toList();
 
@@ -355,8 +360,13 @@ class ReportsService {
 
   String _status(double value, HistoryValueRange? range) {
     if (range == null) return 'No range configured';
-    if (value < range.minimum || value > range.maximum) return 'Out of range';
-    return 'In range';
+    return HistoryValueRange(
+      minimum: range.minimum,
+      maximum: range.maximum,
+      value: value,
+      unit: range.unit,
+      warningMargin: range.warningMargin,
+    ).severity;
   }
 
   double? _parseValue(String value) {

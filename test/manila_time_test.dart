@@ -28,13 +28,13 @@ void main() {
     expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM');
   });
 
-  test('corrects the live sensor storage skew before converting to Manila', () {
+  test('uses the standard UTC conversion for sensor timestamps', () {
     final result = toSensorManilaTime(
       parseSupabaseTimestamp('2026-09-18T16:04:00+00:00'),
     );
 
-    expect(result, DateTime(2026, 9, 19, 8, 4));
-    expect(formatManilaDateTime(result), 'Sep 19, 2026, 8:04 AM');
+    expect(result, DateTime(2026, 9, 19, 0, 4));
+    expect(formatManilaDateTime(result), 'Sep 19, 2026, 12:04 AM');
   });
 
   test('converts a Manila history boundary back to UTC', () {
@@ -43,9 +43,9 @@ void main() {
     expect(result, DateTime.utc(2026, 9, 24, 16));
   });
 
-  test('accounts for sensor storage skew in history boundaries', () {
+  test('uses standard UTC history boundaries for sensor data', () {
     final result = sensorManilaWallTimeToStoredUtc(DateTime(2026, 9, 19));
 
-    expect(result, DateTime.utc(2026, 9, 18, 8));
+    expect(result, DateTime.utc(2026, 9, 18, 16));
   });
 }

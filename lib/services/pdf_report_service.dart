@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
+import '../utils/sensor_value_format.dart';
 import 'app_state.dart';
 import 'pdf_report_output.dart';
 
@@ -86,12 +87,12 @@ class PdfReportService {
                 [
                   [
                     'Average pH (30d)',
-                    summary.avgPh.toStringAsFixed(1),
+                    formatSensorValue(summary.avgPh),
                     summary.phStatus,
                   ],
                   [
                     'Average EC (30d)',
-                    '${summary.avgEc.toStringAsFixed(1)} mS/cm',
+                    '${formatSensorValue(summary.avgEc)} mS/cm',
                     summary.ecStatus,
                   ],
                   [
@@ -118,13 +119,13 @@ class PdfReportService {
                 [
                   [
                     'pH',
-                    phRange.start.toStringAsFixed(1),
-                    phRange.end.toStringAsFixed(1),
+                    formatSensorValue(phRange.start),
+                    formatSensorValue(phRange.end),
                   ],
                   [
                     'EC (mS/cm)',
-                    ecRange.start.toStringAsFixed(1),
-                    ecRange.end.toStringAsFixed(1),
+                    formatSensorValue(ecRange.start),
+                    formatSensorValue(ecRange.end),
                   ],
                 ],
               ),
@@ -294,7 +295,7 @@ class PdfReportService {
         pw.SizedBox(height: 6),
         pw.Text(
           title,
-          style: pw.TextStyle(
+          style: const pw.TextStyle(
             fontSize: 12,
             fontWeight: pw.FontWeight.bold,
           ),
@@ -379,7 +380,7 @@ class PdfReportService {
       data: rows
           .map((row) => row.map(_pdfSafeText).toList(growable: false))
           .toList(growable: false),
-      headerStyle: pw.TextStyle(
+      headerStyle: const pw.TextStyle(
         fontSize: 8,
         fontWeight: pw.FontWeight.bold,
         color: PdfColors.white,
@@ -461,7 +462,7 @@ class PdfReportService {
           ),
           yAxis: pw.FixedAxis<double>(
             yTicks,
-            format: (v) => v.toStringAsFixed(1),
+            format: formatSensorValue,
             textStyle: axisStyle,
             color: borderColor,
             divisions: true,
@@ -529,9 +530,9 @@ class PdfReportService {
       ],
       [
         [
-          '${value.toStringAsFixed(1)}$unit',
-          '${range.start.toStringAsFixed(1)}$unit',
-          '${range.end.toStringAsFixed(1)}$unit',
+          '${formatSensorValue(value)}$unit',
+          '${formatSensorValue(range.start)}$unit',
+          '${formatSensorValue(range.end)}$unit',
           status,
         ]
       ],
@@ -568,8 +569,8 @@ class PdfReportService {
         .map(
           (date) => [
             date,
-            phByDate[date]?.toStringAsFixed(2) ?? '-',
-            ecByDate[date]?.toStringAsFixed(2) ?? '-',
+            phByDate[date] == null ? '-' : formatSensorValue(phByDate[date]!),
+            ecByDate[date] == null ? '-' : formatSensorValue(ecByDate[date]!),
           ],
         )
         .toList();

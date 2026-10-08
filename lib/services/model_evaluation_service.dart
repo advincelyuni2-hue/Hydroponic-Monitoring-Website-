@@ -23,9 +23,9 @@ class ModelEvaluationService {
 
   Future<ModelEvaluation> evaluate({int horizonHours = 12}) async {
     final readings = await Future.wait([
-      _loadReadings('ph_readings'),
-      _loadReadings('ec_readings'),
-      _loadReadings('temp_readings'),
+      _loadReadings('avg_ph'),
+      _loadReadings('avg_ec'),
+      _loadReadings('avg_temp'),
     ]);
     final ph = readings[0];
     final ec = readings[1];
@@ -151,19 +151,18 @@ class ModelEvaluationService {
     }
   }
 
-  Future<List<_Reading>> _loadReadings(String table) async {
+  Future<List<_Reading>> _loadReadings(String valueColumn) async {
     final rows = await supabase
-        .from(table)
-        .select('value, recorded_at')
-        .eq('is_average', false)
+        .from('sensor_history')
+        .select('$valueColumn, recorded_at')
         .order('recorded_at', ascending: false)
         .limit(1000);
     return [
       for (final row in rows)
-        if (row['value'] is num && row['recorded_at'] is String)
+        if (row[valueColumn] is num && row['recorded_at'] is String)
           _Reading(
             parseSupabaseTimestamp(row['recorded_at'] as String),
-            (row['value'] as num).toDouble(),
+            (row[valueColumn] as num).toDouble(),
           ),
     ];
   }
@@ -182,7 +181,7 @@ class ModelEvaluationService {
   }
 
   String _label(DateTime time) {
-    final local = toSensorManilaTime(time);
+    final local = toManilaTime(time);
     const months = [
       'Jan',
       'Feb',

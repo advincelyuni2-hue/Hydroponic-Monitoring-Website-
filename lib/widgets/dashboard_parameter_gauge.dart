@@ -19,7 +19,7 @@ class DashboardParameterGauge extends StatelessWidget {
     this.dense = false,
   });
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: appMeasurementUnits,
@@ -149,6 +149,7 @@ class DashboardParameterGauge extends StatelessWidget {
                 color: statusColor,
                 backgroundColor: AppColors.cardBorder,
                 textColor: AppColors.textSecondary,
+                decimals: _isTemp ? 0 : 6,
               ),
             ),
           ),
@@ -261,7 +262,8 @@ class DashboardParameterGauge extends StatelessWidget {
   _GaugeScale get _displayScale {
     final base = _scaleFor(data.label, _rawValue);
     if (!_isTemp) return base;
-    return _GaugeScale(toDisplayTemp(base.minimum), toDisplayTemp(base.maximum));
+    return _GaugeScale(
+        toDisplayTemp(base.minimum), toDisplayTemp(base.maximum));
   }
 
   String get _rangeText {
@@ -317,6 +319,7 @@ class _GaugePainter extends CustomPainter {
   final Color color;
   final Color backgroundColor;
   final Color textColor;
+  final int decimals;
 
   const _GaugePainter({
     required this.value,
@@ -325,6 +328,7 @@ class _GaugePainter extends CustomPainter {
     required this.color,
     required this.backgroundColor,
     required this.textColor,
+    required this.decimals,
   });
 
   @override
@@ -374,7 +378,7 @@ class _GaugePainter extends CustomPainter {
       Paint()..color = AppColors.textPrimary,
     );
 
-    final minimumText = minimum.toStringAsFixed(0);
+    final minimumText = minimum.toStringAsFixed(decimals);
     final minimumPainter = _textPainter(minimumText);
     minimumPainter.paint(
       canvas,
@@ -383,7 +387,7 @@ class _GaugePainter extends CustomPainter {
         center.dy + 8,
       ),
     );
-    final maximumText = maximum.toStringAsFixed(0);
+    final maximumText = maximum.toStringAsFixed(decimals);
     final painter = _textPainter(maximumText);
     painter.paint(
       canvas,

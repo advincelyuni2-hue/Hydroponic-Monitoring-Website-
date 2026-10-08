@@ -8,12 +8,12 @@ import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/parameter_severity.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/dashboard_forecast_overview.dart';
 import '../widgets/dashboard_parameter_gauge.dart';
 import 'forecasting_dashboard_screen.dart';
-
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -406,7 +406,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Text('Contributing factors', style: AppTextStyles.bodyBold),
         const SizedBox(height: 4),
-         _factorRow('Temperature', formatTempText(insight.temperature)),
+        _factorRow('Temperature', formatTempText(insight.temperature)),
         const SizedBox(height: 2),
         _factorRow('EC', insight.ecLevel),
       ],
@@ -444,13 +444,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _predictedInsightValue(PredictionInsightDetail insight) {
     if (_controller.forecastSummaries.isEmpty) {
-      return insight.currentPh.toStringAsFixed(2);
+      return insight.currentPh.toStringAsFixed(6);
     }
     final summary = _controller.forecastSummaries.last;
     if (insight.statusLabel.toLowerCase().contains('ec')) {
-      return summary.ecValue.toStringAsFixed(2);
+      return summary.ecValue.toStringAsFixed(6);
     }
-    return summary.phValue.toStringAsFixed(2);
+    return summary.phValue.toStringAsFixed(6);
   }
 
   Color _insightColor(String status) {
@@ -470,11 +470,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     if (_controller.forecastSummaries.isNotEmpty) {
       final forecast = _controller.forecastSummaries.last;
-      final phCritical = _isOutsideConfiguredRange('pH', forecast.phValue);
-      final ecCritical = _isOutsideConfiguredRange('EC', forecast.ecValue);
-      if (phCritical && ecCritical) return 'Critical';
-      if (!phCritical && !ecCritical) return 'Stable';
-      return 'Warning';
+      final severities = [
+        _predictedSeverity('pH', forecast.phValue),
+        _predictedSeverity('EC', forecast.ecValue),
+      ];
+      if (severities.contains('Critical')) return 'Critical';
+      if (severities.contains('Warning')) return 'Warning';
+      return 'Stable';
     }
 
     String normalize(String status) =>
@@ -486,7 +488,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : 'Warning';
   }
 
-  bool _isOutsideConfiguredRange(String parameter, double value) {
+  String _predictedSeverity(String parameter, double value) {
     ParameterStatus? configured;
     for (final status in _controller.parameterStatuses) {
       if (status.label.toLowerCase().contains(parameter.toLowerCase())) {
@@ -504,7 +506,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         parameter.toLowerCase() == 'ph' ? const [5.5, 6.5] : const [1.2, 1.8];
     final minimum = matches.length >= 2 ? matches[0] : fallback[0];
     final maximum = matches.length >= 2 ? matches[1] : fallback[1];
-    return value < minimum || value > maximum;
+    return parameterSeverityLabel(
+      classifyParameterValue(
+        value: value,
+        stableMin: minimum,
+        stableMax: maximum,
+        warningMargin: 0.5,
+      ),
+    );
   }
 
   Future<void> _showAlertAdminDialog() async {

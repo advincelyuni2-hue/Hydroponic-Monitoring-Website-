@@ -54,6 +54,35 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
+  Future<bool> recordFixAndResolve(
+    AppNotificationItem item, {
+    required String parameter,
+    required double currentValue,
+    required String actionType,
+    required double amount,
+    required String notes,
+  }) async {
+    final saved = await _notificationService.recordFixAndResolve(
+      notificationId: item.id,
+      parameter: parameter,
+      currentValue: currentValue,
+      currentStatus: item.currentStatus,
+      actionType: actionType,
+      amount: amount,
+      notes: notes,
+    );
+
+    if (saved) {
+      item.isResolved = true;
+      errorMessage = null;
+    } else {
+      errorMessage =
+          'Unable to save the fix log. The notification was not resolved.';
+    }
+    notifyListeners();
+    return saved;
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

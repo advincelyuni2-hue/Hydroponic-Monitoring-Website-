@@ -35,7 +35,8 @@ def health_check():
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv(
-    "SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_ANON_KEY", "")
+    "SUPABASE_SERVICE_ROLE_KEY",
+    os.getenv("SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_ANON_KEY", "")),
 )
 
 supabase: Client | None = (
@@ -79,36 +80,33 @@ def get_resilient_sequence(live_ph: float, live_ec: float, live_temp: float) -> 
     if supabase is None:
         return df
 
-    def fetch_records(table_name: str, col_name: str):
-        try:
-            res = (
-                supabase.from_(table_name)
-                .select("value, recorded_at")
-                .eq("is_average", False)
-                .order("recorded_at", desc=True)
-                .limit(288)
-                .execute()
+    try:
+        res = (
+            supabase.from_("sensor_history")
+            .select("avg_ph, avg_ec, avg_temp, recorded_at")
+            .order("recorded_at", desc=True)
+            .limit(288)
+            .execute()
+        )
+        data = res.data or []
+        if data:
+            history = pd.DataFrame(data)
+            history["recorded_at"] = pd.to_datetime(history["recorded_at"], utc=True)
+            history = history.sort_values("recorded_at").set_index("recorded_at")
+            history = history.rename(
+                columns={"avg_ph": "ph", "avg_ec": "ec", "avg_temp": "temp"}
             )
-            data = res.data or []
-            if not data:
-                return None
-            sub_df = pd.DataFrame(data)
-            sub_df["recorded_at"] = pd.to_datetime(sub_df["recorded_at"], utc=True)
-            sub_df[col_name] = sub_df["value"].astype(float)
-            return sub_df[["recorded_at", col_name]].sort_values("recorded_at").set_index("recorded_at")
-        except Exception:
-            return None
-
-    ph_df = fetch_records("ph_readings", "ph")
-    ec_df = fetch_records("ec_readings", "ec")
-    temp_df = fetch_records("temp_readings", "temp")
-
-    if ph_df is not None and not ph_df.empty:
-        df["ph"] = ph_df["ph"].reindex(df.index, method="nearest").fillna(live_ph)
-    if ec_df is not None and not ec_df.empty:
-        df["ec"] = ec_df["ec"].reindex(df.index, method="nearest").fillna(live_ec)
-    if temp_df is not None and not temp_df.empty:
-        df["temp"] = temp_df["temp"].reindex(df.index, method="nearest").fillna(live_temp)
+            for column, fallback in [
+                ("ph", live_ph),
+                ("ec", live_ec),
+                ("temp", live_temp),
+            ]:
+                values = history[column].astype(float)
+                df[column] = values.reindex(
+                    df.index, method="nearest", tolerance=pd.Timedelta("20min")
+                ).fillna(fallback)
+    except Exception:
+        pass
 
     # Set current live values at t0
     df.iloc[-1, df.columns.get_loc("ph")] = live_ph

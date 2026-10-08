@@ -33,14 +33,22 @@ class HistoryLogValue extends StatelessWidget {
     Color iconColor;
     String tooltipMsg;
 
-    if (range.isHigh) {
+    if (range.isCriticalHigh) {
       icon = Icons.arrow_upward_rounded;
-      iconColor = const Color(0xFFDC2626); // Red for critical high
+      iconColor = const Color(0xFFDC2626);
       tooltipMsg = 'Above ideal range (Critical)';
+    } else if (range.isCriticalLow) {
+      icon = Icons.arrow_downward_rounded;
+      iconColor = const Color(0xFFDC2626);
+      tooltipMsg = 'Below ideal range (Critical)';
+    } else if (range.isHigh) {
+      icon = Icons.arrow_upward_rounded;
+      iconColor = const Color(0xFFE79A08);
+      tooltipMsg = 'Above stable range (Warning)';
     } else if (range.isLow) {
       icon = Icons.arrow_downward_rounded;
-      iconColor = const Color(0xFFDC2626); // Red for critical low
-      tooltipMsg = 'Below ideal range (Critical)';
+      iconColor = const Color(0xFFE79A08);
+      tooltipMsg = 'Below stable range (Warning)';
     } else {
       icon = Icons.arrow_forward_rounded;
       iconColor = const Color(0xFF16A34A); // Green for stable

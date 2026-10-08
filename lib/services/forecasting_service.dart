@@ -8,7 +8,7 @@ import '../utils/manila_time.dart';
 class ForecastingService {
   static const String backendApiUrl = String.fromEnvironment(
     'FORECAST_API_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/predict/forecast',
+    defaultValue: 'http://hydroponics-monitoring.onrender.com/api/predict/forecast',
   );
 
   Future<List<ForecastingChartPoint>> getForecastChartData(

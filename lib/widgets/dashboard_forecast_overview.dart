@@ -140,7 +140,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                           final color = isPh ? _phColor : _ecColor;
                           final unit = isPh ? '' : ' mS/cm';
                           return LineTooltipItem(
-                            '$label ${spot.y.toStringAsFixed(2)}$unit',
+                            '$label ${spot.y.toStringAsFixed(6)}$unit',
                             AppTextStyles.bodyBold.copyWith(color: color),
                           );
                         }).toList(),
@@ -304,7 +304,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     required bool isMobile,
   }) {
     final singleInterval = (chartRange.maximum - chartRange.minimum) / 4;
-    final axisDecimals = _parameter == 'EC' ? 2 : 1;
+    const axisDecimals = 6;
     final centerTime = widget.generatedAt ?? manilaNow();
     final horizontalInterval = isMobile ? _hours.toDouble() : _hours / 2;
     return FlTitlesData(
@@ -318,7 +318,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         ),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 33 : 42,
+          reservedSize: isMobile ? 62 : 72,
           interval: singleInterval,
           getTitlesWidget: (value, _) => Text(
             value.toStringAsFixed(axisDecimals),
@@ -330,7 +330,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 33 : 42,
+          reservedSize: isMobile ? 62 : 72,
           interval: singleInterval,
           getTitlesWidget: (value, _) => Text(
             value.toStringAsFixed(axisDecimals),
@@ -443,7 +443,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                   (a.hour - _hours).abs() <= (b.hour - _hours).abs() ? a : b,
             )
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
-      return point.value.toStringAsFixed(2);
+      return point.value.toStringAsFixed(6);
     }
 
     final values = <String>[];
