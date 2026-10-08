@@ -66,7 +66,7 @@ class MonitoringService {
     ];
   }
 
-    Future<_ParameterRanges> _getParameterRanges() async {
+  Future<_ParameterRanges> _getParameterRanges() async {
     try {
       final row = await supabase
           .from('parameter_configurations')
@@ -318,6 +318,43 @@ class MonitoringService {
     }
   }
 
+  Future<void> deleteSingleSensorHistoryBucket({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final storedStart =
+        sensorManilaWallTimeToStoredUtc(start).toIso8601String();
+    final storedEnd = sensorManilaWallTimeToStoredUtc(end).toIso8601String();
+
+    final results = await Future.wait([
+      supabase
+          .from('ph_readings')
+          .delete()
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+      supabase
+          .from('ec_readings')
+          .delete()
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+      supabase
+          .from('temp_readings')
+          .delete()
+          .eq('is_average', true)
+          .gte('recorded_at', storedStart)
+          .lt('recorded_at', storedEnd)
+          .select('recorded_at'),
+    ]);
+
+    if (results.every((deletedRows) => deletedRows.isEmpty)) {
+      throw StateError('No sensor history records matched the selected entry.');
+    }
+  }
+
   Future<void> deleteCalibrationLogs({
     required DateTime start,
     required DateTime end,
@@ -330,10 +367,18 @@ class MonitoringService {
   }
 
   Future<void> deleteCalibrationLog(DateTime recordedAt) async {
-    await supabase
+    final deletedRows = await supabase
         .from('calibration_logs')
         .delete()
-        .eq('recorded_at', manilaWallTimeToUtc(recordedAt).toIso8601String());
+        .eq(
+          'recorded_at',
+          manilaWallTimeToUtc(recordedAt).toIso8601String(),
+        )
+        .select('recorded_at');
+
+    if (deletedRows.isEmpty) {
+      throw StateError('No calibration log matched the selected entry.');
+    }
   }
 
   Future<void> updateSensorHistoryBucket({

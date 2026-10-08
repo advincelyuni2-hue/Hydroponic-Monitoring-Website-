@@ -118,11 +118,20 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-      await _controller.deleteSingleRow(index);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Log entry deleted.')),
-        );
+      try {
+        await _controller.deleteSingleRow(index);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Log entry deleted.')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not delete the log entry: $error')),
+          );
+        }
       }
     }
   }
@@ -198,11 +207,25 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     );
 
     if (confirmed == true) {
-      await _controller.deleteSelectedRows();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$count log records deleted.')),
-        );
+      try {
+        await _controller.deleteSelectedRows();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$count log records deleted.')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not delete every selected log. Refresh the table and '
+                'check which rows remain. Details: $error',
+              ),
+            ),
+          );
+        }
       }
     }
   }
@@ -349,11 +372,24 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
       final newEc = double.tryParse(ecController.text) ?? initialEc;
       final newTemp = double.tryParse(tempController.text) ?? initialTemp;
 
-      await _controller.updateRowValues(index, newPh, newEc, newTemp);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Log record updated successfully.')),
-        );
+      try {
+        await _controller.updateRowValues(index, newPh, newEc, newTemp);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Log record updated successfully.'),
+            ),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not save the log record: $error'),
+            ),
+          );
+        }
       }
     }
   }
@@ -376,8 +412,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_controller.errorMessage!,
-                        style: AppTextStyles.body),
+                    Text(_controller.errorMessage!, style: AppTextStyles.body),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _controller.loadData,
@@ -421,8 +456,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                                 selectedTab: _controller.selectedTab,
                                 isAdmin: isAdmin,
                                 isSelectionMode: _controller.isSelectionMode,
-                                selectedIndices:
-                                    _controller.selectedRowIndices,
+                                selectedIndices: _controller.selectedRowIndices,
                                 onSelectAll: _controller.toggleSelectAll,
                                 onToggleRow: _controller.toggleRowSelection,
                                 onDeleteRow: _confirmDeleteSingle,
@@ -634,7 +668,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -656,8 +691,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     final tabOptions = ['Sensor logs', 'Calibration logs', 'Reports logs'];
     return Wrap(
       spacing: isMobile ? 12 : 24,
-      children:
-          tabOptions.map((title) => _tab(title, isMobile)).toList(),
+      children: tabOptions.map((title) => _tab(title, isMobile)).toList(),
     );
   }
 
@@ -674,9 +708,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
               title,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: isMobile ? 15 : 18,
-                color: isActive
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                color:
+                    isActive ? AppColors.textPrimary : AppColors.textSecondary,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -685,9 +718,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
               duration: const Duration(milliseconds: 200),
               height: 3,
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.primaryButton
-                    : Colors.transparent,
+                color: isActive ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

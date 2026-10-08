@@ -14,7 +14,8 @@ class HistoryLogsController extends ChangeNotifier {
   String? errorMessage;
   UserProfile? profile;
 
-  String selectedTab = 'Sensor logs'; // 'Sensor logs' | 'Calibration logs' | 'Reports logs'
+  String selectedTab =
+      'Sensor logs'; // 'Sensor logs' | 'Calibration logs' | 'Reports logs'
   String selectedRange = 'Daily'; // 'Daily' | 'Weekly' | 'Monthly'
   DateTime selectedDate = manilaNow();
   DateTimeRange? selectedWeekRange;
@@ -139,25 +140,25 @@ class HistoryLogsController extends ChangeNotifier {
   Future<void> loadSelectedLogs() async {
     selectedRowIndices.clear();
     if (selectedTab == 'Calibration logs') {
-        isLoading = true;
-        errorMessage = null;
-        columns = MonitoringService.calibrationLogColumns;
-        notifyListeners();
+      isLoading = true;
+      errorMessage = null;
+      columns = MonitoringService.calibrationLogColumns;
+      notifyListeners();
 
-        try {
-          final range = _selectedDateRange();
-          rows = await monitoringService.getCalibrationHistory(
-            start: range.start,
-            end: range.end,
-          );
-        } catch(_) {
-          errorMessage = 'Failed to load calibration logs from Supabase';
-        } finally {
-          isLoading = false;
-          notifyListeners();
-        }
-        return;
+      try {
+        final range = _selectedDateRange();
+        rows = await monitoringService.getCalibrationHistory(
+          start: range.start,
+          end: range.end,
+        );
+      } catch (_) {
+        errorMessage = 'Failed to load calibration logs from Supabase';
+      } finally {
+        isLoading = false;
+        notifyListeners();
       }
+      return;
+    }
 
     if (selectedTab == 'Reports logs') {
       columns = const [
@@ -235,21 +236,89 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   Future<void> deleteSingleRow(int index) async {
-    if (index >= 0 && index < rows.length) {
-      rows.removeAt(index);
-      selectedRowIndices.remove(index);
-      notifyListeners();
+    if (index < 0 || index >= rows.length) return;
+
+    final entry = rows[index];
+    final recordStart = entry.recordStart;
+
+    if (recordStart == null) {
+      throw StateError('This log entry has no saved timestamp.');
     }
+
+    if (selectedTab == 'Sensor logs') {
+      final duration = entry.recordDuration;
+
+      if (duration == null) {
+        throw StateError('This sensor log has no saved time range.');
+      }
+
+      await monitoringService.deleteSingleSensorHistoryBucket(
+        start: recordStart,
+        end: recordStart.add(duration),
+      );
+    } else if (selectedTab == 'Calibration logs') {
+      await monitoringService.deleteCalibrationLog(recordStart);
+    } else {
+      throw StateError('This log type cannot be deleted here.');
+    }
+
+    // Remove it from the screen only after the database delete succeeds.
+    rows.removeAt(index);
+    selectedRowIndices.remove(index);
+    notifyListeners();
   }
 
   Future<void> deleteSelectedRows() async {
     final sortedIndices = selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
-    for (final idx in sortedIndices) {
-      if (idx >= 0 && idx < rows.length) {
-        rows.removeAt(idx);
+
+    if (sortedIndices.isEmpty) return;
+
+    var deletedCount = 0;
+
+    try {
+      for (final index in sortedIndices) {
+        if (index < 0 || index >= rows.length) continue;
+
+        final entry = rows[index];
+        final recordStart = entry.recordStart;
+
+        if (recordStart == null) {
+          throw StateError('A selected log has no saved timestamp.');
+        }
+
+        if (selectedTab == 'Sensor logs') {
+          final duration = entry.recordDuration;
+
+          if (duration == null) {
+            throw StateError('A selected sensor log has no saved time range.');
+          }
+
+          await monitoringService.deleteSingleSensorHistoryBucket(
+            start: recordStart,
+            end: recordStart.add(duration),
+          );
+        } else if (selectedTab == 'Calibration logs') {
+          await monitoringService.deleteCalibrationLog(recordStart);
+        } else {
+          throw StateError('These selected logs cannot be deleted here.');
+        }
+
+        // Remove this row from the screen only after its database delete succeeds.
+        rows.removeAt(index);
+        deletedCount++;
       }
+    } catch (error) {
+      selectedRowIndices.clear();
+      isSelectionMode = false;
+      notifyListeners();
+
+      throw StateError(
+        'Deleted $deletedCount of ${sortedIndices.length} selected logs. '
+        'Refresh the table and check which rows remain. Details: $error',
+      );
     }
+
     selectedRowIndices.clear();
     isSelectionMode = false;
     notifyListeners();
@@ -259,8 +328,24 @@ class HistoryLogsController extends ChangeNotifier {
       int index, double newPh, double newEc, double newTemp) async {
     if (index >= 0 && index < rows.length) {
       final oldEntry = rows[index];
-      final newValues = List<String>.from(oldEntry.values);
+      final recordStart = oldEntry.recordStart;
+      final recordDuration = oldEntry.recordDuration;
 
+      if (recordStart == null || recordDuration == null) {
+        throw StateError('This history row cannot be saved.');
+      }
+
+      // Save the edited sensor averages to Supabase first.
+      await monitoringService.updateSensorHistoryBucket(
+        start: recordStart,
+        end: recordStart.add(recordDuration),
+        ph: newPh,
+        ec: newEc,
+        temperature: newTemp,
+      );
+
+      // Keep the existing local display update.
+      final newValues = List<String>.from(oldEntry.values);
       final valueStart = selectedRange == 'Monthly' ? 1 : 2;
 
       if (newValues.length > valueStart + 2) {
@@ -272,7 +357,10 @@ class HistoryLogsController extends ChangeNotifier {
       rows[index] = HistoryLogEntry(
         newValues,
         ranges: oldEntry.ranges,
+        recordStart: oldEntry.recordStart,
+        recordDuration: oldEntry.recordDuration,
       );
+
       notifyListeners();
     }
   }

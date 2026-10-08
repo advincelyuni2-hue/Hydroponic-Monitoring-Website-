@@ -43,8 +43,7 @@ class HistoryLogTable extends StatelessWidget {
         if (isAdmin) colWidthMultiplier += 100;
 
         final minCalculatedWidth = math.max(620.0, colWidthMultiplier);
-        final tableWidth =
-            math.max(minCalculatedWidth, constraints.maxWidth);
+        final tableWidth = math.max(minCalculatedWidth, constraints.maxWidth);
 
         String emptyText = 'No logs yet.';
         if (selectedTab == 'Reports logs') {
@@ -223,9 +222,19 @@ class HistoryLogTable extends StatelessWidget {
 
     String? subtitle;
     if (colName == 'Average pH') {
-      subtitle = 'Ideal pH Range: 5.50–6.50';
+      final config = appParameterRanges.value;
+      final minimum = range?.minimum ?? config.phMin;
+      final maximum = range?.maximum ?? config.phMax;
+
+      subtitle =
+          'Ideal pH Range: ${minimum.toStringAsFixed(2)}–${maximum.toStringAsFixed(2)}';
     } else if (colName == 'Average EC') {
-      subtitle = 'Ideal EC Range: 1.20–1.80 mS/cm';
+      final config = appParameterRanges.value;
+      final minimum = range?.minimum ?? config.ecMin;
+      final maximum = range?.maximum ?? config.ecMax;
+
+      subtitle =
+          'Ideal EC Range: ${minimum.toStringAsFixed(2)}–${maximum.toStringAsFixed(2)} mS/cm';
     } else if (colName == 'Average Temp') {
       subtitle = 'Ideal Temp Range: ${formatTempRange(18, 24)}';
     } else if (colName == 'Critical Alerts') {
