@@ -66,7 +66,8 @@ class AddLogScreen extends StatelessWidget {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(notificationService.lastInterventionError ??
+                          content: Text(notificationService
+                                  .lastInterventionError ??
                               'Unable to save the intervention. The alert remains active.'),
                         ),
                       );
@@ -339,7 +340,8 @@ class RecordFixCardState extends State<RecordFixCard> {
             if (_submissionError != null) ...[
               Text(
                 _submissionError!,
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.criticalRed),
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.criticalRed),
               ),
               const SizedBox(height: 12),
             ],
@@ -497,9 +499,11 @@ Future<void> showRecordFixDialog(
   AppNotificationItem? notification,
   required Future<bool> Function(FixEntry) onSubmit,
   String? Function()? submissionError,
+  bool barrierDismissible = true,
 }) {
   return showDialog(
     context: context,
+    barrierDismissible: barrierDismissible,
     builder: (dialogContext) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16),
@@ -510,7 +514,9 @@ Future<void> showRecordFixDialog(
           onCancel: () => Navigator.of(dialogContext).pop(),
           onSubmit: (entry) async {
             final saved = await onSubmit(entry);
-            if (saved && dialogContext.mounted) Navigator.of(dialogContext).pop();
+            if (saved && dialogContext.mounted) {
+              Navigator.of(dialogContext).pop();
+            }
             return saved;
           },
         ),

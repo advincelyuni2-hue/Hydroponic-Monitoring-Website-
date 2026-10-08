@@ -15,7 +15,7 @@ class HistoryLogsController extends ChangeNotifier {
   UserProfile? profile;
 
   String selectedTab =
-      'Sensor logs'; // 'Sensor logs' | 'Calibration logs' | 'Reports logs'
+      'Sensor logs'; // 'Sensor logs' | 'Calibration logs' | 'Intervention logs'
   String selectedRange = 'Daily'; // 'Daily' | 'Weekly' | 'Monthly'
   DateTime selectedDate = manilaNow();
   DateTimeRange? selectedWeekRange;
@@ -160,18 +160,24 @@ class HistoryLogsController extends ChangeNotifier {
       return;
     }
 
-    if (selectedTab == 'Reports logs') {
-      columns = const [
-        'Date',
-        'Time',
-        'Average pH',
-        'Average EC',
-        'Average Temp',
-        'Critical Alerts'
-      ];
-      rows = const [];
-      isLoading = false;
+    if (selectedTab == 'Intervention logs') {
+      isLoading = true;
+      errorMessage = null;
+      columns = MonitoringService.interventionLogColumns;
       notifyListeners();
+
+      try {
+        final range = _selectedDateRange();
+        rows = await monitoringService.getInterventionHistory(
+          start: range.start,
+          end: range.end,
+        );
+      } catch (_) {
+        errorMessage = 'Failed to load intervention logs from Supabase';
+      } finally {
+        isLoading = false;
+        notifyListeners();
+      }
       return;
     }
 
@@ -269,7 +275,6 @@ class HistoryLogsController extends ChangeNotifier {
   }
 
   Future<void> deleteSelectedRows() async {
-
     final sortedIndices = selectedRowIndices.toList()
       ..sort((a, b) => b.compareTo(a));
 

@@ -3,6 +3,49 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:monitoring_app/screens/add_log_screen.dart';
 
 void main() {
+  testWidgets('manual fix popup submits without an alert', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    FixEntry? submitted;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        return Scaffold(
+          body: TextButton(
+            onPressed: () => showRecordFixDialog(
+              context,
+              barrierDismissible: false,
+              onSubmit: (entry) async {
+                submitted = entry;
+                return true;
+              },
+            ),
+            child: const Text('Log Intervention'),
+          ),
+        );
+      }),
+    ));
+
+    await tester.tap(find.text('Log Intervention'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RecordFixCard), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField).at(1), '6.8');
+    final actionDropdown = find.byType(DropdownButtonFormField<String>).last;
+    await tester.ensureVisible(actionDropdown);
+    await tester.tap(actionDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('pH Down').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Record fix'));
+    await tester.tap(find.text('Record fix'));
+    await tester.pumpAndSettle();
+
+    expect(submitted?.actionType, 'pH Down');
+    expect(submitted?.amount, isNull);
+    expect(find.byType(RecordFixCard), findsNothing);
+  });
+
   testWidgets('manual fix accepts blank amount and reservoir volume',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1000));

@@ -23,7 +23,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Getting started',
     title: 'Find your way around the app',
-    body: '1. Tap the green menu button at the top left to open the side menu.\n'
+    body:
+        '1. Tap the green menu button at the top left to open the side menu.\n'
         '2. Pick Dashboard, Forecasts, History logs or Reports to see your hydroponic data.\n'
         '3. Settings and Help are at the bottom of the menu. Admins also see Admin settings.\n'
         '4. The bell at the top right shows your alerts. A red number means there are new alerts.\n'
@@ -33,7 +34,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Getting started',
     title: 'Check alerts from the bell',
-    body: '1. On a computer, click the bell to see the latest alerts in a small list. On a phone, the bell opens the Notifications screen.\n'
+    body:
+        '1. On a computer, click the bell to see the latest alerts in a small list. On a phone, the bell opens the Notifications screen.\n'
         '2. Click an alert to record the fix you made. The form opens with the reading already filled in.\n'
         '3. Click View all notifications to open the full Notifications screen.\n'
         '4. On the Notifications screen, the Active tab shows alerts that still need attention and the Resolved tab shows finished ones.',
@@ -51,7 +53,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Getting started',
     title: 'What can employees and admins do?',
-    body: 'Everyone who is signed in can view the dashboard, forecasts, history logs, reports and alerts, and can send an alert to an admin. '
+    body:
+        'Everyone who is signed in can view the dashboard, forecasts, history logs, reports and alerts, and can send an alert to an admin. '
         'Only admins can edit or delete history logs, change the ideal pH and EC ranges, manage users and add help articles.',
   ),
   HelpArticle(
@@ -79,7 +82,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Dashboard',
     title: 'Use the Latest Insight card',
-    body: '1. Find the Latest Insight card on the Dashboard. It summarizes what the forecast expects for pH and EC.\n'
+    body:
+        '1. Find the Latest Insight card on the Dashboard. It summarizes what the forecast expects for pH and EC.\n'
         '2. The status shows whether things look Stable, Warning or Critical. The text underneath explains why.\n'
         '3. Contributing factors lists the temperature and the other parameter that influence the forecast.\n'
         '4. The predicted pH and EC values show where the readings are expected to go.\n'
@@ -89,7 +93,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Dashboard',
     title: 'Send an alert to an admin',
-    body: '1. In the Latest Insight card, tap Alert Admin (the megaphone button).\n'
+    body:
+        '1. In the Latest Insight card, tap Alert Admin (the megaphone button).\n'
         '2. Describe what you see, for example "pH reading looks wrong on tank 2".\n'
         '3. Tap Send alert. You will see "Alert sent to an administrator."\n'
         '4. The alert appears in the admin\'s bell and on their Notifications screen.\n'
@@ -119,7 +124,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Dashboard',
     title: 'Where do the ideal ranges come from?',
-    body: 'An admin sets the ideal pH and EC ranges in Admin settings (pH / EC Parameter Configuration). '
+    body:
+        'An admin sets the ideal pH and EC ranges in Admin settings (pH / EC Parameter Configuration). '
         'Once saved, the same ranges are used for the status cards, charts, alerts and reports. '
         'Temperature uses a safe range that is built into the app.',
   ),
@@ -150,7 +156,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Forecasts',
     title: 'Apply or dismiss a suggested fix',
-    body: '1. In the Prediction Insights card, read the status badge and the explanation.\n'
+    body:
+        '1. In the Prediction Insights card, read the status badge and the explanation.\n'
         '2. Check Contributing factors and the Suggested fix list.\n'
         '3. After you have done the fix on your system, tap Apply fix, then Yes in the "Apply Corrective Fix?" box. The app shows "Fix logged successfully".\n'
         '4. If the suggestion does not apply, tap Dismiss, then Yes in the "Dismiss Corrective Fix?" box. It is saved to the dismissed action logs.\n'
@@ -169,28 +176,32 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Forecasts',
     title: 'How does the forecast work?',
-    body: 'A machine-learning model uses the latest pH, EC and temperature readings to estimate where pH and EC will be over the next 4, 8 or 12 hours. '
+    body:
+        'A machine-learning model uses the latest pH, EC and temperature readings to estimate where pH and EC will be over the next 4, 8 or 12 hours. '
         'If the forecasting service cannot be reached, the app shows a simple estimated trend instead, so treat the chart as a guide and confirm with your sensors.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Forecasts',
     title: 'Does Apply fix control my equipment?',
-    body: 'No. Apply fix only records that you carried out the suggested action, so your history and future insights stay accurate. '
+    body:
+        'No. Apply fix only records that you carried out the suggested action, so your history and future insights stay accurate. '
         'You still need to adjust the solution yourself.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Forecasts',
     title: 'What happens after I apply or dismiss a fix?',
-    body: 'The action is saved to the logs. For the selected forecast window, the insight then shows as Stable with a note such as '
+    body:
+        'The action is saved to the logs. For the selected forecast window, the insight then shows as Stable with a note such as '
         '"Recent intervention logged" or "Insight dismissed by operator", so the same suggestion is not repeated straight away.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Forecasts',
     title: 'Why do the suggested amounts change?',
-    body: 'Suggested doses, for example the mL of pH-down solution, depend on how far the predicted value is from the middle of the ideal range. '
+    body:
+        'Suggested doses, for example the mL of pH-down solution, depend on how far the predicted value is from the middle of the ideal range. '
         'Add the solution gradually and check the sensor reading afterwards.',
   ),
 
@@ -202,7 +213,7 @@ const List<HelpArticle> kDefaultHelpArticles = [
     category: 'History logs',
     title: 'Browse logs by day, week or month',
     body: '1. Open History logs from the side menu.\n'
-        '2. Choose a tab: Sensor logs, Calibration logs or Reports logs.\n'
+        '2. Choose a tab: Sensor logs, Calibration logs or Intervention logs.\n'
         '3. Tap Daily, Weekly or Monthly. A calendar opens so you can pick the date, week or month.\n'
         '4. The date button next to them shows what you chose. Tap it to pick a different period.\n'
         '5. Daily shows 10-minute averages, Weekly shows 8-hour averages and Monthly shows daily averages.',
@@ -220,7 +231,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'History logs',
     title: 'Edit or delete log records (admins only)',
-    body: '1. To edit one record, tap the pencil (Edit log entry) at the end of the row, change Average pH, Average EC or Average Temp, then tap Save changes to log.\n'
+    body:
+        '1. To edit one record, tap the pencil (Edit log entry) at the end of the row, change Average pH, Average EC or Average Temp, then tap Save changes to log.\n'
         '2. To delete one record, tap the trash can (Delete log entry), then confirm Delete.\n'
         '3. To delete several records, tap Select, tick the rows (or the box at the top for all), tap Delete, then confirm Delete All.\n'
         '4. Tap Cancel to leave selection mode without deleting.\n'
@@ -230,27 +242,30 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'History logs',
     title: 'Who can edit or delete logs?',
-    body: 'Only admins. Employees can view logs, filter by date and open the legend, but the edit and delete buttons are hidden for them.',
+    body:
+        'Only admins. Employees can view logs, filter by date and open the legend, but the edit and delete buttons are hidden for them.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'History logs',
     title: 'What do the average columns mean?',
-    body: 'Each row is an average of the readings in that time slot: 10 minutes for Daily, 8 hours for Weekly and one day for Monthly. '
+    body:
+        'Each row is an average of the readings in that time slot: 10 minutes for Daily, 8 hours for Weekly and one day for Monthly. '
         'Switching between Daily, Weekly and Monthly changes how much detail you see.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'History logs',
-    title: 'Why are Calibration logs or Reports logs empty?',
-    body: 'These tabs fill up as calibration and report records are saved. '
+    title: 'Why are Calibration logs or Intervention logs empty?',
+    body: 'These tabs fill up as calibration records and fixes are saved. '
         'If a table is empty, nothing has been recorded for it yet.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'History logs',
     title: 'Why do some values have a warning color?',
-    body: 'A colored value is outside its ideal range. Tap See legend to see what each color and icon means.',
+    body:
+        'A colored value is outside its ideal range. Tap See legend to see what each color and icon means.',
   ),
 
   // ---------------------------------------------------------------------
@@ -303,7 +318,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Reports',
     title: 'Create a PDF report',
-    body: '1. On the Reports screen, find the Generate PDF Report card and tap Export PDF. The Generate report screen opens.\n'
+    body:
+        '1. On the Reports screen, find the Generate PDF Report card and tap Export PDF. The Generate report screen opens.\n'
         '2. In Report Configuration, tick what you want to include: Sensor history logs, Calibration history logs, pH optimization results, EC optimization results and All analytics and graphs.\n'
         '3. The Document Preview on the left updates to show the real PDF pages.\n'
         '4. Tap Export PDF to download the file. Tap Cancel to go back without exporting.',
@@ -312,14 +328,16 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Reports',
     title: 'What does Out of range mean?',
-    body: 'The average is outside the ideal range that an admin saved in Admin settings. '
+    body:
+        'The average is outside the ideal range that an admin saved in Admin settings. '
         'It does not mean the system is failing right now. Open the trend chart and History logs to see when it happened.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Reports',
     title: 'Which period do the report cards cover?',
-    body: 'The summary cards cover the last 30 days. The trend chart covers 7, 30 or 90 days, depending on what you pick.',
+    body:
+        'The summary cards cover the last 30 days. The trend chart covers 7, 30 or 90 days, depending on what you pick.',
   ),
   HelpArticle(
     type: 'faq',
@@ -332,7 +350,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Reports',
     title: 'What is the Critical Alert Frequency chart?',
-    body: 'It counts critical alerts by type, for example pH drift or EC spike, so you can see which problem happens most often.',
+    body:
+        'It counts critical alerts by type, for example pH drift or EC spike, so you can see which problem happens most often.',
   ),
 
   // ---------------------------------------------------------------------
@@ -342,7 +361,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Notifications',
     title: 'Review and resolve alerts',
-    body: '1. Open Notifications from the bell. On a computer you can also choose View all notifications.\n'
+    body:
+        '1. Open Notifications from the bell. On a computer you can also choose View all notifications.\n'
         '2. The Active tab lists alerts that need attention. The Resolved tab lists finished ones.\n'
         '3. Each card shows its level (Information, Warning Alert or Critical Alert), the message, the current status and reading, the ideal range and a recommendation.\n'
         '4. When the problem is handled, tick the box on the card to mark it resolved, or open the card to record the fix.',
@@ -351,7 +371,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Notifications',
     title: 'Record a fix',
-    body: '1. Tap an alert card. The Record a fix form opens with the parameter, the current value and the recommendation filled in.\n'
+    body:
+        '1. Tap an alert card. The Record a fix form opens with the parameter, the current value and the recommendation filled in.\n'
         '2. Check the Timestamp, Parameter and Current value.\n'
         '3. Choose the Type of action (for example pH Up, pH Down, Add Nutrient or Add Water) and enter the amount in mL.\n'
         '4. Describe what you did in Notes / Intervention Details.\n'
@@ -361,21 +382,24 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Notifications',
     title: 'Where do alerts come from?',
-    body: 'The app creates an alert when pH, EC or temperature goes outside its configured range. '
+    body:
+        'The app creates an alert when pH, EC or temperature goes outside its configured range. '
         'People can also send alerts with the Alert Admin and Alert admin buttons.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Notifications',
     title: 'Why does an alert say Information?',
-    body: 'Alerts that are not about an out-of-range reading, such as a message sent with Alert admin, are labeled Information. '
+    body:
+        'Alerts that are not about an out-of-range reading, such as a message sent with Alert admin, are labeled Information. '
         'Out-of-range readings show as Warning Alert or Critical Alert.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Notifications',
     title: 'Why is there nothing in the list?',
-    body: 'The screen shows "No active notifications found" when everything is resolved. '
+    body:
+        'The screen shows "No active notifications found" when everything is resolved. '
         'Switch to the Resolved tab to see past alerts.',
   ),
 
@@ -386,7 +410,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Settings',
     title: 'Update your profile',
-    body: '1. Tap your name or profile circle at the top right, or choose Settings in the side menu.\n'
+    body:
+        '1. Tap your name or profile circle at the top right, or choose Settings in the side menu.\n'
         '2. Under Profile Management, change your Full name.\n'
         '3. Tap Save profile.\n'
         '4. Your email address is shown partly hidden and cannot be typed over. Use Change email to update it.',
@@ -395,7 +420,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Settings',
     title: 'Change your email or password',
-    body: '1. In Settings, under Profile Management, tap Change email or Change password.\n'
+    body:
+        '1. In Settings, under Profile Management, tap Change email or Change password.\n'
         '2. Enter your current password. This confirms it is really you.\n'
         '3. For a new password, enter it twice (at least 8 characters). Tick Show passwords to check what you typed.\n'
         '4. For a new email, enter the new address. We send a confirmation link, and the change finishes after you open it.\n'
@@ -430,7 +456,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Settings',
     title: 'Can I use the same email for two accounts?',
-    body: 'No. Each email address can have one account. If you already have an account, log in instead of signing up again.',
+    body:
+        'No. Each email address can have one account. If you already have an account, log in instead of signing up again.',
   ),
   HelpArticle(
     type: 'faq',
@@ -443,7 +470,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Settings',
     title: 'What changes when I choose Imperial?',
-    body: 'Temperature is shown in °F instead of °C. pH and EC have no imperial version, so they stay the same.',
+    body:
+        'Temperature is shown in °F instead of °C. pH and EC have no imperial version, so they stay the same.',
   ),
 
   // ---------------------------------------------------------------------
@@ -473,7 +501,8 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'tutorial',
     category: 'Admin settings',
     title: 'Add or edit help articles',
-    body: '1. Open Help from the side menu. Admins see an Add article button at the top.\n'
+    body:
+        '1. Open Help from the side menu. Admins see an Add article button at the top.\n'
         '2. Tap Add article and choose the Section (Tutorial or FAQ) and the Category.\n'
         '3. Enter a Title and the Content. For a tutorial, put each step on its own line, like "1. Open Reports".\n'
         '4. Tap Save article.\n'
@@ -491,12 +520,14 @@ const List<HelpArticle> kDefaultHelpArticles = [
     type: 'faq',
     category: 'Admin settings',
     title: 'What happens to a deactivated user?',
-    body: 'They cannot log in until an admin turns the switch back on. Their past logs and fixes stay in the history.',
+    body:
+        'They cannot log in until an admin turns the switch back on. Their past logs and fixes stay in the history.',
   ),
   HelpArticle(
     type: 'faq',
     category: 'Admin settings',
     title: 'Who can add help articles?',
-    body: 'Only admins. Employees can read every article but do not see the Add article, Edit or Delete buttons.',
+    body:
+        'Only admins. Employees can read every article but do not see the Add article, Edit or Delete buttons.',
   ),
 ];

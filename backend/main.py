@@ -32,13 +32,10 @@ app.add_middleware(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "supabase_configured": supabase is not None}
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv(
-    "SUPABASE_SERVICE_ROLE_KEY",
-    os.getenv("SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_ANON_KEY", "")),
-)
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 FORECAST_MODEL_VERSION = os.getenv("FORECAST_MODEL_VERSION", "delta-lstm-v1")
 SENSOR_OFFLINE_AFTER_MINUTES = int(os.getenv("SENSOR_OFFLINE_AFTER_MINUTES", "10"))
 
@@ -121,7 +118,13 @@ def get_resilient_sequence(live_ph: float, live_ec: float, live_temp: float) -> 
 
 def get_latest_sensor_baseline():
     if supabase is None:
-        return None
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "model_database_unconfigured",
+                "message": "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the model server.",
+            },
+        )
     try:
         response = (
             supabase.from_("sensor_history")

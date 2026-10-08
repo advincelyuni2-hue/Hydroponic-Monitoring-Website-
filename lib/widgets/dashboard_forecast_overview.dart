@@ -15,6 +15,7 @@ class DashboardForecastOverview extends StatefulWidget {
   final List<ForecastHorizonSummary> summaries;
   final DateTime? generatedAt;
   final bool isOffline;
+  final String? forecastIssue;
   final DateTime? latestSensorRecordedAt;
   final VoidCallback onViewDetails;
 
@@ -25,6 +26,7 @@ class DashboardForecastOverview extends StatefulWidget {
     required this.summaries,
     required this.generatedAt,
     this.isOffline = false,
+    this.forecastIssue,
     this.latestSensorRecordedAt,
     required this.onViewDetails,
   });
@@ -44,7 +46,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 600;
-    if (widget.isOffline) {
+    if (widget.isOffline || widget.forecastIssue != null) {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
@@ -72,8 +74,10 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                       style: AppTextStyles.cardMeta,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 4),
-                    Text(lastReceived, style: AppTextStyles.cardMeta),
+                    if (widget.isOffline) ...[
+                      const SizedBox(height: 4),
+                      Text(lastReceived, style: AppTextStyles.cardMeta),
+                    ],
                   ],
                 ),
               ),

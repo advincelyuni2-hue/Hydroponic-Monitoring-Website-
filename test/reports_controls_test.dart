@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:monitoring_app/models/reports_models.dart';
 import 'package:monitoring_app/widgets/report_analytics_card.dart';
 import 'package:monitoring_app/widgets/report_prediction_card.dart';
+import 'package:monitoring_app/widgets/forecast_evaluation_table.dart';
 import 'package:monitoring_app/widgets/target_distribution_card.dart';
 
 void main() {
@@ -50,6 +51,7 @@ void main() {
             isLoading: false,
             errorMessage: null,
             onParameterChanged: selections.add,
+            onViewTable: () {},
           ),
         ),
       ),
@@ -62,8 +64,8 @@ void main() {
     expect(selections, ['EC', 'pH']);
   });
 
-  testWidgets('intervened forecast remains visible outside accuracy',
-      (tester) async {
+  testWidgets('forecast table is opened from the graph card', (tester) async {
+    var opened = false;
     const evaluation = ModelEvaluation(
       samples: [],
       horizonHours: 4,
@@ -95,15 +97,61 @@ void main() {
               isLoading: false,
               errorMessage: null,
               onParameterChanged: (_) {},
+              onViewTable: () => opened = true,
             ),
           ),
         ),
       ),
     );
 
+    expect(find.text('Predicted vs actual'), findsNothing);
+    expect(find.text('Evaluated: 0'), findsNothing);
+    await tester.tap(find.text('View table'));
+    expect(opened, isTrue);
+    expect(evaluation.accuracyFor('Both'), isNull);
+  });
+
+  testWidgets('dedicated forecast table shows records and summary',
+      (tester) async {
+    const evaluation = ModelEvaluation(
+      samples: [],
+      horizonHours: 4,
+      modelName: 'Forecast model',
+      intervenedCount: 1,
+      records: [
+        ForecastEvaluationRecord(
+          parameter: 'ph',
+          targetLabel: 'Oct 9, 2026, 4:00 PM',
+          predictedValue: 7.2,
+          actualValue: 6.3,
+          status: 'intervened',
+          interventionCount: 1,
+          actionType: 'pH Down',
+          actionTimeLabel: 'Oct 9, 2026, 2:00 PM',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: ForecastEvaluationTable(
+            evaluation: evaluation,
+            selectedParameter: 'Both',
+            selectedHorizon: 4,
+            isLoading: false,
+            errorMessage: null,
+            onParameterChanged: (_) {},
+            onHorizonChanged: (_) {},
+          ),
+        ),
+      ),
+    ));
+
+    expect(find.text('Intervention excluded: 1'), findsOneWidget);
+    expect(find.text('Pending: 0'), findsOneWidget);
     expect(find.text('Intervened'), findsOneWidget);
     expect(find.textContaining('pH Down'), findsOneWidget);
-    expect(evaluation.accuracyFor('Both'), isNull);
   });
 
   testWidgets('frequency distribution parameter control responds',

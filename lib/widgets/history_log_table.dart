@@ -46,8 +46,8 @@ class HistoryLogTable extends StatelessWidget {
         final tableWidth = math.max(minCalculatedWidth, constraints.maxWidth);
 
         String emptyText = 'No logs yet.';
-        if (selectedTab == 'Reports logs') {
-          emptyText = 'No report logs documented yet';
+        if (selectedTab == 'Intervention logs') {
+          emptyText = 'No interventions recorded for this period';
         } else if (selectedTab == 'Calibration logs') {
           emptyText = 'No calibration logs documented yet';
         }
@@ -169,11 +169,14 @@ class HistoryLogTable extends StatelessWidget {
                                           ),
                                         )
                                       : Center(
-                                          child: Text(
-                                            rows[r].values[c],
-                                            style: AppTextStyles.body,
-                                            overflow: TextOverflow.ellipsis,
-                                            textAlign: TextAlign.center,
+                                          child: Tooltip(
+                                            message: rows[r].values[c],
+                                            child: Text(
+                                              rows[r].values[c],
+                                              style: AppTextStyles.body,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                            ),
                                           ),
                                         ),
                             ),

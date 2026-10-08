@@ -186,6 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           summaries: _controller.forecastSummaries,
           generatedAt: _controller.forecastGeneratedAt,
           isOffline: _controller.isSensorOffline,
+          forecastIssue: _controller.forecastIssue,
           latestSensorRecordedAt: _controller.latestSensorRecordedAt,
           onViewDetails: _openForecastingScreen,
         ),

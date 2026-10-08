@@ -16,6 +16,7 @@ class ReportPredictionCard extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
   final ValueChanged<String> onParameterChanged;
+  final VoidCallback onViewTable;
 
   const ReportPredictionCard({
     super.key,
@@ -26,6 +27,7 @@ class ReportPredictionCard extends StatelessWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.onParameterChanged,
+    required this.onViewTable,
   });
 
   static Color get _phColor => AppColors.accentGreen;
@@ -46,30 +48,6 @@ class ReportPredictionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(isMobile),
-          const SizedBox(height: 5),
-          Text(
-            'Compares what ${evaluation.modelName} predicted '
-            '${evaluation.horizonHours} hours ahead with what the sensors '
-            'actually measured. Dashed lines are predictions.',
-            style: AppTextStyles.cardMeta,
-          ),
-          if (evaluation.storedPredictionCount > 0) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                Text('Evaluated: ${evaluation.evaluatedCount}',
-                    style: AppTextStyles.cardMeta),
-                Text('Pending: ${evaluation.pendingCount}',
-                    style: AppTextStyles.cardMeta),
-                Text('Intervention excluded: ${evaluation.intervenedCount}',
-                    style: AppTextStyles.cardMeta),
-                Text('Missing actual: ${evaluation.missingActualCount}',
-                    style: AppTextStyles.cardMeta),
-              ],
-            ),
-          ],
           SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
             height: isMobile ? 230 : 350,
@@ -77,10 +55,6 @@ class ReportPredictionCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _buildLegend(),
-          if (evaluation.records.isNotEmpty) ...[
-            const SizedBox(height: 22),
-            _buildEvaluationTable(),
-          ],
         ],
       ),
     );
@@ -127,6 +101,11 @@ class ReportPredictionCard extends StatelessWidget {
       children: [
         Icon(Icons.show_chart, color: AppColors.accentGreen),
         Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
+        TextButton.icon(
+          onPressed: onViewTable,
+          icon: const Icon(Icons.table_chart_outlined, size: 17),
+          label: const Text('View table'),
+        ),
         if (accuracy != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -450,87 +429,6 @@ class ReportPredictionCard extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  Widget _buildEvaluationTable() {
-    final records = evaluation.records
-        .where((record) =>
-            selectedParameter == 'Both' ||
-            record.parameter == selectedParameter.toLowerCase())
-        .take(12)
-        .toList();
-    if (records.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Predicted vs actual', style: AppTextStyles.sectionTitle),
-        const SizedBox(height: 4),
-        Text(
-          'Intervened forecasts stay in the record but are excluded from model accuracy.',
-          style: AppTextStyles.cardMeta,
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowHeight: 40,
-            dataRowMinHeight: 48,
-            dataRowMaxHeight: 68,
-            columnSpacing: 22,
-            columns: const [
-              DataColumn(label: Text('Target time')),
-              DataColumn(label: Text('Parameter')),
-              DataColumn(label: Text('Predicted')),
-              DataColumn(label: Text('Actual')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('Logged action')),
-            ],
-            rows: [
-              for (final record in records)
-                DataRow(cells: [
-                  DataCell(Text(record.targetLabel)),
-                  DataCell(Text(record.parameter.toUpperCase())),
-                  DataCell(Text(_formatValue(record.predictedValue, record.parameter))),
-                  DataCell(Text(record.actualValue == null
-                      ? '—'
-                      : _formatValue(record.actualValue!, record.parameter))),
-                  DataCell(_statusLabel(record.status)),
-                  DataCell(Text(record.status == 'intervened'
-                      ? [
-                          record.actionType ?? 'Action recorded',
-                          if (record.actionTimeLabel != null)
-                            record.actionTimeLabel!,
-                          if (record.interventionCount > 1)
-                            '${record.interventionCount} actions total',
-                        ].join('\n')
-                      : '—')),
-                ]),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatValue(double value, String parameter) =>
-      parameter == 'ec'
-          ? '${value.toStringAsFixed(3)} mS/cm'
-          : value.toStringAsFixed(3);
-
-  Widget _statusLabel(String status) {
-    final label = switch (status) {
-      'evaluated' => 'Evaluated',
-      'intervened' => 'Intervened',
-      'missing_actual' => 'Missing actual',
-      _ => 'Pending',
-    };
-    final color = switch (status) {
-      'evaluated' => AppColors.accentGreen,
-      'intervened' => AppColors.warningYellow,
-      _ => AppColors.textSecondary,
-    };
-    return Text(label, style: AppTextStyles.cardMeta.copyWith(color: color));
   }
 }
 

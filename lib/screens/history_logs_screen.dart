@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/history_logs_controller.dart';
+import '../services/notification_service.dart';
 import '../services/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -11,6 +12,7 @@ import '../widgets/custom_calendar_popup.dart';
 import '../widgets/history_log_cards.dart';
 import '../widgets/history_log_table.dart';
 import '../widgets/history_log_value.dart';
+import 'add_log_screen.dart';
 
 class HistoryLogsScreen extends StatefulWidget {
   const HistoryLogsScreen({super.key});
@@ -43,6 +45,35 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
           _controller.updateDate(selectedDate, weekRange);
         },
       ),
+    );
+  }
+
+  Future<void> _showManualInterventionDialog() async {
+    final service = NotificationService();
+    var saved = false;
+
+    await showRecordFixDialog(
+      context,
+      barrierDismissible: false,
+      submissionError: () => service.lastInterventionError,
+      onSubmit: (entry) async {
+        saved = await service.recordManualIntervention(
+          parameter: entry.parameter,
+          currentValue: entry.currentValue,
+          actionType: entry.actionType,
+          amount: entry.amount,
+          notes: entry.notes,
+          reservoirVolumeL: entry.reservoirVolumeL,
+        );
+        return saved;
+      },
+    );
+
+    if (!mounted || !saved) return;
+    await _controller.loadSelectedLogs();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Intervention recorded successfully.')),
     );
   }
 
@@ -399,6 +430,19 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 2),
+      floatingActionButton: ListenableBuilder(
+        listenable: _controller,
+        builder: (context, _) => _controller.selectedTab == 'Intervention logs'
+            ? FloatingActionButton.extended(
+                heroTag: 'log-intervention',
+                onPressed: _showManualInterventionDialog,
+                backgroundColor: AppColors.primaryButton,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.add),
+                label: const Text('Log Intervention'),
+              )
+            : const SizedBox.shrink(),
+      ),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
@@ -424,7 +468,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             }
 
             final isMobile = Responsive.isMobile(context);
-            final isAdmin = appProfile.value?.isAdmin == true;
+            final isAdmin = appProfile.value?.isAdmin == true &&
+                _controller.selectedTab != 'Intervention logs';
 
             return SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -449,6 +494,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                             ? HistoryLogCards(
                                 columns: _controller.columns,
                                 rows: _controller.rows,
+                                selectedTab: _controller.selectedTab,
                               )
                             : HistoryLogTable(
                                 columns: _controller.columns,
@@ -688,7 +734,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
   }
 
   Widget _buildTabs(bool isMobile) {
-    final tabOptions = ['Sensor logs', 'Calibration logs', 'Reports logs'];
+    final tabOptions = ['Sensor logs', 'Calibration logs', 'Intervention logs'];
     return Wrap(
       spacing: isMobile ? 12 : 24,
       children: tabOptions.map((title) => _tab(title, isMobile)).toList(),

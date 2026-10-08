@@ -34,6 +34,7 @@ class ForecastingController extends ChangeNotifier {
   PredictionInsightDetail? phInsightDetail;
   PredictionInsightDetail? ecInsightDetail;
   bool isSensorOffline = false;
+  String? forecastIssue;
   DateTime? latestSensorRecordedAt;
   Timer? _freshnessTimer;
   RealtimeChannel? _parameterChannel;
@@ -67,6 +68,7 @@ class ForecastingController extends ChangeNotifier {
   Future<void> loadData() async {
     isLoading = true;
     errorMessage = null;
+    forecastIssue = null;
     notifyListeners();
 
     try {
@@ -161,9 +163,14 @@ class ForecastingController extends ChangeNotifier {
 
       isLoading = false;
       notifyListeners();
-    } on SensorOfflineException catch (error) {
-      isSensorOffline = true;
-      latestSensorRecordedAt = error.lastRecordedAt ?? latestSensorRecordedAt;
+    } on ForecastBaselineUnavailableException catch (error) {
+      forecastIssue = error.message;
+      _clearForecastData();
+      errorMessage = null;
+      isLoading = false;
+      notifyListeners();
+    } on ForecastEndpointUnavailableException catch (error) {
+      forecastIssue = error.message;
       _clearForecastData();
       errorMessage = null;
       isLoading = false;
@@ -182,9 +189,10 @@ class ForecastingController extends ChangeNotifier {
       isSensorOffline = snapshot.isOffline;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       if (isSensorOffline) {
+        forecastIssue = null;
         _clearForecastData();
         notifyListeners();
-      } else if (wasOffline) {
+      } else if (wasOffline || forecastIssue != null) {
         await loadData();
       }
     } catch (_) {

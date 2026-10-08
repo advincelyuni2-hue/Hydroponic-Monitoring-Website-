@@ -13,6 +13,7 @@ import '../widgets/report_prediction_card.dart';
 import '../widgets/sensor_health_card.dart';
 import '../widgets/target_distribution_card.dart';
 import 'generate_report_screen.dart';
+import 'forecast_evaluation_table_screen.dart';
 import '../services/app_state.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -35,6 +36,15 @@ class ReportsScreenState extends State<ReportsScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => GenerateReportScreen(controller: _controller),
+      ),
+    );
+  }
+
+  void _navigateToForecastTable() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ForecastEvaluationTableScreen(controller: _controller),
       ),
     );
   }
@@ -159,6 +169,7 @@ class ReportsScreenState extends State<ReportsScreen> {
                 isLoading: _controller.isEvaluationLoading,
                 errorMessage: _controller.evaluationError,
                 onParameterChanged: _controller.setPredictionParameter,
+                onViewTable: _navigateToForecastTable,
               ),
               const SizedBox(height: 20),
               SensorHealthCard(
@@ -233,6 +244,7 @@ class ReportsScreenState extends State<ReportsScreen> {
           isLoading: _controller.isEvaluationLoading,
           errorMessage: _controller.evaluationError,
           onParameterChanged: _controller.setPredictionParameter,
+          onViewTable: _navigateToForecastTable,
         ),
         const SizedBox(height: 16),
         SensorHealthCard(

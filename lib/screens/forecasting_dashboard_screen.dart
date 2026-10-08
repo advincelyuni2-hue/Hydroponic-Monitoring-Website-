@@ -98,6 +98,7 @@ class _ForecastingDashboardScreenState
                       points: phPointsMapped,
                       ecPoints: ecPointsMapped,
                       isOffline: _controller.isSensorOffline,
+                      forecastIssue: _controller.forecastIssue,
                       latestSensorRecordedAt:
                           _controller.latestSensorRecordedAt,
                     ),
@@ -163,6 +164,7 @@ class _ForecastingDashboardScreenState
                             points: phPointsMapped,
                             ecPoints: ecPointsMapped,
                             isOffline: _controller.isSensorOffline,
+                            forecastIssue: _controller.forecastIssue,
                             latestSensorRecordedAt:
                                 _controller.latestSensorRecordedAt,
                           ),

@@ -32,6 +32,7 @@ class DashboardController extends ChangeNotifier {
   List<ForecastPoint> ecForecast = [];
   List<ForecastHorizonSummary> forecastSummaries = [];
   DateTime? forecastGeneratedAt;
+  String? forecastIssue;
   bool isSensorOffline = false;
   DateTime? latestSensorRecordedAt;
   RealtimeChannel? _parameterChannel;
@@ -67,6 +68,7 @@ class DashboardController extends ChangeNotifier {
       isSensorOffline = snapshot.isOffline;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       if (isSensorOffline) {
+        forecastIssue = null;
         _clearPredictiveData();
       }
       notifyListeners();
@@ -101,6 +103,7 @@ class DashboardController extends ChangeNotifier {
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       notifications = results[2] as List<AppNotificationItem>;
       if (isSensorOffline) {
+        forecastIssue = null;
         _clearPredictiveData();
       } else {
         await _refreshPredictiveData(notify: false);
@@ -148,13 +151,19 @@ class DashboardController extends ChangeNotifier {
           currentTemp: currentTemp,
         ),
       ]);
-    } on SensorOfflineException catch (error) {
-      isSensorOffline = true;
-      latestSensorRecordedAt = error.lastRecordedAt ?? latestSensorRecordedAt;
+    } on ForecastBaselineUnavailableException catch (error) {
+      forecastIssue = error.message;
+      _clearPredictiveData();
+      if (notify) notifyListeners();
+      return;
+    } on ForecastEndpointUnavailableException catch (error) {
+      forecastIssue = error.message;
       _clearPredictiveData();
       if (notify) notifyListeners();
       return;
     }
+
+    forecastIssue = null;
 
     final phPoints = results[0];
     final ecPoints = results[1];

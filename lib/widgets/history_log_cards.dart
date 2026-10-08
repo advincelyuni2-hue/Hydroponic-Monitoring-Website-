@@ -7,8 +7,14 @@ import 'history_log_value.dart';
 class HistoryLogCards extends StatelessWidget {
   final List<String> columns;
   final List<HistoryLogEntry> rows;
+  final String selectedTab;
 
-  const HistoryLogCards({super.key, required this.columns, required this.rows});
+  const HistoryLogCards({
+    super.key,
+    required this.columns,
+    required this.rows,
+    this.selectedTab = 'Sensor logs',
+  });
 
   int get _statusColumnIndex => columns.indexOf('Status');
 
@@ -18,7 +24,12 @@ class HistoryLogCards extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 32),
         child: Center(
-          child: Text('No logs yet.', style: AppTextStyles.cardMeta),
+          child: Text(
+            selectedTab == 'Intervention logs'
+                ? 'No interventions recorded for this period'
+                : 'No logs yet.',
+            style: AppTextStyles.cardMeta,
+          ),
         ),
       );
     }
@@ -73,12 +84,15 @@ class _LogCard extends StatelessWidget {
                             range: entry.ranges[i]!,
                             alignRight: true,
                           )
-                        : Text(
-                            entry.values[i],
-                            style:
-                                AppTextStyles.bodyBold.copyWith(fontSize: 13),
-                            textAlign: TextAlign.right,
-                            overflow: TextOverflow.ellipsis,
+                        : Tooltip(
+                            message: entry.values[i],
+                            child: Text(
+                              entry.values[i],
+                              style:
+                                  AppTextStyles.bodyBold.copyWith(fontSize: 13),
+                              textAlign: TextAlign.right,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                   ),
               ],

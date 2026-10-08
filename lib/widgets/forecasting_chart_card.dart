@@ -17,6 +17,7 @@ class ForecastingChartCard extends StatefulWidget {
   final List<ForecastPoint>? ecPoints;
   final DateTime? generatedAt;
   final bool isOffline;
+  final String? forecastIssue;
   final DateTime? latestSensorRecordedAt;
 
   const ForecastingChartCard({
@@ -29,6 +30,7 @@ class ForecastingChartCard extends StatefulWidget {
     this.ecPoints,
     this.generatedAt,
     this.isOffline = false,
+    this.forecastIssue,
     this.latestSensorRecordedAt,
   });
 
@@ -46,7 +48,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     final isDesktop = Responsive.isDesktop(context);
     final isMobile = Responsive.isMobile(context);
 
-    if (widget.isOffline) {
+    if (widget.isOffline || widget.forecastIssue != null) {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
@@ -74,8 +76,10 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                       style: AppTextStyles.cardMeta,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 4),
-                    Text(lastReceived, style: AppTextStyles.cardMeta),
+                    if (widget.isOffline) ...[
+                      const SizedBox(height: 4),
+                      Text(lastReceived, style: AppTextStyles.cardMeta),
+                    ],
                   ],
                 ),
               ),

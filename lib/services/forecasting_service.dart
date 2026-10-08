@@ -1,20 +1,37 @@
 import 'dart:convert';
 import 'app_state.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/forecasting_models.dart';
 import 'supabase_client.dart';
 import '../utils/manila_time.dart';
 
-class SensorOfflineException implements Exception {
-  final DateTime? lastRecordedAt;
-  const SensorOfflineException({this.lastRecordedAt});
+/// The model service rejected its own sensor baseline. This does not prove
+/// that the app's independently fetched realtime sensor feed is offline.
+class ForecastBaselineUnavailableException implements Exception {
+  final DateTime? modelLastRecordedAt;
+  const ForecastBaselineUnavailableException({this.modelLastRecordedAt});
+
+  String get message {
+    final lastSeen = modelLastRecordedAt == null
+        ? 'The model did not report a last reading.'
+        : 'Model last received '
+            '${formatManilaDateTime(toManilaTime(modelLastRecordedAt!))}.';
+    return 'The model service cannot find a recent sensor reading. $lastSeen '
+        'Check that the website and model use the same Supabase project '
+        'and that the model server clock is correct.';
+  }
+}
+
+class ForecastEndpointUnavailableException implements Exception {
+  final String message;
+  const ForecastEndpointUnavailableException(this.message);
 }
 
 class ForecastingService {
   static const String backendApiUrl = String.fromEnvironment(
     'FORECAST_API_URL',
-    defaultValue:
-        'http://127.0.0.1:8000/api/predict/forecast',
+    defaultValue: 'http://127.0.0.1:8000/api/predict/forecast',
   );
 
   Future<List<ForecastingChartPoint>> getForecastChartData(
@@ -24,6 +41,25 @@ class ForecastingService {
     double currentEc = 1.5,
     double currentTemp = 24.0,
   }) async {
+    final deployedWeb =
+        kIsWeb && Uri.base.host != 'localhost' && Uri.base.host != '127.0.0.1';
+    final endpoint = Uri.parse(backendApiUrl);
+    if (deployedWeb &&
+        (endpoint.host == 'localhost' || endpoint.host == '127.0.0.1')) {
+      throw const ForecastEndpointUnavailableException(
+        'The deployed website is still configured to call localhost. '
+        'Rebuild it with FORECAST_API_URL set to the public HTTPS model endpoint.',
+      );
+    }
+    if (deployedWeb &&
+        Uri.base.scheme == 'https' &&
+        endpoint.scheme != 'https') {
+      throw const ForecastEndpointUnavailableException(
+        'The deployed website uses HTTPS but FORECAST_API_URL does not. '
+        'Rebuild it with the public HTTPS model endpoint.',
+      );
+    }
+
     final chartPoints = <ForecastingChartPoint>[];
     final requestTime = DateTime.now().toUtc();
     final baselineVal = parameter == 'ph' ? currentPh : currentEc;
@@ -64,7 +100,7 @@ class ForecastingService {
         baselineVal,
       );
 
-      final uri = Uri.parse(backendApiUrl).replace(queryParameters: {
+      final uri = endpoint.replace(queryParameters: {
         'parameter': parameter.toLowerCase(),
         'ph': currentPh.toString(),
         'ec': currentEc.toString(),
@@ -73,7 +109,7 @@ class ForecastingService {
       });
 
       final apiResponse =
-          await http.get(uri).timeout(const Duration(seconds: 10));
+          await http.get(uri).timeout(Duration(seconds: deployedWeb ? 45 : 10));
 
       if (apiResponse.statusCode == 200) {
         final data = json.decode(apiResponse.body);
@@ -94,14 +130,43 @@ class ForecastingService {
 
       if (apiResponse.statusCode == 409) {
         DateTime? lastRecordedAt;
+        var modelSensorOffline = false;
         try {
           final body = json.decode(apiResponse.body) as Map<String, dynamic>;
           final detail = body['detail'];
           if (detail is Map && detail['code'] == 'sensor_offline') {
+            modelSensorOffline = true;
             lastRecordedAt = DateTime.tryParse('${detail['last_recorded_at']}');
           }
         } catch (_) {}
-        throw SensorOfflineException(lastRecordedAt: lastRecordedAt);
+        if (modelSensorOffline) {
+          throw ForecastBaselineUnavailableException(
+            modelLastRecordedAt: lastRecordedAt,
+          );
+        }
+      }
+
+      if (apiResponse.statusCode == 503) {
+        try {
+          final body = json.decode(apiResponse.body) as Map<String, dynamic>;
+          final detail = body['detail'];
+          if (detail is Map &&
+              detail['code'] == 'model_database_unconfigured') {
+            throw const ForecastEndpointUnavailableException(
+              'The model server is missing SUPABASE_SERVICE_ROLE_KEY. '
+              'Set it in the backend environment and redeploy the model service.',
+            );
+          }
+        } on ForecastEndpointUnavailableException {
+          rethrow;
+        } catch (_) {}
+      }
+
+      if (deployedWeb) {
+        throw ForecastEndpointUnavailableException(
+          'The forecast service returned HTTP ${apiResponse.statusCode}. '
+          'Check its /api/predict/forecast endpoint and Supabase connection.',
+        );
       }
 
       return _withFallbackPredictions(
@@ -109,9 +174,17 @@ class ForecastingService {
         selectedHours,
         baselineVal,
       );
-    } on SensorOfflineException {
+    } on ForecastBaselineUnavailableException {
+      rethrow;
+    } on ForecastEndpointUnavailableException {
       rethrow;
     } catch (_) {
+      if (deployedWeb) {
+        throw const ForecastEndpointUnavailableException(
+          'The deployed website could not load a model forecast. '
+          'Check the public HTTPS FORECAST_API_URL and backend logs.',
+        );
+      }
       return _withFallbackPredictions(
         chartPoints,
         selectedHours,

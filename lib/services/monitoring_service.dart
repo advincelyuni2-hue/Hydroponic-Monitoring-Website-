@@ -32,6 +32,53 @@ class MonitoringService {
     'Action Taken',
   ];
 
+  static const List<String> interventionLogColumns = [
+    'Date',
+    'Time',
+    'Parameter',
+    'Action taken',
+    'Amount',
+    'Notes',
+    'Source',
+  ];
+
+  Future<List<HistoryLogEntry>> getInterventionHistory({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final rows = await supabase
+        .from('action_logs')
+        .select('performed_at, parameter, action_type, amount, amount_unit, '
+            'notes, source')
+        .inFilter('source', ['notification_fix', 'manual_fix'])
+        .gte('performed_at', manilaWallTimeToUtc(start).toIso8601String())
+        .lt('performed_at', manilaWallTimeToUtc(end).toIso8601String())
+        .order('performed_at', ascending: false);
+
+    return rows.map<HistoryLogEntry>(interventionEntryFromRow).toList();
+  }
+
+  static HistoryLogEntry interventionEntryFromRow(Map<String, dynamic> row) {
+    final recordedAt = parseSupabaseTimestamp(row['performed_at'].toString());
+    final local = toManilaTime(recordedAt);
+    final date = formatManilaDateTime(local).split(', ').take(2).join(', ');
+    final action = row['action_type']?.toString().trim();
+    final amount = row['amount'];
+    final amountText = amount == null
+        ? '—'
+        : '$amount ${row['amount_unit']?.toString() ?? 'mL'}';
+    final notes = row['notes']?.toString().trim();
+    return HistoryLogEntry([
+      date,
+      formatManilaClockTime(local),
+      row['parameter']?.toString() ?? '—',
+      action == null || action.isEmpty ? '—' : action,
+      amountText,
+      notes == null || notes.isEmpty ? '—' : notes,
+      row['source'] == 'notification_fix' ? 'Notification' : 'Manual',
+    ]);
+  }
+
   /// Column headers for the "Calibration logs" tab. Different shape from
   /// Sensor logs — a calibration event records what was adjusted and who
   /// performed it, not a raw reading.
