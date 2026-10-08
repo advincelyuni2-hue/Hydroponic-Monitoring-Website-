@@ -76,16 +76,16 @@ const double PH_SLOPE =
 // FINAL EC CALIBRATION
 // =====================================================
 
-// Voltages normalized to 25 C:
+// Raw probe-output voltages measured with the solutions at 25 C:
 //
-// 1.413 mS/cm = 0.836311 V
-// 12.88 mS/cm = 1.721006 V
+// 1.413 mS/cm = 1.001935 V (mean of the final 5 stable readings)
+// 12.88 mS/cm = 2.092003 V (mean of the final 7 stable readings)
 
 const double EC_LOW_REFERENCE = 1.413;
 const double EC_HIGH_REFERENCE = 12.88;
 
-const double EC_LOW_VOLTAGE_25 = 0.836311;
-const double EC_HIGH_VOLTAGE_25 = 1.721006;
+const double EC_LOW_VOLTAGE_25 = 1.001935;
+const double EC_HIGH_VOLTAGE_25 = 2.092003;
 
 const double EC_SLOPE =
   (EC_HIGH_REFERENCE - EC_LOW_REFERENCE) /
@@ -95,7 +95,10 @@ const double EC_INTERCEPT =
   EC_LOW_REFERENCE -
   (EC_SLOPE * EC_LOW_VOLTAGE_25);
 
-const double EC_TEMPERATURE_COEFFICIENT = 0.019;
+// The DHT22 measures air temperature, not nutrient-solution temperature.
+// Do not use it to temperature-compensate EC. The EC calibration solutions
+// must be physically held at 25 C. Add a waterproof solution-temperature
+// sensor before enabling EC temperature compensation.
 
 // =====================================================
 // TIMING
@@ -187,10 +190,7 @@ double readAverageVoltage(uint8_t pin);
 
 double calculatePH(double voltage);
 
-double calculateEC(
-  double voltage,
-  double temperature
-);
+double calculateEC(double voltage);
 
 void processFiveMinuteHistory();
 void resetHistoryBuffer();
@@ -531,33 +531,22 @@ void completeECCycle() {
     "[SENSOR] Reading temperature and EC..."
   );
 
-  double temperatureForCompensation =
-    dht.readTemperature();
+  double airTemperature = dht.readTemperature();
 
-  if (!isnan(temperatureForCompensation)) {
-    latestTemperature =
-      temperatureForCompensation;
+  if (!isnan(airTemperature)) {
+    latestTemperature = airTemperature;
 
     Serial.printf(
-      "[TEMP] Value: %.2f C\n",
+      "[AIR TEMP] Value: %.2f C\n",
       latestTemperature
     );
   } else {
-    Serial.println("[TEMP] DHT22 read failed.");
+    Serial.println("[AIR TEMP] DHT22 read failed.");
 
     if (!isnan(latestTemperature)) {
-      temperatureForCompensation =
-        latestTemperature;
-
       Serial.printf(
-        "[TEMP] Previous value used for EC: %.2f C\n",
-        temperatureForCompensation
-      );
-    } else {
-      temperatureForCompensation = 25.0;
-
-      Serial.println(
-        "[TEMP] Using 25 C for EC compensation only."
+        "[AIR TEMP] Previous value retained: %.2f C\n",
+        latestTemperature
       );
     }
   }
@@ -566,10 +555,7 @@ void completeECCycle() {
 
   latestECVoltage = readECVoltage();
 
-  latestEC = calculateEC(
-    latestECVoltage,
-    temperatureForCompensation
-  );
+  latestEC = calculateEC(latestECVoltage);
 
   if (!isnan(latestEC)) {
     Serial.printf(
@@ -700,35 +686,13 @@ double calculatePH(double voltage) {
 // EC CALCULATION
 // =====================================================
 
-double calculateEC(
-  double voltage,
-  double temperature
-) {
-  if (
-    isnan(voltage) ||
-    isnan(temperature)
-  ) {
+double calculateEC(double voltage) {
+  if (isnan(voltage)) {
     return NAN;
   }
-
-  double compensation =
-    1.0 +
-    EC_TEMPERATURE_COEFFICIENT *
-    (temperature - 25.0);
-
-  if (compensation <= 0.0) {
-    Serial.println(
-      "[EC] Invalid temperature compensation."
-    );
-
-    return NAN;
-  }
-
-  double voltageAt25C =
-    voltage / compensation;
 
   double calculatedEC =
-    (EC_SLOPE * voltageAt25C) +
+    (EC_SLOPE * voltage) +
     EC_INTERCEPT;
 
   if (calculatedEC < 0.0) {
@@ -737,8 +701,8 @@ double calculateEC(
 
   if (CALIBRATION_MODE) {
     Serial.printf(
-      "[EC CAL] Voltage normalized to 25 C: %.6f V\n",
-      voltageAt25C
+      "[EC CAL] Raw solution voltage (solution at 25 C): %.6f V\n",
+      voltage
     );
 
     Serial.printf(
@@ -1355,4 +1319,3 @@ void updateOLED() {
 
   display.display();
 }
-
