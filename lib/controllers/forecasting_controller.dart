@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../models/forecast_insight_summary.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -31,6 +32,16 @@ class ForecastingController extends ChangeNotifier {
   List<ForecastingChartPoint> phPoints = [];
   List<ForecastingChartPoint> ecPoints = [];
 
+  List<ForecastingChartPoint> phInsightPoints = [];
+  List<ForecastingChartPoint> ecInsightPoints = [];
+  int _loadVersion = 0;
+  bool _disposed = false;
+  bool get isPhInsight => selectedTab == 'Both'
+      ? selectedBothInsightParam == 'pH'
+      : selectedTab.startsWith('pH');
+  List<ForecastingChartPoint> get activeInsightPoints =>
+      isPhInsight ? phInsightPoints : ecInsightPoints;
+
   PredictionInsightDetail? phInsightDetail;
   PredictionInsightDetail? ecInsightDetail;
   bool isSensorOffline = false;
@@ -55,18 +66,12 @@ class ForecastingController extends ChangeNotifier {
 
   /// Active single insight detail to display based on inner tab or primary tab selection
   PredictionInsightDetail? get activeInsightDetail {
-    if (selectedTab == 'Both') {
-      return selectedBothInsightParam == 'pH'
-          ? (phInsightDetail ?? ecInsightDetail)
-          : (ecInsightDetail ?? phInsightDetail);
-    } else if (selectedTab.startsWith('EC')) {
-      return ecInsightDetail;
-    } else {
-      return phInsightDetail;
-    }
+    return isPhInsight ? phInsightDetail : ecInsightDetail;
   }
 
   Future<void> loadData() async {
+    final version = ++_loadVersion;
+    final hours = selectedHours;
     isLoading = true;
     errorMessage = null;
     forecastIssue = null;
@@ -74,6 +79,7 @@ class ForecastingController extends ChangeNotifier {
 
     try {
       final snapshot = await monitoringService.getTelemetrySnapshot();
+      if (_disposed || version != _loadVersion) return;
       final statuses = snapshot.statuses;
       isSensorOffline = snapshot.isOffline;
       isCalibrating = snapshot.isCalibrating;
@@ -82,7 +88,9 @@ class ForecastingController extends ChangeNotifier {
       final userId = supabaseClient?.auth.currentUser?.id ??
           appProfile.value?.id ??
           'mock-user-id';
-      profile = await userService.getProfile(userId);
+      final loadedProfile = await userService.getProfile(userId);
+      if (_disposed || version != _loadVersion) return;
+      profile = loadedProfile;
 
       if (isSensorOffline) {
         _clearForecastData();
@@ -102,27 +110,43 @@ class ForecastingController extends ChangeNotifier {
       }
 
       final results = await Future.wait([
-        forecastingService.getForecastChartData(
+        forecastingService.getSharedForecastChartData(
           'ph',
-          selectedHours: selectedHours,
+          selectedHours: hours,
+          baselineRecordedAt: latestSensorRecordedAt,
           currentPh: currentPh,
           currentEc: currentEc,
           currentTemp: currentTemp,
         ),
-        forecastingService.getForecastChartData(
+        forecastingService.getSharedForecastChartData(
           'ec',
-          selectedHours: selectedHours,
+          selectedHours: hours,
+          baselineRecordedAt: latestSensorRecordedAt,
           currentPh: currentPh,
           currentEc: currentEc,
           currentTemp: currentTemp,
         ),
+        if (hours != 12)
+          for (final parameter in ['ph', 'ec'])
+            forecastingService.getSharedForecastChartData(parameter,
+                selectedHours: 12,
+                baselineRecordedAt: latestSensorRecordedAt,
+                currentPh: currentPh,
+                currentEc: currentEc,
+                currentTemp: currentTemp),
       ]);
-
+      if (_disposed || version != _loadVersion) return;
+      phInsightPoints = results[hours == 12 ? 0 : 2];
+      ecInsightPoints = results[hours == 12 ? 1 : 3];
       phPoints = results[0];
       ecPoints = results[1];
 
-      final predictedPhPoints = phPoints.where((p) => p.isPredicted).toList();
-      final predictedEcPoints = ecPoints.where((p) => p.isPredicted).toList();
+      final predictedPhPoints = ForecastInsightSummary(
+              forecast: phInsightPoints, minimum: 0, maximum: 1)
+          .points;
+      final predictedEcPoints = ForecastInsightSummary(
+              forecast: ecInsightPoints, minimum: 0, maximum: 1)
+          .points;
 
       final double predictedPh = predictedPhPoints.isNotEmpty
           ? predictedPhPoints.last.value
@@ -139,7 +163,7 @@ class ForecastingController extends ChangeNotifier {
           currentTemp: currentTemp,
           predictedPh: predictedPh,
           predictedEc: predictedEc,
-          horizonHours: selectedHours,
+          horizonHours: 12,
         ),
         forecastingService.getPredictionInsight(
           'ec',
@@ -148,10 +172,11 @@ class ForecastingController extends ChangeNotifier {
           currentTemp: currentTemp,
           predictedPh: predictedPh,
           predictedEc: predictedEc,
-          horizonHours: selectedHours,
+          horizonHours: 12,
         ),
       ]);
 
+      if (_disposed || version != _loadVersion) return;
       phInsightDetail = insightResults[0];
       ecInsightDetail = insightResults[1];
 
@@ -166,18 +191,21 @@ class ForecastingController extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     } on ForecastBaselineUnavailableException catch (error) {
+      if (_disposed || version != _loadVersion) return;
       forecastIssue = error.message;
       _clearForecastData();
       errorMessage = null;
       isLoading = false;
       notifyListeners();
     } on ForecastEndpointUnavailableException catch (error) {
+      if (_disposed || version != _loadVersion) return;
       forecastIssue = error.message;
       _clearForecastData();
       errorMessage = null;
       isLoading = false;
       notifyListeners();
     } catch (e) {
+      if (_disposed || version != _loadVersion) return;
       errorMessage = 'Failed to load forecasting data';
       isLoading = false;
       notifyListeners();
@@ -185,17 +213,24 @@ class ForecastingController extends ChangeNotifier {
   }
 
   Future<void> _refreshFreshness() async {
+    final version = _loadVersion;
     try {
       final snapshot = await monitoringService.getTelemetrySnapshot();
+      if (_disposed || version != _loadVersion) return;
       final wasOffline = isSensorOffline;
+      final previousRecordedAt = latestSensorRecordedAt;
       isSensorOffline = snapshot.isOffline;
       isCalibrating = snapshot.isCalibrating;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       if (isSensorOffline) {
+        ++_loadVersion;
+        isLoading = false;
         forecastIssue = null;
         _clearForecastData();
         notifyListeners();
-      } else if (wasOffline || forecastIssue != null) {
+      } else if (wasOffline ||
+          forecastIssue != null ||
+          previousRecordedAt != snapshot.latestRecordedAt) {
         await loadData();
       }
     } catch (_) {
@@ -206,6 +241,8 @@ class ForecastingController extends ChangeNotifier {
   void _clearForecastData() {
     phPoints = [];
     ecPoints = [];
+    phInsightPoints = [];
+    ecInsightPoints = [];
     phInsightDetail = null;
     ecInsightDetail = null;
   }
@@ -258,6 +295,8 @@ class ForecastingController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    ++_loadVersion;
     _freshnessTimer?.cancel();
     final channel = _parameterChannel;
     if (channel != null) {

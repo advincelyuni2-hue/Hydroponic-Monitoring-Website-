@@ -294,7 +294,7 @@ class PdfReportService {
         pw.SizedBox(height: 6),
         pw.Text(
           title,
-          style: const pw.TextStyle(
+          style:pw.TextStyle(
             fontSize: 12,
             fontWeight: pw.FontWeight.bold,
           ),
@@ -379,7 +379,7 @@ class PdfReportService {
       data: rows
           .map((row) => row.map(_pdfSafeText).toList(growable: false))
           .toList(growable: false),
-      headerStyle: const pw.TextStyle(
+      headerStyle: pw.TextStyle(
         fontSize: 8,
         fontWeight: pw.FontWeight.bold,
         color: PdfColors.white,

@@ -1,7 +1,13 @@
 import 'dart:async';
+import '../models/forecast_insight_summary.dart';
 
 import 'package:flutter/material.dart';
-import '../models/monitoring_models.dart';
+import '../models/monitoring_models.dart'
+    show
+        ParameterStatus,
+        TelemetrySnapshot,
+        ForecastPoint,
+        ForecastHorizonSummary;
 import '../models/forecasting_models.dart' as forecasting;
 import '../models/notification_models.dart';
 import '../services/forecasting_service.dart';
@@ -40,6 +46,9 @@ class DashboardController extends ChangeNotifier {
   StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
   Timer? _freshnessTimer;
   bool _refreshingParameters = false;
+  bool _disposed = false;
+  int _telemetryVersion = 0;
+  int _forecastVersion = 0;
 
   DashboardController() {
     loadDashboard();
@@ -61,10 +70,13 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<void> _refreshParameterStatuses() async {
-    if (_refreshingParameters) return;
+    if (_refreshingParameters || isLoading || _disposed) return;
     _refreshingParameters = true;
+    final version = ++_telemetryVersion;
+    ++_forecastVersion;
     try {
       final snapshot = await _monitoringService.getTelemetrySnapshot();
+      if (_disposed || version != _telemetryVersion) return;
       parameterStatuses = snapshot.statuses;
       isSensorOffline = snapshot.isOffline;
       isCalibrating = snapshot.isCalibrating;
@@ -83,6 +95,8 @@ class DashboardController extends ChangeNotifier {
   }
 
   Future<void> loadDashboard() async {
+    final version = ++_telemetryVersion;
+    ++_forecastVersion;
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -98,6 +112,7 @@ class DashboardController extends ChangeNotifier {
         _notificationService.getNotificationItems(limit: 3, activeOnly: true),
       ]);
 
+      if (_disposed || version != _telemetryVersion) return;
       profile = results[0] as UserProfile;
       final snapshot = results[1] as TelemetrySnapshot;
       parameterStatuses = snapshot.statuses;
@@ -112,14 +127,17 @@ class DashboardController extends ChangeNotifier {
         await _refreshPredictiveData(notify: false);
       }
     } catch (e) {
+      if (_disposed || version != _telemetryVersion) return;
       errorMessage = 'Could not load dashboard data';
     }
 
+    if (_disposed || version != _telemetryVersion) return;
     isLoading = false;
     notifyListeners();
   }
 
   Future<void> _refreshPredictiveData({bool notify = true}) async {
+    final version = ++_forecastVersion;
     if (isSensorOffline) {
       _clearPredictiveData();
       if (notify) notifyListeners();
@@ -139,33 +157,38 @@ class DashboardController extends ChangeNotifier {
     late final List<List<forecasting.ForecastingChartPoint>> results;
     try {
       results = await Future.wait([
-        _forecastingService.getForecastChartData(
+        _forecastingService.getSharedForecastChartData(
           'ph',
           selectedHours: 12,
+          baselineRecordedAt: latestSensorRecordedAt,
           currentPh: currentPh,
           currentEc: currentEc,
           currentTemp: currentTemp,
         ),
-        _forecastingService.getForecastChartData(
+        _forecastingService.getSharedForecastChartData(
           'ec',
           selectedHours: 12,
+          baselineRecordedAt: latestSensorRecordedAt,
           currentPh: currentPh,
           currentEc: currentEc,
           currentTemp: currentTemp,
         ),
       ]);
     } on ForecastBaselineUnavailableException catch (error) {
+      if (_disposed || version != _forecastVersion) return;
       forecastIssue = error.message;
       _clearPredictiveData();
       if (notify) notifyListeners();
       return;
     } on ForecastEndpointUnavailableException catch (error) {
+      if (_disposed || version != _forecastVersion) return;
       forecastIssue = error.message;
       _clearPredictiveData();
       if (notify) notifyListeners();
       return;
     }
 
+    if (_disposed || version != _forecastVersion) return;
     forecastIssue = null;
 
     final phPoints = results[0];
@@ -175,16 +198,21 @@ class DashboardController extends ChangeNotifier {
 
     final generatedAt = manilaNow();
     forecastGeneratedAt = generatedAt;
-    forecastSummaries = [4, 8, 12]
-        .map(
-          (hours) => ForecastHorizonSummary(
+    final phSummary =
+        ForecastInsightSummary(forecast: phPoints, minimum: 0, maximum: 1);
+    final ecSummary =
+        ForecastInsightSummary(forecast: ecPoints, minimum: 0, maximum: 1);
+    forecastSummaries = [
+      for (final hours in [4, 8, 12])
+        if (phSummary.valueAt(hours) != null &&
+            ecSummary.valueAt(hours) != null)
+          ForecastHorizonSummary(
             hoursAhead: hours,
-            phValue: _predictedValueAt(phPoints, hours, currentPh),
-            ecValue: _predictedValueAt(ecPoints, hours, currentEc),
+            phValue: phSummary.valueAt(hours)!,
+            ecValue: ecSummary.valueAt(hours)!,
             predictedFor: generatedAt.add(Duration(hours: hours)),
           ),
-        )
-        .toList();
+    ];
 
     final predictedPh = _lastPredictedValue(phPoints, currentPh);
     final predictedEc = _lastPredictedValue(ecPoints, currentEc);
@@ -225,6 +253,7 @@ class DashboardController extends ChangeNotifier {
   }
 
   void _clearPredictiveData() {
+    ++_forecastVersion;
     phForecast = [];
     ecForecast = [];
     forecastSummaries = [];
@@ -247,25 +276,9 @@ class DashboardController extends ChangeNotifier {
     List<forecasting.ForecastingChartPoint> points,
     double fallback,
   ) {
-    final predicted = points.where((point) => point.isPredicted);
+    final predicted =
+        ForecastInsightSummary(forecast: points, minimum: 0, maximum: 1).points;
     return predicted.isEmpty ? fallback : predicted.last.value;
-  }
-
-  double _predictedValueAt(
-    List<forecasting.ForecastingChartPoint> points,
-    int hours,
-    double fallback,
-  ) {
-    final predicted = points.where((point) => point.isPredicted).toList();
-    if (predicted.isEmpty) return fallback;
-
-    var closest = predicted.first;
-    for (final point in predicted.skip(1)) {
-      if ((point.hour - hours).abs() < (closest.hour - hours).abs()) {
-        closest = point;
-      }
-    }
-    return closest.value;
   }
 
   int _severity(String badge) {
@@ -281,6 +294,9 @@ class DashboardController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    ++_telemetryVersion;
+    ++_forecastVersion;
     final channel = _parameterChannel;
     if (channel != null) {
       _monitoringService.unsubscribe(channel);

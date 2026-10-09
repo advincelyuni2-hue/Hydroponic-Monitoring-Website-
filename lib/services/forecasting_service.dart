@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'forecast_snapshot_cache.dart';
 import 'app_state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -34,6 +35,34 @@ class ForecastingService {
     'FORECAST_API_URL',
     defaultValue: 'http://127.0.0.1:8000/api/predict/forecast',
   );
+
+  static final _snapshots = ForecastSnapshotCache();
+
+  Future<List<ForecastingChartPoint>> getSharedForecastChartData(
+    String parameter, {
+    required int selectedHours,
+    required DateTime? baselineRecordedAt,
+    required double currentPh,
+    required double currentEc,
+    required double currentTemp,
+  }) {
+    Future<List<ForecastingChartPoint>> fetch() =>
+        getForecastChartData(parameter,
+            selectedHours: selectedHours,
+            currentPh: currentPh,
+            currentEc: currentEc,
+            currentTemp: currentTemp);
+    if (baselineRecordedAt == null) return fetch();
+    return _snapshots.get((
+      supabaseClient?.auth.currentUser?.id,
+      baselineRecordedAt.toUtc(),
+      parameter,
+      selectedHours,
+      currentPh,
+      currentEc,
+      currentTemp
+    ), fetch);
+  }
 
   Future<List<ForecastingChartPoint>> getForecastChartData(
     String parameter, {
@@ -408,18 +437,20 @@ class ForecastingService {
     }
 
     String calloutText = '';
-    if (currentTemp > 25.0 && (isPhCriticalHigh || isPhWarningHigh)) {
+    if (isPh && currentTemp > 25.0 && (isPhCriticalHigh || isPhWarningHigh)) {
       calloutText =
           'High temperature (${currentTemp.toStringAsFixed(1)} °C) is accelerating chemical drift, pushing pH higher.';
-    } else if (currentTemp > 25.0 && (isEcCriticalHigh || isEcWarningHigh)) {
+    } else if (!isPh &&
+        currentTemp > 25.0 &&
+        (isEcCriticalHigh || isEcWarningHigh)) {
       calloutText =
           'High temperature (${currentTemp.toStringAsFixed(1)} °C) is increasing evaporation rates, raising EC concentration.';
-    } else if (isEcCriticalLow || isEcWarningLow) {
+    } else if (!isPh && (isEcCriticalLow || isEcWarningLow)) {
       calloutText =
           'Active root uptake of mineral salts has depleted EC below optimal levels.';
     } else {
       calloutText =
-          'Parameters are operating within balanced environmental thresholds.';
+          'Review ${isPh ? 'pH' : 'EC'} forecasts alongside recent sensor readings.';
     }
 
     return PredictionInsightDetail(

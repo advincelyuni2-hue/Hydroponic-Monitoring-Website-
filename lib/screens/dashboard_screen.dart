@@ -14,6 +14,8 @@ import '../widgets/app_header.dart';
 import '../widgets/dashboard_forecast_overview.dart';
 import '../widgets/dashboard_parameter_gauge.dart';
 import 'forecasting_dashboard_screen.dart';
+import '../widgets/dashboard_insight_card.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -197,76 +199,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildLatestInsightCard(bool isMobile) {
-    final insight = _controller.latestInsight;
-    if (insight == null) return const SizedBox.shrink();
-    final phInsight = _controller.phPredictionInsight ?? insight;
-    final ecInsight = _controller.ecPredictionInsight ?? insight;
-    final displayStatus = _combinedPredictionStatus(phInsight, ecInsight);
-    final statusColor = _insightColor(displayStatus);
-    final content = _buildInsightContent(
-      insight,
-      phInsight,
-      ecInsight,
-      displayStatus,
-      statusColor,
-    );
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 18,
-        vertical: isMobile ? 14 : 12,
-      ),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                displayStatus == 'Stable'
-                    ? Icons.lightbulb_outline
-                    : Icons.warning_amber_rounded,
-                color: statusColor,
-                size: 21,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child:
-                    Text('Latest Insight', style: AppTextStyles.sectionTitle),
-              ),
-              if (appProfile.value?.isAdmin != true)
-                if (isMobile)
-                  IconButton(
-                    tooltip: 'Alert Admin',
-                    onPressed: _showAlertAdminDialog,
-                    icon: const Icon(Icons.campaign_outlined, size: 20),
-                  )
-                else
-                  TextButton.icon(
-                    onPressed: _showAlertAdminDialog,
-                    icon: const Icon(Icons.campaign_outlined, size: 18),
-                    label: const Text('Alert Admin'),
-                  ),
-              if (isMobile)
-                IconButton(
-                  tooltip: 'View insight details',
-                  onPressed: _openForecastingScreen,
-                  icon: const Icon(Icons.open_in_new, size: 19),
-                )
-              else
-                TextButton(
-                  onPressed: _openForecastingScreen,
-                  child: const Text('View insight details'),
-                ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 10 : 6),
-          content,
-        ],
-      ),
-    );
-  }
+  
+Widget _buildLatestInsightCard(bool isMobile) {
+  return DashboardInsightCard(
+    phForecast: _controller.phForecast,
+    ecForecast: _controller.ecForecast,
+    summaries: _controller.forecastSummaries,
+    parameterStatuses: _controller.parameterStatuses,
+    phInsight: _controller.phPredictionInsight,
+    ecInsight: _controller.ecPredictionInsight,
+    isOffline: _controller.isSensorOffline,
+    isCalibrating: _controller.isCalibrating,
+    forecastIssue: _controller.forecastIssue,
+    onViewDetails: _openForecastingScreen,
+  );
+}
+
 
   Widget _buildInsightContent(
     PredictionInsightDetail insight,
