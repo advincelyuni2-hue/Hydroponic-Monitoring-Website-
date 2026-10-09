@@ -3,6 +3,18 @@ import 'package:monitoring_app/services/app_state.dart';
 import 'package:monitoring_app/services/forecasting_service.dart';
 
 void main() {
+  test('EC explanation does not select the pH branch', () {
+    final insight = ForecastingService().runFlutterDSS(
+        parameter: 'ec',
+        currentPh: 7.5,
+        currentEc: 2.5,
+        currentTemp: 28,
+        predictedPh: 7.8,
+        predictedEc: 2.8);
+    expect(insight.calloutText, contains('EC'));
+    expect(insight.calloutText, isNot(contains('pH higher')));
+  });
+
   final service = ForecastingService();
 
   setUp(() {

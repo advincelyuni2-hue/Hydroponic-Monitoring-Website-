@@ -107,8 +107,9 @@ class _ForecastingDashboardScreenState
                     if (insight != null)
                       PredictionInsightsCard(
                         detail: insight,
-                        onApplyFix: () => _controller.applyFix(insight),
-                        onDismiss: () => _controller.dismissFix(insight),
+                        forecastPoints: _controller.activeInsightPoints,
+                        currentPh: _controller.currentPh,
+                        currentEc: _controller.currentEc,
                         showParamSelector: isBothTab,
                         selectedInsightParam:
                             _controller.selectedBothInsightParam,
@@ -133,10 +134,10 @@ class _ForecastingDashboardScreenState
                               if (insight != null)
                                 PredictionInsightsCard(
                                   detail: insight,
-                                  onApplyFix: () =>
-                                      _controller.applyFix(insight),
-                                  onDismiss: () =>
-                                      _controller.dismissFix(insight),
+                                  forecastPoints:
+                                      _controller.activeInsightPoints,
+                                  currentPh: _controller.currentPh,
+                                  currentEc: _controller.currentEc,
                                   showParamSelector: isBothTab,
                                   selectedInsightParam:
                                       _controller.selectedBothInsightParam,
