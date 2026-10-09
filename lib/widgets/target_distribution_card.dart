@@ -49,7 +49,12 @@ class TargetDistributionCard extends StatelessWidget {
               _buildParamPill(),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+          Text(
+            'Last 30 days',
+            style: AppTextStyles.cardMeta,
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             height: 160,
             child: isLoading

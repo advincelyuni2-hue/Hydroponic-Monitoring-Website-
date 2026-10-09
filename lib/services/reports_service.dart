@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../utils/manila_time.dart';
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
 import 'monitoring_service.dart';
@@ -114,7 +114,7 @@ class ReportsService {
 
     var criticalAlerts = 0;
     try {
-      criticalAlerts = (await getAlertStats()).criticalCount;
+      criticalAlerts = (await getAlertStats()).activeCount;
     } catch (e) {
       debugPrint('Critical alert count failed: $e');
     }
@@ -134,14 +134,11 @@ class ReportsService {
   Future<TargetDistributionData> getTargetDistribution(
     String parameter,
   ) async {
-    final range = await getCollectionDateRange();
-    if (range == null) {
-      throw StateError('No averaged sensor readings are available.');
-    }
-    final end = DateTime(range.end.year, range.end.month, range.end.day)
-        .add(const Duration(days: 1));
+    final end = manilaNow();
+    final start = end.subtract(const Duration(days: 30));
+
     final logs = await _monitoringService.getSensorHistory(
-      start: DateTime(range.start.year, range.start.month, range.start.day),
+      start: start,
       end: end,
       aggregation: HistoryAggregation.daily,
     );
@@ -182,12 +179,14 @@ class ReportsService {
 
   /// Critical alerts from the notifications table (last [days] days).
   Future<AlertStats> getAlertStats({int days = 30}) async {
-    final since =
-        DateTime.now().toUtc().subtract(Duration(days: days)).toIso8601String();
+    final now = DateTime.now().toUtc();
+    final since = now.subtract(Duration(days: days)).toIso8601String();
+
     final rows = await supabase
         .from('notifications')
         .select()
         .gte('created_at', since)
+        .lte('created_at', now.toIso8601String())
         .order('created_at', ascending: false)
         .limit(1000);
 
