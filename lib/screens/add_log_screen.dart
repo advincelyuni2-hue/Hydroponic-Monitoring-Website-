@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import '../utils/manila_time.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
+import '../widgets/custom_button.dart';
 import 'notifications_screen.dart';
 
 class AddLogScreen extends StatelessWidget {
@@ -416,44 +417,30 @@ class RecordFixCardState extends State<RecordFixCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                SizedBox(
-                  height: 38,
-                  child: OutlinedButton(
-                    onPressed: widget.onCancel,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primaryButton),
-                      padding: const EdgeInsets.symmetric(horizontal: 28),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: Text(
-                      'Cancel',
-                      style: AppTextStyles.button.copyWith(
-                        fontSize: 13,
-                        color: AppColors.primaryButton,
-                      ),
-                    ),
+                CustomButton(
+                  text: 'Cancel',
+                  backgroundColor: AppColors.primaryButton,
+                  textStyle: AppTextStyles.button.copyWith(
+                    fontSize: 13,
+                    color: AppColors.primaryButton,
                   ),
+                  onPressed: _submitting ? null : widget.onCancel,
+                  outlined: true,
+                  width: 116,
+                  height: 38,
                 ),
                 const SizedBox(width: 12),
-                SizedBox(
-                  height: 38,
-                  child: ElevatedButton(
-                    onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryButton,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 28),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: Text(
-                      _submitting ? 'Saving...' : 'Record fix',
-                      style: AppTextStyles.button.copyWith(fontSize: 13),
-                    ),
+                CustomButton(
+                  text: 'Record fix',
+                  backgroundColor: AppColors.primaryButton,
+                  textStyle: AppTextStyles.button.copyWith(
+                    fontSize: 13,
+                    color: Colors.white,
                   ),
+                  onPressed: _submitting ? null : _submit,
+                  isLoading: _submitting,
+                  width: 136,
+                  height: 38,
                 ),
               ],
             ),
