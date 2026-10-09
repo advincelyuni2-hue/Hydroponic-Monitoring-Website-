@@ -5,6 +5,7 @@ class AppNotificationItem {
   final String title;
   final String subtitle;
   final String timestamp;
+  final DateTime? createdAt;
   final NotificationType type;
   final String currentStatus;
   final String currentValue;
@@ -25,6 +26,7 @@ class AppNotificationItem {
     required this.title,
     required this.subtitle,
     required this.timestamp,
+    this.createdAt,
     required this.type,
     required this.currentStatus,
     required this.currentValue,

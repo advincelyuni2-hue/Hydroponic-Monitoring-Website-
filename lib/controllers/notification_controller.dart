@@ -4,13 +4,18 @@ import '../models/notification_models.dart';
 import '../services/notification_service.dart';
 
 class NotificationController extends ChangeNotifier {
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService;
+  final Set<String> _pending = {};
+  bool _disposed = false;
+  int _revision = 0;
+  bool isBusy(String id) => _pending.contains(id);
   StreamSubscription<List<AppNotificationItem>>? _subscription;
   List<AppNotificationItem> notifications = [];
   bool isLoading = true;
   String? errorMessage;
 
-  NotificationController() {
+  NotificationController({NotificationService? service})
+      : _notificationService = service ?? NotificationService() {
     initRealtimeListener();
   }
 
@@ -19,6 +24,8 @@ class NotificationController extends ChangeNotifier {
     notifyListeners();
     _subscription = _notificationService.streamNotificationItems().listen(
       (data) {
+        if (_disposed) return;
+        ++_revision;
         notifications = data;
         errorMessage = null;
         isLoading = false;
@@ -40,18 +47,34 @@ class NotificationController extends ChangeNotifier {
 
   /// Retained for manual notifications. Sensor alerts use Record Fix and are
   /// resolved automatically after three stable five-minute readings.
-  Future<void> toggleResolve(AppNotificationItem item, bool? value) async {
-    bool resolved = value ?? false;
-    item.isResolved = resolved;
+  Future<bool> toggleResolve(AppNotificationItem item, bool? value) async {
+    if (item.isSensorAlert || isBusy(item.id) || item.isResolved == value) {
+      return false;
+    }
+    _pending.add(item.id);
     notifyListeners();
-    final updated =
-        await _notificationService.updateAlertResolved(item.id, resolved);
-    if (!updated) {
-      item.isResolved = !resolved;
-      errorMessage = 'Unable to update this notification. Please try again.';
-      notifyListeners();
-    } else {
-      errorMessage = null;
+    try {
+      final updated = await _notificationService.updateAlertResolved(
+          item.id, value ?? false);
+      if (_disposed) return updated;
+      if (updated) {
+        item.isResolved = value ?? false;
+        for (final current in notifications.where((n) => n.id == item.id)) {
+          current.isResolved = value ?? false;
+        }
+        errorMessage = null;
+      } else {
+        errorMessage = 'Unable to update this notification. Please try again.';
+      }
+      return updated;
+    } catch (_) {
+      if (!_disposed) {
+        errorMessage = 'Unable to update this notification. Please try again.';
+      }
+      return false;
+    } finally {
+      _pending.remove(item.id);
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -64,29 +87,46 @@ class NotificationController extends ChangeNotifier {
     required String notes,
     double? reservoirVolumeL,
   }) async {
-    final saved = await _notificationService.recordFixAndResolve(
-      notificationId: item.id,
-      parameter: parameter,
-      currentValue: currentValue,
-      currentStatus: item.currentStatus,
-      actionType: actionType,
-      amount: amount,
-      notes: notes,
-      reservoirVolumeL: reservoirVolumeL,
-    );
-
-    if (saved) {
-      errorMessage = null;
-    } else {
-      errorMessage = _notificationService.lastInterventionError ??
-          'Unable to save the intervention. The alert remains open.';
-    }
+    if (_disposed || item.isResolved || isBusy(item.id)) return false;
+    _pending.add(item.id);
     notifyListeners();
-    return saved;
+    try {
+      final saved = await _notificationService.recordFixAndResolve(
+        notificationId: item.id,
+        parameter: parameter,
+        currentValue: currentValue,
+        currentStatus: item.currentStatus,
+        actionType: actionType,
+        amount: amount,
+        notes: notes,
+        reservoirVolumeL: reservoirVolumeL,
+      );
+
+      if (_disposed) return saved;
+      if (saved) {
+        errorMessage = null;
+        try {
+          final revision = _revision;
+          final refreshed =
+              await _notificationService.getNotificationItems(limit: 1000);
+          if (!_disposed && revision == _revision) notifications = refreshed;
+        } catch (_) {
+          // Realtime remains subscribed if an immediate refresh is unavailable.
+        }
+      } else {
+        errorMessage = _notificationService.lastInterventionError ??
+            'Unable to save the intervention. The alert remains open.';
+      }
+      return saved;
+    } finally {
+      _pending.remove(item.id);
+      if (!_disposed) notifyListeners();
+    }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _subscription?.cancel();
     super.dispose();
   }
