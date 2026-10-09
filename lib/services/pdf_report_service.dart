@@ -44,6 +44,7 @@ class PdfReportService {
     required bool includeEcOptimization,
     required bool includeAllAnalytics,
     required bool includeInsightsAndDecisionSupport,
+    String downloadedBy = 'Current user',
   }) async {
     final document = pw.Document();
     final generatedAt = DateTime.now();
@@ -66,14 +67,8 @@ class PdfReportService {
           margin: pw.EdgeInsets.fromLTRB(54, 118, 54, 54),
         ),
         header: (context) =>
-            _buildReportHeader(generatedAt, leftLogo, rightLogo),
-        footer: (context) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Page ${context.pageNumber} of ${context.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8, color: mutedText),
-          ),
-        ),
+            _buildReportHeader(downloadedBy, leftLogo, rightLogo),
+        footer: (context) => _buildReportFooter(generatedAt, context),
         build: (context) => [
           pw.SizedBox(height: 12),
           _section(
@@ -161,7 +156,7 @@ class PdfReportService {
                 pw.Text(
                   '${_recommendation(summary, predictionPoints, 'pH', phRange, ecRange)}\n'
                   '${_recommendation(summary, predictionPoints, 'EC', phRange, ecRange)}',
-                  style: const pw.TextStyle(fontSize: 10, lineSpacing: 4),
+                  style: const pw.TextStyle(fontSize: 12, lineSpacing: 4),
                 ),
               ],
             ),
@@ -241,13 +236,10 @@ class PdfReportService {
       outputPdf(bytes, 'hydroponic-monitoring-report.pdf');
 
   pw.Widget _buildReportHeader(
-    DateTime generatedAt,
+    String downloadedBy,
     pw.MemoryImage leftLogo,
     pw.MemoryImage rightLogo,
   ) {
-    final date =
-        '${_twoDigits(generatedAt.month)}/${_twoDigits(generatedAt.day)}/${generatedAt.year} ${_twoDigits(generatedAt.hour % 12 == 0 ? 12 : generatedAt.hour % 12)}:${_twoDigits(generatedAt.minute)} ${generatedAt.hour < 12 ? "AM" : "PM"}';
-
     return pw.SizedBox(
       height: 100,
       child: pw.Row(
@@ -259,15 +251,17 @@ class PdfReportService {
               mainAxisAlignment: pw.MainAxisAlignment.start,
               children: [
                 pw.Text(
-                  'San Pedro Office of the\nAgricultural and Biosystems Engineering\nAnalytics Report',
+                  'San Pedro Office of the\n'
+                  'Agricultural and Biosystems Engineering\n'
+                  'Analytics Report',
                   textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 11, lineSpacing: 2),
+                  style: const pw.TextStyle(fontSize: 13, lineSpacing: 2),
                 ),
                 pw.SizedBox(height: 5),
                 pw.Text(
-                  'Date Generated: $date',
+                  'Downloaded by: $downloadedBy',
                   textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 9),
+                  style: const pw.TextStyle(fontSize: 11),
                 ),
               ],
             ),
@@ -275,6 +269,28 @@ class PdfReportService {
           _reportLogo(rightLogo),
         ],
       ),
+    );
+  }
+
+  pw.Widget _buildReportFooter(DateTime generatedAt, pw.Context context) {
+    final date =
+        '${_twoDigits(generatedAt.month)}/${_twoDigits(generatedAt.day)}/${generatedAt.year} '
+        '${_twoDigits(generatedAt.hour % 12 == 0 ? 12 : generatedAt.hour % 12)}:'
+        '${_twoDigits(generatedAt.minute)} '
+        '${generatedAt.hour < 12 ? "AM" : "PM"}';
+
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(
+          'Date Generated: $date',
+          style: const pw.TextStyle(fontSize: 11, color: mutedText),
+        ),
+        pw.Text(
+          'Page ${context.pageNumber} of ${context.pagesCount}',
+          style: const pw.TextStyle(fontSize: 10, color: mutedText),
+        ),
+      ],
     );
   }
 
@@ -294,8 +310,8 @@ class PdfReportService {
         pw.SizedBox(height: 6),
         pw.Text(
           title,
-          style:pw.TextStyle(
-            fontSize: 12,
+          style: pw.TextStyle(
+            fontSize: 14,
             fontWeight: pw.FontWeight.bold,
           ),
         ),
@@ -310,7 +326,7 @@ class PdfReportService {
       child: pw.Text(
         text,
         style: const pw.TextStyle(
-          fontSize: 8.5,
+          fontSize: 10.5,
           color: mutedText,
           lineSpacing: 2,
         ),
@@ -380,14 +396,13 @@ class PdfReportService {
           .map((row) => row.map(_pdfSafeText).toList(growable: false))
           .toList(growable: false),
       headerStyle: pw.TextStyle(
-        fontSize: 8,
+        fontSize: 10,
         fontWeight: pw.FontWeight.bold,
         color: PdfColors.white,
       ),
       headerDecoration: const pw.BoxDecoration(color: _primaryGreen),
-      cellStyle: const pw.TextStyle(fontSize: 8),
-      cellPadding:
-          const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+      cellStyle: const pw.TextStyle(fontSize: 10),
+      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 6),
       border: pw.TableBorder.all(color: borderColor, width: 0.5),
       oddRowDecoration:
           const pw.BoxDecoration(color: PdfColor(0.97, 0.98, 0.96)),
@@ -413,7 +428,7 @@ class PdfReportService {
         ),
         child: pw.Text(
           'Not enough trend data to draw a chart (at least 2 days needed).',
-          style: const pw.TextStyle(fontSize: 8, color: mutedText),
+          style: const pw.TextStyle(fontSize: 10, color: mutedText),
         ),
       );
     }
@@ -443,7 +458,7 @@ class PdfReportService {
         i % labelStep == 0 ? labels[i] : '',
     ];
 
-    const axisStyle = pw.TextStyle(fontSize: 7, color: mutedText);
+    const axisStyle = pw.TextStyle(fontSize: 9, color: mutedText);
 
     return pw.SizedBox(
       height: 190,
@@ -500,7 +515,7 @@ class PdfReportService {
           children: [
             pw.Container(width: 8, height: 8, color: color),
             pw.SizedBox(width: 4),
-            pw.Text(title, style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(title, style: const pw.TextStyle(fontSize: 10)),
           ],
         );
 
@@ -521,12 +536,7 @@ class PdfReportService {
     required String unit,
   }) {
     return _table(
-      const [
-        'Average reading',
-        'Target minimum',
-        'Target maximum',
-        'Status'
-      ],
+      const ['Average reading', 'Target minimum', 'Target maximum', 'Status'],
       [
         [
           '${formatSensorValue(value)}$unit',
@@ -543,7 +553,7 @@ class PdfReportService {
       padding: const pw.EdgeInsets.symmetric(vertical: 8),
       child: pw.Text(
         message,
-        style: const pw.TextStyle(fontSize: 9, color: mutedText),
+        style: const pw.TextStyle(fontSize: 11, color: mutedText),
       ),
     );
   }
@@ -552,12 +562,8 @@ class PdfReportService {
     List<AnalyticsPoint> phPoints,
     List<AnalyticsPoint> ecPoints,
   ) {
-    final phByDate = {
-      for (final point in phPoints) point.label: point.value
-    };
-    final ecByDate = {
-      for (final point in ecPoints) point.label: point.value
-    };
+    final phByDate = {for (final point in phPoints) point.label: point.value};
+    final ecByDate = {for (final point in ecPoints) point.label: point.value};
 
     final dates = <String>{
       ...phPoints.map((point) => point.label),
