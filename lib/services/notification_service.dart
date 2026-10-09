@@ -433,6 +433,7 @@ class NotificationService {
     required String parameter,
     required double currentValue,
     required String actionType,
+    required DateTime performedAtManila,
     double? amount,
     required String notes,
     double? reservoirVolumeL,
@@ -447,7 +448,7 @@ class NotificationService {
     try {
       lastInterventionError = null;
       final actionId = await client.rpc(
-        'record_manual_intervention',
+        'record_manual_intervention_at',
         params: {
           'parameter_value': parameter,
           'current_value_value': currentValue,
@@ -455,6 +456,8 @@ class NotificationService {
           'amount_value': amount,
           'notes_value': notes,
           'reservoir_volume_l_value': reservoirVolumeL,
+          'performed_at_value':
+              manilaWallTimeToUtc(performedAtManila).toIso8601String(),
         },
       );
       if (actionId == null) {
@@ -463,7 +466,11 @@ class NotificationService {
       }
       return true;
     } catch (error) {
-      lastInterventionError = _saveError(error);
+      lastInterventionError = error is PostgrestException &&
+              error.code == 'PGRST202'
+          ? 'The dated intervention function is missing. Run '
+              'supabase/manual_intervention_time_setup.sql in the SQL Editor.'
+          : _saveError(error);
       return false;
     }
   }

@@ -27,11 +27,13 @@ class TelemetrySnapshot {
   final List<ParameterStatus> statuses;
   final DateTime? latestRecordedAt;
   final bool isOffline;
+  final bool isCalibrating;
 
   const TelemetrySnapshot({
     required this.statuses,
     required this.latestRecordedAt,
     required this.isOffline,
+    this.isCalibrating = false,
   });
 }
 

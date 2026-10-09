@@ -35,6 +35,7 @@ class ModelEvaluationService {
     var evaluatedCount = 0;
     var intervenedCount = 0;
     var missingActualCount = 0;
+    var calibrationExcludedCount = 0;
     var storedModelName = modelName;
     final samplesByTarget = <String, _MutableEvaluationSample>{};
     final records = <ForecastEvaluationRecord>[];
@@ -47,6 +48,8 @@ class ModelEvaluationService {
         intervenedCount++;
       } else if (status == 'missing_actual') {
         missingActualCount++;
+      } else if (status == 'calibration_excluded') {
+        calibrationExcludedCount++;
       } else {
         pendingCount++;
       }
@@ -113,6 +116,7 @@ class ModelEvaluationService {
       evaluatedCount: evaluatedCount,
       intervenedCount: intervenedCount,
       missingActualCount: missingActualCount,
+      calibrationExcludedCount: calibrationExcludedCount,
     );
   }
 

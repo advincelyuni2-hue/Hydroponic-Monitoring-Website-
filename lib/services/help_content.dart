@@ -193,8 +193,7 @@ const List<HelpArticle> kDefaultHelpArticles = [
     category: 'Forecasts',
     title: 'What happens after I apply or dismiss a fix?',
     body:
-        'The action is saved to the logs. For the selected forecast window, the insight then shows as Stable with a note such as '
-        '"Recent intervention logged" or "Insight dismissed by operator", so the same suggestion is not repeated straight away.',
+        'The action is saved to the logs and noted in the insight. The status still follows the latest reading and forecast: it stays Warning or Critical until the values return to the stable range.',
   ),
   HelpArticle(
     type: 'faq',

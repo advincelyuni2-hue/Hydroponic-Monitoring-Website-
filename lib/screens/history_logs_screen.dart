@@ -13,6 +13,7 @@ import '../widgets/history_log_cards.dart';
 import '../widgets/history_log_table.dart';
 import '../widgets/history_log_value.dart';
 import 'add_log_screen.dart';
+import 'calibration_screen.dart';
 
 class HistoryLogsScreen extends StatefulWidget {
   const HistoryLogsScreen({super.key});
@@ -64,6 +65,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
           amount: entry.amount,
           notes: entry.notes,
           reservoirVolumeL: entry.reservoirVolumeL,
+          performedAtManila: entry.performedAtManila!,
         );
         return saved;
       },
@@ -75,6 +77,14 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Intervention recorded successfully.')),
     );
+  }
+
+  Future<void> _openCalibration() async {
+    final completed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const CalibrationScreen()),
+    );
+    if (completed == true && mounted) await _controller.loadSelectedLogs();
   }
 
   Future<void> _confirmDeleteSingle(int index) async {
@@ -432,16 +442,25 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
       drawer: const AppDrawer(selectedIndex: 2),
       floatingActionButton: ListenableBuilder(
         listenable: _controller,
-        builder: (context, _) => _controller.selectedTab == 'Intervention logs'
+        builder: (context, _) => _controller.selectedTab == 'Calibration logs'
             ? FloatingActionButton.extended(
-                heroTag: 'log-intervention',
-                onPressed: _showManualInterventionDialog,
+                heroTag: 'start-calibration',
+                onPressed: _openCalibration,
                 backgroundColor: AppColors.primaryButton,
                 foregroundColor: Colors.white,
-                icon: const Icon(Icons.add),
-                label: const Text('Log Intervention'),
+                icon: const Icon(Icons.tune),
+                label: const Text('Start Calibration'),
               )
-            : const SizedBox.shrink(),
+            : _controller.selectedTab == 'Intervention logs'
+                ? FloatingActionButton.extended(
+                    heroTag: 'log-intervention',
+                    onPressed: _showManualInterventionDialog,
+                    backgroundColor: AppColors.primaryButton,
+                    foregroundColor: Colors.white,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Log Intervention'),
+                  )
+                : const SizedBox.shrink(),
       ),
       body: SafeArea(
         child: ListenableBuilder(

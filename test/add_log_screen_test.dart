@@ -29,8 +29,9 @@ void main() {
     await tester.tap(find.text('Log Intervention'));
     await tester.pumpAndSettle();
     expect(find.byType(RecordFixCard), findsOneWidget);
+    expect(find.text('Action date & time (Manila)'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField).at(1), '6.8');
+    await tester.enterText(find.byType(TextFormField).first, '6.8');
     final actionDropdown = find.byType(DropdownButtonFormField<String>).last;
     await tester.ensureVisible(actionDropdown);
     await tester.tap(actionDropdown);
@@ -43,6 +44,7 @@ void main() {
 
     expect(submitted?.actionType, 'pH Down');
     expect(submitted?.amount, isNull);
+    expect(submitted?.performedAtManila, isNotNull);
     expect(find.byType(RecordFixCard), findsNothing);
   });
 
@@ -68,7 +70,7 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.byType(TextFormField).at(1), '6.8');
+    await tester.enterText(find.byType(TextFormField).first, '6.8');
     final actionDropdown = find.byType(DropdownButtonFormField<String>).last;
     await tester.ensureVisible(actionDropdown);
     await tester.tap(actionDropdown);

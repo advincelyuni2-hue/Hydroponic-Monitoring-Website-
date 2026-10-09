@@ -3,6 +3,7 @@ import 'app_state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/forecasting_models.dart';
+import '../utils/parameter_severity.dart';
 import 'supabase_client.dart';
 import '../utils/manila_time.dart';
 
@@ -235,29 +236,7 @@ class ForecastingService {
     final recentIntervention =
         await checkRecentIntervention(parameter, horizonHours);
 
-    if (recentIntervention != null) {
-      final isPh = parameter == 'ph';
-      final isApplied = recentIntervention == 'applied';
-      return PredictionInsightDetail(
-        statusLabel: isPh ? 'pH Level' : 'EC Level',
-        statusBadge: 'Stable',
-        warningText: isPh
-            ? 'pH levels are stable and within optimal bounds.'
-            : 'EC levels are stable and within safe parameters.',
-        temperature: '${currentTemp.toStringAsFixed(1)} °C',
-        ecLevel: isPh
-            ? '${currentEc.toStringAsFixed(1)} mS/cm'
-            : '${currentPh.toStringAsFixed(1)} pH',
-        calloutText: isApplied
-            ? 'Recent intervention logged: parameter fix applied successfully.'
-            : 'Insight dismissed by operator.',
-        currentPh: isPh ? currentPh : currentEc,
-        targetPh: isPh ? 6.5 : 1.5,
-        suggestedFixes: const ['No recommendation for now'],
-      );
-    }
-
-    final insight = runFlutterDSS(
+    final calculated = runFlutterDSS(
       parameter: parameter,
       currentPh: currentPh,
       currentEc: currentEc,
@@ -265,6 +244,22 @@ class ForecastingService {
       predictedPh: predictedPh ?? currentPh,
       predictedEc: predictedEc ?? currentEc,
     );
+
+    final insight = recentIntervention == null
+        ? calculated
+        : PredictionInsightDetail(
+            statusLabel: calculated.statusLabel,
+            statusBadge: calculated.statusBadge,
+            warningText: calculated.warningText,
+            temperature: calculated.temperature,
+            ecLevel: calculated.ecLevel,
+            calloutText: recentIntervention == 'applied'
+                ? 'Recent intervention recorded. ${calculated.calloutText}'
+                : 'Previous insight dismissed. ${calculated.calloutText}',
+            currentPh: calculated.currentPh,
+            targetPh: calculated.targetPh,
+            suggestedFixes: calculated.suggestedFixes,
+          );
 
     await saveForecastToSupabase(insight, parameter);
     return insight;
@@ -281,49 +276,80 @@ class ForecastingService {
     bool isPh = parameter == 'ph';
     final cfg = appParameterRanges.value;
 
-    bool isPhCriticalHigh = predictedPh >= 8.0 || currentPh >= 8.0;
-    bool isPhCriticalLow = predictedPh <= 5.0 || currentPh <= 5.0;
+    const warningMargin = 0.5;
+    final phCurrentSeverity = classifyParameterValue(
+      value: currentPh,
+      stableMin: cfg.phMin,
+      stableMax: cfg.phMax,
+      warningMargin: warningMargin,
+    );
+    final phPredictedSeverity = classifyParameterValue(
+      value: predictedPh,
+      stableMin: cfg.phMin,
+      stableMax: cfg.phMax,
+      warningMargin: warningMargin,
+    );
+    final ecCurrentSeverity = classifyParameterValue(
+      value: currentEc,
+      stableMin: cfg.ecMin,
+      stableMax: cfg.ecMax,
+      warningMargin: warningMargin,
+    );
+    final ecPredictedSeverity = classifyParameterValue(
+      value: predictedEc,
+      stableMin: cfg.ecMin,
+      stableMax: cfg.ecMax,
+      warningMargin: warningMargin,
+    );
+    final phSeverity = phCurrentSeverity.index >= phPredictedSeverity.index
+        ? phCurrentSeverity
+        : phPredictedSeverity;
+    final ecSeverity = ecCurrentSeverity.index >= ecPredictedSeverity.index
+        ? ecCurrentSeverity
+        : ecPredictedSeverity;
+
+    bool isPhCriticalHigh = predictedPh > cfg.phMax + warningMargin ||
+        currentPh > cfg.phMax + warningMargin;
+    bool isPhCriticalLow = predictedPh < cfg.phMin - warningMargin ||
+        currentPh < cfg.phMin - warningMargin;
     bool isPhWarningHigh = predictedPh > cfg.phMax && !isPhCriticalHigh;
     bool isPhWarningLow = predictedPh < cfg.phMin && !isPhCriticalLow;
 
-    bool isEcCriticalLow = predictedEc <= 0.8 || currentEc <= 0.8;
-    bool isEcCriticalHigh = predictedEc >= 2.2 || currentEc >= 2.2;
+    bool isEcCriticalLow = predictedEc < cfg.ecMin - warningMargin ||
+        currentEc < cfg.ecMin - warningMargin;
+    bool isEcCriticalHigh = predictedEc > cfg.ecMax + warningMargin ||
+        currentEc > cfg.ecMax + warningMargin;
     bool isEcWarningLow = predictedEc < cfg.ecMin && !isEcCriticalLow;
     bool isEcWarningHigh = predictedEc > cfg.ecMax && !isEcCriticalHigh;
 
     double targetPh = (cfg.phMin + cfg.phMax) / 2;
     double targetEc = (cfg.ecMin + cfg.ecMax) / 2;
 
-    String statusBadge = 'Stable';
     String warningText = '';
     List<String> fixes = [];
 
     if (isPh) {
-      if (isPhCriticalHigh || (isPhWarningHigh && isEcCriticalLow)) {
-        statusBadge = 'Critical';
+      if (isPhCriticalHigh) {
         warningText =
             'pH level is critically elevated outside safe operating limits.';
         fixes = [
           'Immediate action required: Add appropriate pH-down dosing solution.',
-          'Flush or re-balance nutrient solution if pH remains above 8.0.',
+          'Flush or re-balance nutrient solution if pH remains critically high.',
           'Verify sensor calibration before secondary adjustments.',
         ];
       } else if (isPhCriticalLow) {
-        statusBadge = 'Critical';
         warningText = 'pH level has dropped to a critical low threshold.';
         fixes = [
           'Immediate action required: Add appropriate pH-up solution gradually.',
           'Check root zone health and re-verify probe reading.',
         ];
       } else if (isPhWarningHigh && isEcWarningLow) {
-        statusBadge = 'Warning';
         warningText = 'pH is predicted high while EC is predicted low.';
         fixes = [
           'Correct pH condition using an appropriate pH-down solution.',
           'Review nutrient concentration before nutrient replenishment.',
         ];
       } else if (isPhWarningHigh) {
-        statusBadge = 'Warning';
         warningText =
             'pH is expected to rise above safe levels within horizon.';
         double phDiff = (predictedPh - targetPh).abs();
@@ -333,20 +359,17 @@ class ForecastingService {
           'Verify with sensor measurement after application.',
         ];
       } else if (isPhWarningLow) {
-        statusBadge = 'Warning';
         warningText = 'pH is expected to drop below optimal bounds.';
         fixes = [
           'Gradual pH increase using an appropriate pH-up solution.',
           'Verify through sensor measurement.',
         ];
       } else {
-        statusBadge = 'Stable';
         warningText = 'pH levels are predicted to remain stable.';
         fixes = ['No recommendation for now'];
       }
     } else {
-      if (isEcCriticalLow || (isEcWarningLow && isPhCriticalHigh)) {
-        statusBadge = 'Critical';
+      if (isEcCriticalLow) {
         warningText =
             'EC level is critically low; severe nutrient depletion detected.';
         fixes = [
@@ -355,35 +378,30 @@ class ForecastingService {
           'Re-verify pH stability after nutrient dosage.',
         ];
       } else if (isEcCriticalHigh) {
-        statusBadge = 'Critical';
         warningText = 'EC level is critically high; risk of nutrient burn.';
         fixes = [
           'Immediate action required: Dilute reservoir with fresh water.',
           'Inspect system for high evaporation rates.',
         ];
       } else if (isEcWarningLow && isPhWarningHigh) {
-        statusBadge = 'Warning';
         warningText = 'EC is predicted low while pH is predicted high.';
         fixes = [
           'Inspect nutrient solution strength and replenish nutrients.',
           'Reassess pH condition after nutrient replenishment.',
         ];
       } else if (isEcWarningHigh) {
-        statusBadge = 'Warning';
         warningText = 'EC level is predicted above ideal concentration.';
         fixes = [
           'Dilute solution with fresh water to normalize EC concentration.',
           'Verify EC through sensor measurement.',
         ];
       } else if (isEcWarningLow) {
-        statusBadge = 'Warning';
         warningText = 'EC level is expected to drop below ideal concentration.';
         fixes = [
           'Inspect nutrient solution strength.',
           'Replenish nutrients according to standard procedure.',
         ];
       } else {
-        statusBadge = 'Stable';
         warningText = 'EC levels are stable and within safe parameters.';
         fixes = ['No recommendation for now'];
       }
@@ -406,7 +424,7 @@ class ForecastingService {
 
     return PredictionInsightDetail(
       statusLabel: isPh ? 'pH Level' : 'EC Level',
-      statusBadge: statusBadge,
+      statusBadge: parameterSeverityLabel(isPh ? phSeverity : ecSeverity),
       warningText: warningText,
       temperature: '${currentTemp.toStringAsFixed(1)} °C',
       ecLevel: isPh

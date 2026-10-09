@@ -34,6 +34,7 @@ class ForecastingController extends ChangeNotifier {
   PredictionInsightDetail? phInsightDetail;
   PredictionInsightDetail? ecInsightDetail;
   bool isSensorOffline = false;
+  bool isCalibrating = false;
   String? forecastIssue;
   DateTime? latestSensorRecordedAt;
   Timer? _freshnessTimer;
@@ -75,6 +76,7 @@ class ForecastingController extends ChangeNotifier {
       final snapshot = await monitoringService.getTelemetrySnapshot();
       final statuses = snapshot.statuses;
       isSensorOffline = snapshot.isOffline;
+      isCalibrating = snapshot.isCalibrating;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
 
       final userId = supabaseClient?.auth.currentUser?.id ??
@@ -187,6 +189,7 @@ class ForecastingController extends ChangeNotifier {
       final snapshot = await monitoringService.getTelemetrySnapshot();
       final wasOffline = isSensorOffline;
       isSensorOffline = snapshot.isOffline;
+      isCalibrating = snapshot.isCalibrating;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       if (isSensorOffline) {
         forecastIssue = null;
@@ -236,7 +239,7 @@ class ForecastingController extends ChangeNotifier {
       currentTemp: currentTemp,
       suggestedFixes: detail.suggestedFixes,
     );
-    _resolveInsightState(param, isApplied: true);
+    await loadData();
   }
 
   Future<void> dismissFix(PredictionInsightDetail detail) async {
@@ -250,34 +253,7 @@ class ForecastingController extends ChangeNotifier {
       currentTemp: currentTemp,
       suggestedFixes: detail.suggestedFixes,
     );
-    _resolveInsightState(param, isApplied: false);
-  }
-
-  void _resolveInsightState(String param, {required bool isApplied}) {
-    final updatedDetail = PredictionInsightDetail(
-      statusLabel: param == 'ph' ? 'pH Level' : 'EC Level',
-      statusBadge: 'Stable',
-      warningText: param == 'ph'
-          ? 'pH levels are stable and within optimal bounds.'
-          : 'EC levels are stable and within safe parameters.',
-      temperature: '${currentTemp.toStringAsFixed(1)} °C',
-      ecLevel: param == 'ph'
-          ? '${currentEc.toStringAsFixed(6)} mS/cm'
-          : '${currentPh.toStringAsFixed(6)} pH',
-      calloutText: isApplied
-          ? 'Recent intervention logged: parameter fix applied successfully.'
-          : 'Insight dismissed by operator.',
-      currentPh: param == 'ph' ? currentPh : currentEc,
-      targetPh: param == 'ph' ? 6.5 : 1.5,
-      suggestedFixes: const ['No recommendation for now'],
-    );
-
-    if (param == 'ph') {
-      phInsightDetail = updatedDetail;
-    } else {
-      ecInsightDetail = updatedDetail;
-    }
-    notifyListeners();
+    await loadData();
   }
 
   @override

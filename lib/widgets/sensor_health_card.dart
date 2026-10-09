@@ -33,7 +33,8 @@ class SensorHealthCard extends StatelessWidget {
               ),
               Text(
                 '${sensors.length} sensors',
-                style: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w600),
+                style: AppTextStyles.cardMeta
+                    .copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -79,7 +80,8 @@ class SensorHealthCard extends StatelessWidget {
               ),
               Text(
                 item.statusLabel,
-                style: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w600),
+                style: AppTextStyles.cardMeta
+                    .copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -101,11 +103,13 @@ class SensorHealthCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            item.daysSinceCalibration < 0
-                ? 'No calibration recorded'
-                : item.daysSinceCalibration == 0
-                  ? 'Calibrated today'
-                  : 'Last cal: ${item.daysSinceCalibration}d ago',
+            item.statusLabel == 'Awaiting device'
+                ? 'Calibration saved; waiting for ESP32 confirmation'
+                : item.daysSinceCalibration < 0
+                    ? 'No calibration recorded'
+                    : item.daysSinceCalibration == 0
+                        ? 'Calibrated today'
+                        : 'Last cal: ${item.daysSinceCalibration}d ago',
             style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
           ),
         ],

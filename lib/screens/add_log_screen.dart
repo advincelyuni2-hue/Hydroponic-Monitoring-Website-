@@ -60,6 +60,7 @@ class AddLogScreen extends StatelessWidget {
                       amount: entry.amount,
                       notes: entry.notes,
                       reservoirVolumeL: entry.reservoirVolumeL,
+                      performedAtManila: entry.performedAtManila!,
                     );
                   }
                   if (!saved) {
@@ -103,6 +104,7 @@ class FixEntry {
   final double? amount;
   final double? reservoirVolumeL;
   final String notes;
+  final DateTime? performedAtManila;
 
   const FixEntry({
     required this.parameter,
@@ -111,6 +113,7 @@ class FixEntry {
     required this.amount,
     this.reservoirVolumeL,
     required this.notes,
+    this.performedAtManila,
   });
 }
 
@@ -149,14 +152,14 @@ class RecordFixCardState extends State<RecordFixCard> {
 
   String? parameter;
   String? actionType;
-  late final String dateTimestamp;
+  late DateTime _performedAtManila;
   bool _submitting = false;
   String? _submissionError;
 
   @override
   void initState() {
     super.initState();
-    dateTimestamp = formatManilaDateTime(manilaNow());
+    _performedAtManila = manilaNow();
 
     String prefilledParam = 'pH';
     if (widget.notification != null) {
@@ -187,8 +190,53 @@ class RecordFixCardState extends State<RecordFixCard> {
     super.dispose();
   }
 
+  Future<void> _pickDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _performedAtManila,
+      firstDate: DateTime(2020),
+      lastDate: manilaNow(),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _performedAtManila = DateTime(
+        selected.year,
+        selected.month,
+        selected.day,
+        _performedAtManila.hour,
+        _performedAtManila.minute,
+      );
+      _submissionError = null;
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_performedAtManila),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _performedAtManila = DateTime(
+        _performedAtManila.year,
+        _performedAtManila.month,
+        _performedAtManila.day,
+        selected.hour,
+        selected.minute,
+      );
+      _submissionError = null;
+    });
+  }
+
   Future<void> _submit() async {
     if (_submitting || !_formKey.currentState!.validate()) return;
+    if (widget.notification == null &&
+        manilaWallTimeToUtc(_performedAtManila)
+            .isAfter(DateTime.now().toUtc())) {
+      setState(() => _submissionError =
+          'The intervention date and time cannot be in the future.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _submissionError = null;
@@ -204,6 +252,8 @@ class RecordFixCardState extends State<RecordFixCard> {
         reservoirVolumeL:
             double.tryParse(_reservoirVolumeController.text.trim()),
         notes: _notesController.text.trim(),
+        performedAtManila:
+            widget.notification == null ? _performedAtManila : null,
       ));
       if (!saved && mounted) {
         setState(() => _submissionError = widget.submissionError?.call() ??
@@ -222,15 +272,33 @@ class RecordFixCardState extends State<RecordFixCard> {
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
-    final timestampField = _labeled(
-      'Logged Date & Time (Read-only)',
-      TextFormField(
-        initialValue: dateTimestamp,
-        enabled: false,
-        style: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
-        decoration: _decoration(hint: dateTimestamp),
-      ),
-    );
+    final timestampField = widget.notification != null
+        ? _labeled(
+            'Logged Date & Time (Read-only)',
+            TextFormField(
+              initialValue: formatManilaDateTime(_performedAtManila),
+              enabled: false,
+              style:
+                  AppTextStyles.input.copyWith(color: AppColors.textSecondary),
+              decoration: _decoration(),
+            ),
+          )
+        : _labeled(
+            'Action date & time (Manila)',
+            Wrap(spacing: 12, runSpacing: 8, children: [
+              OutlinedButton.icon(
+                onPressed: _submitting ? null : _pickDate,
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Text(
+                    '${_performedAtManila.year}-${_performedAtManila.month.toString().padLeft(2, '0')}-${_performedAtManila.day.toString().padLeft(2, '0')}'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _submitting ? null : _pickTime,
+                icon: const Icon(Icons.access_time_outlined, size: 18),
+                label: Text(formatManilaClockTime(_performedAtManila)),
+              ),
+            ]),
+          );
 
     final parameterField = _labeled(
       'Parameter',

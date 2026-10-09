@@ -5,14 +5,15 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <math.h>
+#include <Preferences.h>
 
 // =====================================================
 // OPERATING MODE
 // =====================================================
 
-// true  = calibration only; no buffering or uploads
-// false = normal monitoring and five-minute uploads
-const bool CALIBRATION_MODE = true;
+// Legacy serial-only override. Leave false for web-guided calibration; the
+// web app now switches this device into maintenance mode through Supabase.
+const bool CALIBRATION_MODE = false;
 
 enum CalibrationTarget {
   PH_ONLY,
@@ -30,14 +31,14 @@ const CalibrationTarget CALIBRATION_TARGET = PH_ONLY;
 // WIFI AND SUPABASE
 // =====================================================
 
-const char* WIFI_SSID = "PLDT_Home_BB3C1";
-const char* WIFI_PASSWORD = "pldthome";
+const char* WIFI_SSID = "";
+const char* WIFI_PASSWORD = "";
 
 const char* SUPABASE_REST_URL =
-  "https://rhgcxqgcxnaxgwksdyks.supabase.co/rest/v1/";
+  "";
 
 const char* SUPABASE_PUBLISHABLE_KEY =
-  "sb_publishable_JCVLqWnQuQKzrnFGWUDJcQ_Lax526-E";
+  "";
 
 // =====================================================
 // PIN DEFINITIONS
@@ -94,6 +95,28 @@ const double EC_SLOPE =
 const double EC_INTERCEPT =
   EC_LOW_REFERENCE -
   (EC_SLOPE * EC_LOW_VOLTAGE_25);
+
+// The old two-point constants remain as a fallback. Completed web sessions
+// replace them in ESP32 NVS without changing the five-minute upload format.
+Preferences calibrationPreferences;
+double activePH4Voltage = PH4_VOLTAGE;
+double activePHHighVoltage = PH686_VOLTAGE;
+double activePHHighReference = PH_HIGH_REFERENCE;
+double activeTDSFactor = 0.0;  // 0 keeps the existing EC calculation.
+long calibrationVersion = 0;
+long maintenanceEpoch = 0;
+String activeCalibrationSession = "";
+String activeCalibrationParameter = "";
+unsigned long lastCalibrationPoll = 0;
+unsigned long calibrationCooldownUntil = 0;
+
+bool calibrationIsActive();
+bool calibrationIsPaused();
+void pollCalibrationState();
+void sendCalibrationSample(const char* parameter, double voltage);
+void acknowledgeCalibrationVersion(long version);
+String jsonField(const String& body, const char* name);
+void loadCalibrationPreferences();
 
 // The DHT22 measures air temperature, not nutrient-solution temperature.
 // Do not use it to temperature-compensate EC. The EC calibration solutions
@@ -255,6 +278,7 @@ void updateOLED();
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  loadCalibrationPreferences();
 
   Serial.println();
   Serial.println("====================================");
@@ -263,7 +287,7 @@ void setup() {
 
   if (CALIBRATION_MODE) {
     Serial.println("[MODE] CALIBRATION MODE");
-    Serial.println("[MODE] Supabase uploads disabled.");
+    Serial.println("[MODE] Normal history uploads disabled.");
 
     if (CALIBRATION_TARGET == PH_ONLY) {
       Serial.println("[MODE] Calibration target: pH only.");
@@ -320,17 +344,19 @@ void setup() {
 
   Serial.printf(
     "[CAL] pH 4.00 voltage: %.6f V\n",
-    PH4_VOLTAGE
+    activePH4Voltage
   );
 
   Serial.printf(
-    "[CAL] pH 6.86 voltage: %.6f V\n",
-    PH686_VOLTAGE
+    "[CAL] pH high reference %.2f voltage: %.6f V\n",
+    activePHHighReference,
+    activePHHighVoltage
   );
 
   Serial.printf(
     "[CAL] pH slope: %.6f V/pH\n",
-    PH_SLOPE
+    (activePH4Voltage - activePHHighVoltage) /
+      (activePHHighReference - PH_LOW_REFERENCE)
   );
 
   Serial.printf(
@@ -353,10 +379,7 @@ void setup() {
     EC_INTERCEPT
   );
 
-  if (CALIBRATION_MODE) {
-    WiFi.mode(WIFI_OFF);
-    Serial.println("[WiFi] Disabled during calibration.");
-  } else {
+  {
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -390,6 +413,10 @@ void setup() {
   sensorCycleStartedAt = currentTime;
   lastFiveMinuteUpload = currentTime;
 
+  if (WiFi.status() == WL_CONNECTED) {
+    pollCalibrationState();
+  }
+
   startPHCycle(currentTime);
 }
 
@@ -401,6 +428,13 @@ void loop() {
   unsigned long currentTime = millis();
 
   maintainWiFi();
+
+  if (WiFi.status() == WL_CONNECTED &&
+      (lastCalibrationPoll == 0 ||
+       currentTime - lastCalibrationPoll >=
+         (calibrationIsActive() ? 5000UL : 15000UL))) {
+    pollCalibrationState();
+  }
 
   if (
     sensorState == WAITING_FOR_EC &&
@@ -419,7 +453,7 @@ void loop() {
   }
 
   if (
-    !CALIBRATION_MODE &&
+    !calibrationIsPaused() &&
     currentTime - lastFiveMinuteUpload >=
       FIVE_MINUTE_INTERVAL
   ) {
@@ -445,10 +479,6 @@ void loop() {
 // =====================================================
 
 void maintainWiFi() {
-  if (CALIBRATION_MODE) {
-    return;
-  }
-
   if (WiFi.status() == WL_CONNECTED) {
     return;
   }
@@ -470,6 +500,157 @@ void maintainWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
+bool calibrationIsActive() {
+  return CALIBRATION_MODE || activeCalibrationSession.length() > 0;
+}
+
+bool calibrationIsPaused() {
+  return calibrationIsActive() ||
+    (calibrationCooldownUntil != 0 &&
+     (long)(calibrationCooldownUntil - millis()) > 0);
+}
+
+void loadCalibrationPreferences() {
+  calibrationPreferences.begin("hydrocal", false);
+  calibrationVersion = calibrationPreferences.getLong("version", 0);
+  maintenanceEpoch = calibrationPreferences.getLong("maintEpoch", 0);
+  activePH4Voltage = calibrationPreferences.getDouble("ph4", PH4_VOLTAGE);
+  activePHHighVoltage = calibrationPreferences.getDouble("phHigh", PH686_VOLTAGE);
+  activePHHighReference = calibrationPreferences.getDouble("phHighRef", PH_HIGH_REFERENCE);
+  activeTDSFactor = calibrationPreferences.getDouble("tdsFactor", 0.0);
+}
+
+// The REST endpoint returns one flat JSON object inside an array. We read
+// only the fixed scalar fields below; no arbitrary JSON is accepted.
+String jsonField(const String& body, const char* name) {
+  String marker = String("\"") + name + "\":";
+  int start = body.indexOf(marker);
+  if (start < 0) return "";
+  start += marker.length();
+  while (start < body.length() && body[start] == ' ') start++;
+  if (body.substring(start, start + 4) == "null") return "";
+  if (body[start] == '"') {
+    int end = body.indexOf('"', start + 1);
+    return end < 0 ? "" : body.substring(start + 1, end);
+  }
+  int end = start;
+  while (end < body.length() &&
+         body[end] != ',' && body[end] != '}') end++;
+  return body.substring(start, end);
+}
+
+void pollCalibrationState() {
+  lastCalibrationPoll = millis();
+  HTTPClient http;
+  String endpoint = String(SUPABASE_REST_URL) +
+    "calibration_device_state?select=active_session_id,active_parameter,"
+    "ph4_voltage,ph7_voltage,tds_factor,coefficients_version,applied_version,"
+    "maintenance_epoch"
+    "&device_id=eq.hydroponic-esp32";
+  if (!http.begin(endpoint)) return;
+  http.setTimeout(5000);
+  http.addHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_PUBLISHABLE_KEY));
+  const int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[CAL] State poll failed: HTTP %d\n", code);
+    http.end();
+    return;
+  }
+  const String body = http.getString();
+  http.end();
+  if (body.length() < 4 || body == "[]") return;
+
+  const String nextSession = jsonField(body, "active_session_id");
+  const String nextParameter = jsonField(body, "active_parameter");
+  const long nextEpoch = jsonField(body, "maintenance_epoch").toInt();
+  if (nextEpoch != maintenanceEpoch) {
+    // Also handles a calibration that began AND ended while Wi-Fi was down.
+    resetHistoryBuffer();
+    lastFiveMinuteUpload = millis();
+    calibrationCooldownUntil = millis() + 60000UL;
+    maintenanceEpoch = nextEpoch;
+    calibrationPreferences.putLong("maintEpoch", nextEpoch);
+    Serial.printf("[CAL] Maintenance revision %ld; history buffer discarded.\n",
+      nextEpoch);
+  }
+  const bool wasActive = activeCalibrationSession.length() > 0;
+  if (nextSession != activeCalibrationSession) {
+    resetHistoryBuffer();
+    lastFiveMinuteUpload = millis();
+    if (wasActive && nextSession.length() == 0) {
+      calibrationCooldownUntil = millis() + 60000UL;
+      Serial.println("[CAL] Session ended. Waiting for fresh reservoir samples.");
+    }
+    Serial.printf("[CAL] Active session: %s\n", nextSession.c_str());
+  }
+  activeCalibrationSession = nextSession;
+  activeCalibrationParameter = nextParameter;
+
+  const long nextVersion = jsonField(body, "coefficients_version").toInt();
+  if (nextVersion > calibrationVersion) {
+    const double ph4 = jsonField(body, "ph4_voltage").toDouble();
+    const double ph7 = jsonField(body, "ph7_voltage").toDouble();
+    const double tds = jsonField(body, "tds_factor").toDouble();
+    if (ph4 > 0 && ph7 > 0 && fabs(ph4 - ph7) >= 0.02) {
+      activePH4Voltage = ph4;
+      activePHHighVoltage = ph7;
+      activePHHighReference = 7.0;
+      calibrationPreferences.putDouble("ph4", ph4);
+      calibrationPreferences.putDouble("phHigh", ph7);
+      calibrationPreferences.putDouble("phHighRef", 7.0);
+    }
+    if (tds >= 0.1 && tds <= 10.0) {
+      activeTDSFactor = tds;
+      calibrationPreferences.putDouble("tdsFactor", tds);
+    }
+    calibrationVersion = nextVersion;
+    calibrationPreferences.putLong("version", nextVersion);
+    Serial.printf("[CAL] Applied coefficient version %ld\n", nextVersion);
+  }
+  const long reportedVersion = jsonField(body, "applied_version").toInt();
+  if (nextVersion > 0 && reportedVersion < nextVersion &&
+      calibrationVersion == nextVersion) {
+    acknowledgeCalibrationVersion(nextVersion);
+  }
+}
+
+void acknowledgeCalibrationVersion(long version) {
+  HTTPClient http;
+  const String endpoint = String(SUPABASE_REST_URL) +
+    "rpc/ack_calibration_version";
+  if (!http.begin(endpoint)) return;
+  http.setTimeout(5000);
+  http.addHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_PUBLISHABLE_KEY));
+  http.addHeader("Content-Type", "application/json");
+  const String body = String("{\"target_device_id\":\"hydroponic-esp32\","
+    "\"target_version\":") + version + "}";
+  const int code = http.POST(body);
+  Serial.printf("[CAL] Reported applied version %ld: HTTP %d\n", version, code);
+  http.end();
+}
+
+void sendCalibrationSample(const char* parameter, double voltage) {
+  if (WiFi.status() != WL_CONNECTED ||
+      activeCalibrationSession.length() == 0 ||
+      isnan(voltage) || voltage < 0.0 || voltage > 3.3) return;
+
+  HTTPClient http;
+  const String endpoint = String(SUPABASE_REST_URL) + "calibration_samples";
+  if (!http.begin(endpoint)) return;
+  http.setTimeout(5000);
+  http.addHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
+  http.addHeader("Authorization", "Bearer " + String(SUPABASE_PUBLISHABLE_KEY));
+  http.addHeader("Content-Type", "application/json");
+  String body = String("{\"session_id\":\"") + activeCalibrationSession +
+    "\",\"device_id\":\"hydroponic-esp32\",\"parameter\":\"" +
+    parameter + "\",\"voltage\":" + String(voltage, 6) + "}";
+  const int code = http.POST(body);
+  Serial.printf("[CAL] %s %.6f V uploaded: HTTP %d\n", parameter, voltage, code);
+  http.end();
+}
+
 // =====================================================
 // pH MEASUREMENT
 // =====================================================
@@ -481,8 +662,8 @@ void startPHCycle(unsigned long currentTime) {
   Serial.println("---------- SENSOR CYCLE ----------");
 
   if (
-    CALIBRATION_MODE &&
-    CALIBRATION_TARGET == EC_ONLY
+    calibrationIsActive() &&
+    activeCalibrationParameter == "tds"
   ) {
     Serial.println("[CAL] pH skipped; EC-only calibration.");
     completeECCycle();
@@ -493,6 +674,12 @@ void startPHCycle(unsigned long currentTime) {
 
   latestPHVoltage = readPHVoltage();
   latestPH = calculatePH(latestPHVoltage);
+
+  if (activeCalibrationParameter == "ph" &&
+      activeCalibrationSession.length() > 0 &&
+      !isnan(latestPHVoltage)) {
+    sendCalibrationSample("ph", latestPHVoltage);
+  }
 
   if (!isnan(latestPH)) {
     Serial.printf(
@@ -509,8 +696,8 @@ void startPHCycle(unsigned long currentTime) {
   }
 
   if (
-    CALIBRATION_MODE &&
-    CALIBRATION_TARGET == PH_ONLY
+    calibrationIsActive() &&
+    activeCalibrationParameter == "ph"
   ) {
     Serial.println("[CAL] EC skipped; pH-only calibration.");
     Serial.println("[CAL] Reading not stored or uploaded.");
@@ -557,6 +744,12 @@ void completeECCycle() {
 
   latestEC = calculateEC(latestECVoltage);
 
+  if (activeCalibrationParameter == "tds" &&
+      activeCalibrationSession.length() > 0 &&
+      !isnan(latestECVoltage)) {
+    sendCalibrationSample("tds", latestECVoltage);
+  }
+
   if (!isnan(latestEC)) {
     Serial.printf(
       "[EC] Voltage: %.6f V\n",
@@ -571,7 +764,7 @@ void completeECCycle() {
     Serial.println("[EC] Invalid reading.");
   }
 
-  if (CALIBRATION_MODE) {
+  if (calibrationIsPaused()) {
     Serial.println(
       "[CAL] Reading not stored or uploaded."
     );
@@ -653,9 +846,12 @@ double readAverageVoltage(uint8_t pin) {
 // =====================================================
 
 double calculatePH(double voltage) {
+  const double activeSlope =
+    (activePH4Voltage - activePHHighVoltage) /
+    (activePHHighReference - PH_LOW_REFERENCE);
   if (
     isnan(voltage) ||
-    fabs(PH_SLOPE) < 0.000001
+    fabs(activeSlope) < 0.000001
   ) {
     Serial.println(
       "[pH] Invalid voltage or calibration slope."
@@ -665,10 +861,10 @@ double calculatePH(double voltage) {
   }
 
   double calculatedPH =
-    PH_HIGH_REFERENCE -
+    activePHHighReference -
     (
-      (voltage - PH686_VOLTAGE) /
-      PH_SLOPE
+      (voltage - activePHHighVoltage) /
+      activeSlope
     );
 
   if (calculatedPH < 0.0) {
@@ -691,15 +887,25 @@ double calculateEC(double voltage) {
     return NAN;
   }
 
-  double calculatedEC =
-    (EC_SLOPE * voltage) +
-    EC_INTERCEPT;
+  double calculatedEC;
+  if (activeTDSFactor > 0.0) {
+    // Gravity analog TDS approximation at 25 C: calibrate the polynomial to
+    // 707 ppm (1413 uS/cm), then display an approximate EC at 0.5 scale.
+    // DHT22 is AIR temperature and must not compensate this solution reading.
+    const double basePPM =
+      (133.42 * voltage * voltage * voltage -
+       255.86 * voltage * voltage +
+       857.39 * voltage) * 0.5;
+    calculatedEC = basePPM * activeTDSFactor * 2.0 / 1000.0;
+  } else {
+    calculatedEC = (EC_SLOPE * voltage) + EC_INTERCEPT;
+  }
 
   if (calculatedEC < 0.0) {
     calculatedEC = 0.0;
   }
 
-  if (CALIBRATION_MODE) {
+  if (calibrationIsActive()) {
     Serial.printf(
       "[EC CAL] Raw solution voltage (solution at 25 C): %.6f V\n",
       voltage
@@ -1105,9 +1311,9 @@ bool sendHistoryToSupabase(
 
   int sampleCount
 ) {
-  if (CALIBRATION_MODE) {
+  if (calibrationIsPaused()) {
     Serial.println(
-      "[HISTORY] Upload blocked by calibration mode."
+      "[HISTORY] Upload blocked by calibration or settling mode."
     );
 
     return false;
@@ -1301,7 +1507,7 @@ void updateOLED() {
 
   display.setCursor(0, 45);
 
-  if (CALIBRATION_MODE) {
+  if (calibrationIsPaused()) {
     display.print("CAL MODE");
   } else {
     display.print("Samples:");

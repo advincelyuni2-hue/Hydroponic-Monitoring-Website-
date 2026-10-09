@@ -150,6 +150,7 @@ class ModelEvaluation {
   final int evaluatedCount;
   final int intervenedCount;
   final int missingActualCount;
+  final int calibrationExcludedCount;
 
   const ModelEvaluation({
     required this.samples,
@@ -160,6 +161,7 @@ class ModelEvaluation {
     this.evaluatedCount = 0,
     this.intervenedCount = 0,
     this.missingActualCount = 0,
+    this.calibrationExcludedCount = 0,
   });
 
   static const empty = ModelEvaluation(
@@ -169,7 +171,11 @@ class ModelEvaluation {
   );
 
   int get storedPredictionCount =>
-      pendingCount + evaluatedCount + intervenedCount + missingActualCount;
+      pendingCount +
+      evaluatedCount +
+      intervenedCount +
+      missingActualCount +
+      calibrationExcludedCount;
 
   /// 100 minus the mean absolute percentage error, for 'pH', 'EC' or 'Both'.
   double? accuracyFor(String parameter) {

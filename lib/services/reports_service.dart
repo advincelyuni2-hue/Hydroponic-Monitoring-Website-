@@ -273,6 +273,17 @@ class ReportsService {
         _ => parameter.contains('ph'),
       };
       if (matches) {
+        final calibrationStatus =
+            (row['status'] ?? '').toString().toLowerCase();
+        if (calibrationStatus.contains('cancel')) continue;
+        if (calibrationStatus.contains('pending')) {
+          return SensorHealthItem(
+            sensorName: name,
+            daysSinceCalibration: -1,
+            healthPercentage: 0,
+            statusLabel: 'Awaiting device',
+          );
+        }
         latest = row; // rows are newest first
         break;
       }

@@ -17,6 +17,7 @@ class ForecastingChartCard extends StatefulWidget {
   final List<ForecastPoint>? ecPoints;
   final DateTime? generatedAt;
   final bool isOffline;
+  final bool isCalibrating;
   final String? forecastIssue;
   final DateTime? latestSensorRecordedAt;
 
@@ -30,6 +31,7 @@ class ForecastingChartCard extends StatefulWidget {
     this.ecPoints,
     this.generatedAt,
     this.isOffline = false,
+    this.isCalibrating = false,
     this.forecastIssue,
     this.latestSensorRecordedAt,
   });
@@ -66,13 +68,19 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_off,
+                    Icon(widget.isCalibrating ? Icons.tune : Icons.cloud_off,
                         size: 46, color: AppColors.textSecondary),
                     const SizedBox(height: 12),
-                    Text('Sensor offline', style: AppTextStyles.sectionTitle),
+                    Text(
+                        widget.isCalibrating
+                            ? 'Calibration in progress'
+                            : 'Sensor offline',
+                        style: AppTextStyles.sectionTitle),
                     const SizedBox(height: 6),
                     Text(
-                      'Forecasting requires a recent five-minute sensor reading.',
+                      widget.isCalibrating
+                          ? 'Forecasting and reservoir history are paused while the probe is in calibration solution.'
+                          : 'Forecasting requires a recent five-minute sensor reading.',
                       style: AppTextStyles.cardMeta,
                       textAlign: TextAlign.center,
                     ),

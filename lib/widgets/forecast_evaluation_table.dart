@@ -46,7 +46,7 @@ class ForecastEvaluationTable extends StatelessWidget {
           Text('Predicted vs actual', style: AppTextStyles.sectionTitle),
           const SizedBox(height: 6),
           Text(
-            'Intervened forecasts stay in the record but are excluded from model accuracy.',
+            'Intervention- and calibration-affected forecasts stay in the record but are excluded from model accuracy.',
             style: AppTextStyles.cardMeta,
           ),
           const SizedBox(height: 18),
@@ -95,6 +95,7 @@ class ForecastEvaluationTable extends StatelessWidget {
                 _summary('Evaluated', count('evaluated')),
                 _summary('Pending', count('pending')),
                 _summary('Intervention excluded', count('intervened')),
+                _summary('Calibration excluded', count('calibration_excluded')),
                 _summary('Missing actual', count('missing_actual')),
               ],
             ),
@@ -160,10 +161,11 @@ class _ForecastRecordSource extends DataTableSource {
   DataRow? getRow(int index) {
     if (index < 0 || index >= records.length) return null;
     final record = records[index];
-    final action = record.status == 'intervened'
+    final action = record.actionType != null || record.actionTimeLabel != null
         ? [
             record.actionType ?? 'Action recorded',
             if (record.actionTimeLabel != null) record.actionTimeLabel!,
+            if (record.status == 'pending') 'Awaiting actual reading',
             if (record.interventionCount > 1)
               '${record.interventionCount} actions total',
           ].join('\n')
@@ -188,6 +190,7 @@ class _ForecastRecordSource extends DataTableSource {
     final label = switch (status) {
       'evaluated' => 'Evaluated',
       'intervened' => 'Intervened',
+      'calibration_excluded' => 'Calibration excluded',
       'missing_actual' => 'Missing actual',
       _ => 'Pending',
     };

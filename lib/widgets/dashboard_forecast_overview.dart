@@ -15,6 +15,7 @@ class DashboardForecastOverview extends StatefulWidget {
   final List<ForecastHorizonSummary> summaries;
   final DateTime? generatedAt;
   final bool isOffline;
+  final bool isCalibrating;
   final String? forecastIssue;
   final DateTime? latestSensorRecordedAt;
   final VoidCallback onViewDetails;
@@ -26,6 +27,7 @@ class DashboardForecastOverview extends StatefulWidget {
     required this.summaries,
     required this.generatedAt,
     this.isOffline = false,
+    this.isCalibrating = false,
     this.forecastIssue,
     this.latestSensorRecordedAt,
     required this.onViewDetails,
@@ -64,13 +66,19 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud_off,
+                    Icon(widget.isCalibrating ? Icons.tune : Icons.cloud_off,
                         size: 42, color: AppColors.textSecondary),
                     const SizedBox(height: 12),
-                    Text('Sensor offline', style: AppTextStyles.sectionTitle),
+                    Text(
+                        widget.isCalibrating
+                            ? 'Calibration in progress'
+                            : 'Sensor offline',
+                        style: AppTextStyles.sectionTitle),
                     const SizedBox(height: 6),
                     Text(
-                      'Forecasting requires a recent five-minute sensor reading.',
+                      widget.isCalibrating
+                          ? 'Forecasting and reservoir history are paused while the probe is in calibration solution.'
+                          : 'Forecasting requires a recent five-minute sensor reading.',
                       style: AppTextStyles.cardMeta,
                       textAlign: TextAlign.center,
                     ),

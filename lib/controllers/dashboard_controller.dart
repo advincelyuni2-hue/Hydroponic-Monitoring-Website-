@@ -34,6 +34,7 @@ class DashboardController extends ChangeNotifier {
   DateTime? forecastGeneratedAt;
   String? forecastIssue;
   bool isSensorOffline = false;
+  bool isCalibrating = false;
   DateTime? latestSensorRecordedAt;
   RealtimeChannel? _parameterChannel;
   StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
@@ -66,6 +67,7 @@ class DashboardController extends ChangeNotifier {
       final snapshot = await _monitoringService.getTelemetrySnapshot();
       parameterStatuses = snapshot.statuses;
       isSensorOffline = snapshot.isOffline;
+      isCalibrating = snapshot.isCalibrating;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       if (isSensorOffline) {
         forecastIssue = null;
@@ -100,6 +102,7 @@ class DashboardController extends ChangeNotifier {
       final snapshot = results[1] as TelemetrySnapshot;
       parameterStatuses = snapshot.statuses;
       isSensorOffline = snapshot.isOffline;
+      isCalibrating = snapshot.isCalibrating;
       latestSensorRecordedAt = snapshot.latestRecordedAt;
       notifications = results[2] as List<AppNotificationItem>;
       if (isSensorOffline) {

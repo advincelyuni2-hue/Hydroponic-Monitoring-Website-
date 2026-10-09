@@ -264,6 +264,36 @@ def predict_forecast(
     horizon: int = Query(12, description="4, 8, or 12 hours"),
 ):
     try:
+        if supabase is not None:
+            try:
+                state_rows = (
+                    supabase.from_("calibration_device_state")
+                    .select("active_session_id,resume_after")
+                    .eq("device_id", "hydroponic-esp32")
+                    .limit(1)
+                    .execute()
+                ).data or []
+                if state_rows:
+                    state = state_rows[0]
+                    resume_raw = state.get("resume_after")
+                    resume_at = (
+                        datetime.fromisoformat(resume_raw.replace("Z", "+00:00"))
+                        if resume_raw else None
+                    )
+                    if state.get("active_session_id") or (
+                        resume_at is not None
+                        and resume_at > datetime.now(timezone.utc)
+                    ):
+                        raise HTTPException(
+                            status_code=409,
+                            detail={"code": "sensor_calibrating",
+                                    "message": "Calibration is in progress."},
+                        )
+            except HTTPException:
+                raise
+            except Exception:
+                # Older deployments may not have the calibration migration yet.
+                pass
         baseline = get_latest_sensor_baseline()
         if baseline is not None:
             ph = float(baseline["avg_ph"])

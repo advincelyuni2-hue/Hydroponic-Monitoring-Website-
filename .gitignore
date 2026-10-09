@@ -40,6 +40,9 @@ supabase.json
 backend/.env
 
 >>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
+
+# Arduino CLI generated output
+arduino/**/build/
 # Symbolication related
 app.*.symbols
 

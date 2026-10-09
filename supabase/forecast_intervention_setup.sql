@@ -1,5 +1,6 @@
 -- Persistent forecast evaluation, structured interventions, and sensor-alert
 -- recovery. Run after realtime_setup.sql and rbac_setup.sql.
+-- Then run manual_intervention_time_setup.sql for backdated manual actions.
 
 -- Older deployments use UUID sensor_history IDs while newer clean installs use
 -- bigint identities. Mirror the deployed key type so both schemas are valid.

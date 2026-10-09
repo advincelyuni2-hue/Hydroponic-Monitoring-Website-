@@ -146,7 +146,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                _controller.isSensorOffline ? 'Offline' : 'Live',
+                _controller.isCalibrating
+                    ? 'Calibrating'
+                    : (_controller.isSensorOffline ? 'Offline' : 'Live'),
                 style: AppTextStyles.cardMeta,
               ),
             ],
@@ -186,6 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           summaries: _controller.forecastSummaries,
           generatedAt: _controller.forecastGeneratedAt,
           isOffline: _controller.isSensorOffline,
+          isCalibrating: _controller.isCalibrating,
           forecastIssue: _controller.forecastIssue,
           latestSensorRecordedAt: _controller.latestSensorRecordedAt,
           onViewDetails: _openForecastingScreen,

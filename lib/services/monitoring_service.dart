@@ -99,6 +99,17 @@ class MonitoringService {
   Future<TelemetrySnapshot> getTelemetrySnapshot() async {
     final ranges = await _getParameterRanges();
     final reading = await _getLatestFiveMinuteReadingOrNull();
+    if (await _calibrationPaused()) {
+      final timestamp = reading == null
+          ? null
+          : parseSupabaseTimestamp(reading['recorded_at'] as String).toUtc();
+      return TelemetrySnapshot(
+        statuses: _offlineStatuses(ranges, timestamp),
+        latestRecordedAt: timestamp,
+        isOffline: true,
+        isCalibrating: true,
+      );
+    }
     if (reading == null) {
       return TelemetrySnapshot(
         statuses: _offlineStatuses(ranges, null),
@@ -157,6 +168,25 @@ class MonitoringService {
       latestRecordedAt: timestampUtc,
       isOffline: false,
     );
+  }
+
+  Future<bool> _calibrationPaused() async {
+    try {
+      final row = await supabase
+          .from('calibration_device_state')
+          .select('active_session_id, resume_after')
+          .eq('device_id', 'hydroponic-esp32')
+          .maybeSingle();
+      if (row == null) return false;
+      if (row['active_session_id'] != null) return true;
+      final resumeRaw = row['resume_after'] as String?;
+      return resumeRaw != null &&
+          DateTime.parse(resumeRaw).toUtc().isAfter(DateTime.now().toUtc());
+    } catch (_) {
+      // Continue to support installations where calibration_setup.sql has not
+      // been installed yet.
+      return false;
+    }
   }
 
   Future<_ParameterRanges> _getParameterRanges() async {
