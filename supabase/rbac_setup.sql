@@ -113,6 +113,16 @@ create unique index if not exists notifications_one_unresolved_alert
 on public.notifications (alert_key)
 where alert_key is not null and is_resolved = false;
 
+-- Dashboard and alert-trigger access paths. These partial indexes keep the
+-- active-alert working set small even after resolved notification history grows.
+create index if not exists notifications_active_created_at_idx
+on public.notifications (created_at desc)
+where is_resolved = false;
+
+create index if not exists notifications_active_sensor_parameter_idx
+on public.notifications (parameter)
+where source = 'sensor' and is_resolved = false;
+
 create table if not exists public.forecast_logs (
   id uuid primary key default gen_random_uuid(),
   created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,

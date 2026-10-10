@@ -16,7 +16,6 @@ import '../widgets/dashboard_parameter_gauge.dart';
 import 'forecasting_dashboard_screen.dart';
 import '../widgets/dashboard_insight_card.dart';
 
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -199,22 +198,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  
-Widget _buildLatestInsightCard(bool isMobile) {
-  return DashboardInsightCard(
-    phForecast: _controller.phForecast,
-    ecForecast: _controller.ecForecast,
-    summaries: _controller.forecastSummaries,
-    parameterStatuses: _controller.parameterStatuses,
-    phInsight: _controller.phPredictionInsight,
-    ecInsight: _controller.ecPredictionInsight,
-    isOffline: _controller.isSensorOffline,
-    isCalibrating: _controller.isCalibrating,
-    forecastIssue: _controller.forecastIssue,
-    onViewDetails: _openForecastingScreen,
-  );
-}
-
+  Widget _buildLatestInsightCard(bool isMobile) {
+    return DashboardInsightCard(
+      phForecast: _controller.phForecast,
+      ecForecast: _controller.ecForecast,
+      summaries: _controller.forecastSummaries,
+      parameterStatuses: _controller.parameterStatuses,
+      phInsight: _controller.phPredictionInsight,
+      ecInsight: _controller.ecPredictionInsight,
+      isOffline: _controller.isSensorOffline,
+      isCalibrating: _controller.isCalibrating,
+      forecastIssue: _controller.forecastIssue,
+      onViewDetails: _openForecastingScreen,
+    );
+  }
 
   Widget _buildInsightContent(
     PredictionInsightDetail insight,

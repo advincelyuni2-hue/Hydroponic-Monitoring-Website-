@@ -13,6 +13,7 @@ import 'package:monitoring_app/main.dart';
 void main() {
   testWidgets('shows the login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Login your account'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));

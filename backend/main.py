@@ -1,6 +1,9 @@
 import os
 import json
 import traceback
+import copy
+import threading
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 import joblib
 import numpy as np
@@ -48,6 +51,14 @@ supabase: Client | None = (
     if SUPABASE_URL and SUPABASE_KEY
     else None
 )
+
+# Forecasts are immutable for a sensor-history baseline and model version.
+# Reuse the complete response when multiple tabs request the same baseline,
+# avoiding repeated history scans, model inference, and database upserts.
+FORECAST_CACHE_MAX_ENTRIES = int(os.getenv("FORECAST_CACHE_MAX_ENTRIES", "48"))
+forecast_response_cache: OrderedDict[tuple, dict] = OrderedDict()
+forecast_cache_guard = threading.Lock()
+forecast_generation_locks = [threading.Lock() for _ in range(32)]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -203,6 +214,7 @@ def persist_forecast_predictions(
             .upsert(
                 rows,
                 on_conflict="baseline_history_id,parameter,horizon_hours,model_version",
+                ignore_duplicates=True,
             )
             .execute()
         )
@@ -310,89 +322,121 @@ def predict_forecast(
         delta_scaler = ph_delta_scaler if is_ph else ec_delta_scaler
         base_val = ph if is_ph else ec
 
-        # 1. Fetch guaranteed 96-step sequence
-        grid_df = get_resilient_sequence(ph, ec, temp)
-
-        # 2. Compute 21 input features
-        feature_matrix = compute_21_features(grid_df)
-
-        # 3. Transform & Clip Features
-        scaled_features = feature_scaler.transform(feature_matrix)
-        feature_clip = model_config.get("feature_clip", 5.0)
-        clipped_features = np.clip(scaled_features, -feature_clip, feature_clip)
-
-        # 4. Reshape for Keras Model: (1 sample, 96 timesteps, 21 features)
-        model_input = np.expand_dims(clipped_features, axis=0)
-
-        # 5. Model Inference (handles both dict and list return types)
-        preds = model.predict(model_input, verbose=0)
-
-        if isinstance(preds, dict):
-            reg_output = preds["reg_output"]
-            state_output = preds["state_output"]
-        elif isinstance(preds, list):
-            reg_output = preds[0]
-            state_output = preds[1]
-        else:
-            reg_output = preds
-            state_output = np.array([[1.0, 0.0, 0.0]])
-
-        # Inverse transform multi-horizon deltas (4h, 8h, 12h)
-        unscaled_deltas = delta_scaler.inverse_transform(reg_output)[0]
-
-        delta_4h = float(unscaled_deltas[0])
-        delta_8h = float(unscaled_deltas[1])
-        delta_12h = float(unscaled_deltas[2])
-
-        val_4h = base_val + delta_4h
-        val_8h = base_val + delta_8h
-        val_12h = base_val + delta_12h
-
-        saved_prediction_ids = persist_forecast_predictions(
-            baseline,
+        cache_key = (
+            baseline["id"] if baseline else None,
             parameter_key,
-            {4: val_4h, 8: val_8h, 12: val_12h},
+            horizon,
+            FORECAST_MODEL_VERSION,
         )
 
-        # 6. Build UI Trajectory Points
-        if horizon == 4:
-            predictions = [
-                {"hour": 1.3, "value": round(base_val + (delta_4h * 0.33), 2), "is_predicted": True},
-                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
-                {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
-            ]
-        elif horizon == 8:
-            predictions = [
-                {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
-                {"hour": 5.3, "value": round(val_4h, 2), "is_predicted": True},
-                {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
-            ]
-        else:
-            predictions = [
-                {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
-                {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
-                {"hour": 12.0, "value": round(val_12h, 2), "is_predicted": True},
-            ]
+        # Identical cache misses share a striped lock, while pH and EC can
+        # normally run concurrently. Cache access itself uses a short guard.
+        generation_lock = forecast_generation_locks[
+            hash(cache_key) % len(forecast_generation_locks)
+        ]
+        with forecast_cache_guard:
+            cached_response = forecast_response_cache.get(cache_key)
+            if cached_response is not None:
+                forecast_response_cache.move_to_end(cache_key)
+                return copy.deepcopy(cached_response)
 
-        state_idx = int(np.argmax(state_output[0]))
-        state_labels = ["Stable", "Warning", "Critical"]
-        predicted_state = state_labels[state_idx]
+        with generation_lock:
+            # A second tab may have filled the cache while this request waited.
+            with forecast_cache_guard:
+                cached_response = forecast_response_cache.get(cache_key)
+                if cached_response is not None:
+                    forecast_response_cache.move_to_end(cache_key)
+                    return copy.deepcopy(cached_response)
 
-        return {
-            "parameter": parameter,
-            "horizon": horizon,
-            "predictions": predictions,
-            "predicted_state": predicted_state,
-            "val_4h": round(val_4h, 3),
-            "val_8h": round(val_8h, 3),
-            "val_12h": round(val_12h, 3),
-            "model_version": FORECAST_MODEL_VERSION,
-            "baseline_history_id": baseline["id"] if baseline else None,
-            "baseline_recorded_at": (
-                baseline["recorded_at"].isoformat() if baseline else None
-            ),
-            "saved_prediction_ids": saved_prediction_ids,
-        }
+            # 1. Fetch guaranteed 96-step sequence
+            grid_df = get_resilient_sequence(ph, ec, temp)
+
+            # 2. Compute 21 input features
+            feature_matrix = compute_21_features(grid_df)
+
+            # 3. Transform & Clip Features
+            scaled_features = feature_scaler.transform(feature_matrix)
+            feature_clip = model_config.get("feature_clip", 5.0)
+            clipped_features = np.clip(scaled_features, -feature_clip, feature_clip)
+
+            # 4. Reshape for Keras Model: (1 sample, 96 timesteps, 21 features)
+            model_input = np.expand_dims(clipped_features, axis=0)
+
+            # 5. Model Inference (handles both dict and list return types)
+            preds = model.predict(model_input, verbose=0)
+
+            if isinstance(preds, dict):
+                reg_output = preds["reg_output"]
+                state_output = preds["state_output"]
+            elif isinstance(preds, list):
+                reg_output = preds[0]
+                state_output = preds[1]
+            else:
+                reg_output = preds
+                state_output = np.array([[1.0, 0.0, 0.0]])
+
+        # Inverse transform multi-horizon deltas (4h, 8h, 12h)
+            unscaled_deltas = delta_scaler.inverse_transform(reg_output)[0]
+
+            delta_4h = float(unscaled_deltas[0])
+            delta_8h = float(unscaled_deltas[1])
+            delta_12h = float(unscaled_deltas[2])
+
+            val_4h = base_val + delta_4h
+            val_8h = base_val + delta_8h
+            val_12h = base_val + delta_12h
+
+            saved_prediction_ids = persist_forecast_predictions(
+                baseline,
+                parameter_key,
+                {4: val_4h, 8: val_8h, 12: val_12h},
+            )
+
+            # 6. Build UI Trajectory Points
+            if horizon == 4:
+                predictions = [
+                    {"hour": 1.3, "value": round(base_val + (delta_4h * 0.33), 2), "is_predicted": True},
+                    {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
+                    {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
+                ]
+            elif horizon == 8:
+                predictions = [
+                    {"hour": 2.6, "value": round(base_val + (delta_4h * 0.66), 2), "is_predicted": True},
+                    {"hour": 5.3, "value": round(val_4h, 2), "is_predicted": True},
+                    {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
+                ]
+            else:
+                predictions = [
+                    {"hour": 4.0, "value": round(val_4h, 2), "is_predicted": True},
+                    {"hour": 8.0, "value": round(val_8h, 2), "is_predicted": True},
+                    {"hour": 12.0, "value": round(val_12h, 2), "is_predicted": True},
+                ]
+
+            state_idx = int(np.argmax(state_output[0]))
+            state_labels = ["Stable", "Warning", "Critical"]
+            predicted_state = state_labels[state_idx]
+
+            response = {
+                "parameter": parameter,
+                "horizon": horizon,
+                "predictions": predictions,
+                "predicted_state": predicted_state,
+                "val_4h": round(val_4h, 3),
+                "val_8h": round(val_8h, 3),
+                "val_12h": round(val_12h, 3),
+                "model_version": FORECAST_MODEL_VERSION,
+                "baseline_history_id": baseline["id"] if baseline else None,
+                "baseline_recorded_at": (
+                    baseline["recorded_at"].isoformat() if baseline else None
+                ),
+                "saved_prediction_ids": saved_prediction_ids,
+            }
+            with forecast_cache_guard:
+                forecast_response_cache[cache_key] = copy.deepcopy(response)
+                forecast_response_cache.move_to_end(cache_key)
+                while len(forecast_response_cache) > FORECAST_CACHE_MAX_ENTRIES:
+                    forecast_response_cache.popitem(last=False)
+            return response
 
     except HTTPException:
         raise

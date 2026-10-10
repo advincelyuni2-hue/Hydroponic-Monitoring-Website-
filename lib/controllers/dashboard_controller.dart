@@ -42,10 +42,13 @@ class DashboardController extends ChangeNotifier {
   bool isSensorOffline = false;
   bool isCalibrating = false;
   DateTime? latestSensorRecordedAt;
+  DateTime? _forecastBaselineRecordedAt;
   RealtimeChannel? _parameterChannel;
-  StreamSubscription<List<AppNotificationItem>>? _notificationSubscription;
+  RealtimeChannel? _notificationChannel;
   Timer? _freshnessTimer;
   bool _refreshingParameters = false;
+  bool _refreshingNotifications = false;
+  bool _notificationRefreshPending = false;
   bool _disposed = false;
   int _telemetryVersion = 0;
   int _forecastVersion = 0;
@@ -55,14 +58,9 @@ class DashboardController extends ChangeNotifier {
     _parameterChannel = _monitoringService.subscribeToParameterChanges(
       _refreshParameterStatuses,
     );
-    _notificationSubscription =
-        _notificationService.streamNotificationItems().listen((items) {
-      notifications = items
-          .where((notification) => !notification.isResolved)
-          .take(3)
-          .toList();
-      notifyListeners();
-    });
+    _notificationChannel = _notificationService.subscribeToNotifications(
+      onNotification: _refreshNotifications,
+    );
     _freshnessTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _refreshParameterStatuses(),
@@ -84,9 +82,10 @@ class DashboardController extends ChangeNotifier {
       if (isSensorOffline) {
         forecastIssue = null;
         _clearPredictiveData();
+        _forecastBaselineRecordedAt = null;
       }
       notifyListeners();
-      if (!isSensorOffline) await _refreshPredictiveData();
+      await _refreshForecastForCurrentBaseline();
     } catch (_) {
       // Keep the last known dashboard values during a transient refresh error.
     } finally {
@@ -123,8 +122,9 @@ class DashboardController extends ChangeNotifier {
       if (isSensorOffline) {
         forecastIssue = null;
         _clearPredictiveData();
+        _forecastBaselineRecordedAt = null;
       } else {
-        await _refreshPredictiveData(notify: false);
+        await _refreshForecastForCurrentBaseline(notify: false);
       }
     } catch (e) {
       if (_disposed || version != _telemetryVersion) return;
@@ -134,6 +134,44 @@ class DashboardController extends ChangeNotifier {
     if (_disposed || version != _telemetryVersion) return;
     isLoading = false;
     notifyListeners();
+  }
+
+  Future<void> _refreshForecastForCurrentBaseline({bool notify = true}) async {
+    final baseline = latestSensorRecordedAt;
+    if (isSensorOffline || baseline == null) return;
+    if (_forecastBaselineRecordedAt?.isAtSameMomentAs(baseline) == true) return;
+
+    // Claim this baseline before starting the request. The one-minute freshness
+    // check and the Realtime insert can arrive together; both must not generate
+    // and persist the same forecast.
+    _forecastBaselineRecordedAt = baseline;
+    await _refreshPredictiveData(notify: notify);
+  }
+
+  Future<void> _refreshNotifications() async {
+    if (_disposed) return;
+    if (_refreshingNotifications) {
+      _notificationRefreshPending = true;
+      return;
+    }
+    _refreshingNotifications = true;
+    try {
+      do {
+        _notificationRefreshPending = false;
+        try {
+          notifications = await _notificationService.getNotificationItems(
+            limit: 3,
+            activeOnly: true,
+          );
+          if (_disposed) return;
+          notifyListeners();
+        } catch (_) {
+          // Keep the last known alerts during a transient refresh error.
+        }
+      } while (_notificationRefreshPending && !_disposed);
+    } finally {
+      _refreshingNotifications = false;
+    }
   }
 
   Future<void> _refreshPredictiveData({bool notify = true}) async {
@@ -301,7 +339,10 @@ class DashboardController extends ChangeNotifier {
     if (channel != null) {
       _monitoringService.unsubscribe(channel);
     }
-    _notificationSubscription?.cancel();
+    final notificationChannel = _notificationChannel;
+    if (notificationChannel != null) {
+      _notificationService.unsubscribe(notificationChannel);
+    }
     _freshnessTimer?.cancel();
     super.dispose();
   }

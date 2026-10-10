@@ -122,7 +122,6 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         children: [
           _buildHeader(isMobile),
           const SizedBox(height: 5),
-          
           SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
             height: isMobile ? 230 : 350,
@@ -253,7 +252,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     );
   }
 
-    Widget _buildHeader(bool isMobile) {
+  Widget _buildHeader(bool isMobile) {
     final title = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -327,37 +326,40 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         color: AppColors.calloutBackground,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final value in values)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => onSelected(value),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: selected == value
-                      ? AppColors.primaryButton
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label(value),
-                  style: AppTextStyles.cardMeta.copyWith(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final value in values)
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => onSelected(value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
                     color: selected == value
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
+                        ? AppColors.primaryButton
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    label(value),
+                    style: AppTextStyles.cardMeta.copyWith(
+                      color: selected == value
+                          ? Colors.white
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

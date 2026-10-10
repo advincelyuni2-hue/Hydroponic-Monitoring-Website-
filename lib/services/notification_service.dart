@@ -508,6 +508,12 @@ class NotificationService {
         .subscribe();
   }
 
+  Future<void> unsubscribe(RealtimeChannel channel) {
+    final client = supabaseClient;
+    if (client == null) return Future.value();
+    return client.removeChannel(channel);
+  }
+
   Future<void> sendAdminAlert(String message) async {
     final client = supabaseClient;
     final user = client?.auth.currentUser;
