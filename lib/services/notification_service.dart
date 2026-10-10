@@ -94,6 +94,7 @@ class NotificationService {
 
     return AppNotificationItem(
       id: row['id'].toString(),
+      createdAt: parsed,
       title: _displayTitle(storedTitle, parameter),
       subtitle: displayMessage.isEmpty
           ? liveDetail?.summary ?? 'Review this notification.'

@@ -74,7 +74,10 @@ class ReportsScreenState extends State<ReportsScreen> {
                     profile: _controller.profile,
                   ),
                   const SizedBox(height: 24),
-                  if (isMobile) _buildMobileLayout() else _buildDesktopLayout(),
+                  if (Responsive.isDesktop(context))
+                    _buildDesktopLayout()
+                  else
+                    _buildMobileLayout(),
                 ],
               ),
             );
@@ -95,7 +98,7 @@ class ReportsScreenState extends State<ReportsScreen> {
         SizedBox(
           width: 320,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildTelemetryStatusCard(lastUpdated),
               const SizedBox(height: 12),
@@ -139,6 +142,8 @@ class ReportsScreenState extends State<ReportsScreen> {
                 errorMessage: _controller.distributionError,
                 onParamChanged: _controller.setDistributionParam,
               ),
+              const SizedBox(height: 20),
+              SensorHealthCard(sensors: _controller.sensorHealthList),
             ],
           ),
         ),
@@ -170,10 +175,6 @@ class ReportsScreenState extends State<ReportsScreen> {
                 errorMessage: _controller.evaluationError,
                 onParameterChanged: _controller.setPredictionParameter,
                 onViewTable: _navigateToForecastTable,
-              ),
-              const SizedBox(height: 20),
-              SensorHealthCard(
-                sensors: _controller.sensorHealthList,
               ),
               const SizedBox(height: 20),
               GenerateReportCard(
@@ -247,10 +248,6 @@ class ReportsScreenState extends State<ReportsScreen> {
           onViewTable: _navigateToForecastTable,
         ),
         const SizedBox(height: 16),
-        SensorHealthCard(
-          sensors: _controller.sensorHealthList,
-        ),
-        const SizedBox(height: 16),
         GenerateReportCard(
           onGenerateReport: _navigateToGenerateReport,
         ),
@@ -267,6 +264,8 @@ class ReportsScreenState extends State<ReportsScreen> {
           errorMessage: _controller.distributionError,
           onParamChanged: _controller.setDistributionParam,
         ),
+        const SizedBox(height: 16),
+        SensorHealthCard(sensors: _controller.sensorHealthList),
       ],
     );
   }

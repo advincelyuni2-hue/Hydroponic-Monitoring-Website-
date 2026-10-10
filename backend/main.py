@@ -13,6 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 from supabase import create_client, Client
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 @tf.keras.utils.register_keras_serializable()
 def se_block(x, reduction=4):
     ch = x.shape[-1]

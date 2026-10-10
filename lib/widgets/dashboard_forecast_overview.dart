@@ -122,12 +122,6 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         children: [
           _buildHeader(isMobile),
           const SizedBox(height: 5),
-          Text(
-            hasFallbackHistory
-                ? 'Sensor data unavailable: estimated baseline and machine-learning forecast'
-                : 'Realtime measurements and machine-learning forecast trajectory',
-            style: AppTextStyles.cardMeta,
-          ),
           SizedBox(height: isMobile ? 16 : 22),
           SizedBox(
             height: isMobile ? 230 : 350,
@@ -259,19 +253,15 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    final title = Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final title = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         const Icon(Icons.show_chart, color: AppColors.primaryButton),
+        const SizedBox(width: 8),
         Text('Forecast Overview', style: AppTextStyles.sectionTitle),
-        TextButton(
-          onPressed: widget.onViewDetails,
-          child: const Text('View forecast details'),
-        ),
       ],
     );
+
     final controls = Wrap(
       spacing: 10,
       runSpacing: 8,
@@ -292,16 +282,34 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
       ],
     );
 
+    final details = TextButton(
+      onPressed: widget.onViewDetails,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
+      ),
+      child: const Text('View forecast details'),
+    );
+
     if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [title, const SizedBox(height: 12), controls],
+        children: [
+          title,
+          const SizedBox(height: 8),
+          controls,
+          Align(alignment: Alignment.centerRight, child: details),
+        ],
       );
     }
+
     return Row(
       children: [
-        Expanded(child: title),
-        controls,
+        title,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Align(alignment: Alignment.centerLeft, child: controls),
+        ),
+        details,
       ],
     );
   }
@@ -318,37 +326,40 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         color: AppColors.calloutBackground,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final value in values)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => onSelected(value),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: selected == value
-                      ? AppColors.primaryButton
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label(value),
-                  style: AppTextStyles.cardMeta.copyWith(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final value in values)
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => onSelected(value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
                     color: selected == value
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
+                        ? AppColors.primaryButton
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    label(value),
+                    style: AppTextStyles.cardMeta.copyWith(
+                      color: selected == value
+                          ? Colors.white
+                          : AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
