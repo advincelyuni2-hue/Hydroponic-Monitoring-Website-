@@ -25,6 +25,11 @@ creates the canonical telemetry table; the second adds user
 profiles, roles, notifications, calibration logs, and administrator-managed
 parameter ranges. Then launch with:
 
+Existing deployments that already ran those setup scripts should also run
+`supabase/io_optimization.sql` once. It adds idempotent partial indexes for the
+active-notification queries and sensor-alert trigger without changing stored
+data or application behavior.
+
 ```powershell
 flutter run -d chrome --dart-define-from-file=supabase.json
 ```
