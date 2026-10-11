@@ -95,7 +95,9 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _saveConfiguration() async {
+  Future<void> _saveConfiguration({
+    String successMessage = 'Parameter configuration saved.',
+  }) async {
     final client = supabaseClient;
     if (client == null) return;
 
@@ -135,7 +137,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
         ecMax: ecMax,
       );
 
-      if (mounted) _message('Parameter configuration saved.');
+      if (mounted) _message(successMessage);
     } on PostgrestException catch (e) {
       debugPrint('Save config failed: ${e.code} ${e.message}');
       if (mounted) _message('Unable to save: ${e.message}');
@@ -151,7 +153,9 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
       _ecRange = const RangeValues(1.2, 1.8);
     });
 
-    await _saveConfiguration();
+    await _saveConfiguration(
+      successMessage: 'Parameter configuration reverted to defaults.',
+    );
   }
 
   Future<void> _changeRole(Map<String, dynamic> user, String role) async {

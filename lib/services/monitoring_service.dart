@@ -463,35 +463,14 @@ class MonitoringService {
     required DateTime start,
     required DateTime end,
   }) async {
-    final storedStart =
-        sensorManilaWallTimeToStoredUtc(start).toIso8601String();
-    final storedEnd = sensorManilaWallTimeToStoredUtc(end).toIso8601String();
+    final deletedRows = await supabase
+        .from('sensor_history')
+        .delete()
+        .gte('recorded_at', manilaWallTimeToUtc(start).toIso8601String())
+        .lt('recorded_at', manilaWallTimeToUtc(end).toIso8601String())
+        .select('id');
 
-    final results = await Future.wait([
-      supabase
-          .from('ph_readings')
-          .delete()
-          .eq('is_average', true)
-          .gte('recorded_at', storedStart)
-          .lt('recorded_at', storedEnd)
-          .select('recorded_at'),
-      supabase
-          .from('ec_readings')
-          .delete()
-          .eq('is_average', true)
-          .gte('recorded_at', storedStart)
-          .lt('recorded_at', storedEnd)
-          .select('recorded_at'),
-      supabase
-          .from('temp_readings')
-          .delete()
-          .eq('is_average', true)
-          .gte('recorded_at', storedStart)
-          .lt('recorded_at', storedEnd)
-          .select('recorded_at'),
-    ]);
-
-    if (results.every((deletedRows) => deletedRows.isEmpty)) {
+    if (deletedRows.isEmpty) {
       throw StateError('No sensor history records matched the selected entry.');
     }
   }

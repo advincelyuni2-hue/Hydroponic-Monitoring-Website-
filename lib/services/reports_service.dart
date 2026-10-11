@@ -114,7 +114,7 @@ class ReportsService {
 
     var criticalAlerts = 0;
     try {
-      criticalAlerts = (await getAlertStats()).activeCount;
+      criticalAlerts = (await getAlertStats()).criticalCount;
     } catch (e) {
       debugPrint('Critical alert count failed: $e');
     }
@@ -177,56 +177,45 @@ class ReportsService {
     );
   }
 
-  /// Critical alerts from the notifications table (last [days] days).
+  /// Counts critical parameter readings from sensor history over the last [days].
   Future<AlertStats> getAlertStats({int days = 30}) async {
-    final now = DateTime.now().toUtc();
-    final since = now.subtract(Duration(days: days)).toIso8601String();
+    final end = manilaNow();
+    final start = end.subtract(Duration(days: days));
 
-    final rows = await supabase
-        .from('notifications')
-        .select()
-        .gte('created_at', since)
-        .lte('created_at', now.toIso8601String())
-        .order('created_at', ascending: false)
-        .limit(1000);
+    final logs = await _monitoringService.getSensorHistory(
+      start: start,
+      end: end,
+      aggregation: HistoryAggregation.fiveMinutes,
+    );
 
     final counts = <String, int>{
       'pH': 0,
       'EC': 0,
       'Temperature': 0,
-      'Other': 0
     };
     var critical = 0;
-    var active = 0;
-    var resolved = 0;
 
-    for (final row in rows) {
-      final type = (row['type'] ?? '').toString().toLowerCase();
-      final text =
-          '${row['title'] ?? ''} ${row['message'] ?? ''}'.toLowerCase();
-      if (type != 'critical' && !text.contains('critical')) continue;
-
-      critical++;
-      if (row['is_resolved'] == true) {
-        resolved++;
-      } else {
-        active++;
+    for (final log in logs) {
+      for (final entry in const <(int, String)>[
+        (2, 'pH'),
+        (3, 'EC'),
+        (4, 'Temperature'),
+      ]) {
+        final range = log.ranges[entry.$1];
+        if (range?.severity == 'Critical') {
+          counts[entry.$2] = counts[entry.$2]! + 1;
+          critical++;
+        }
       }
-      final category = _alertCategory(row['parameter']) ??
-          _alertCategory(row['title']) ??
-          _alertCategory(row['message']) ??
-          'Other';
-      counts[category] = (counts[category] ?? 0) + 1;
     }
 
     return AlertStats(
       criticalCount: critical,
-      activeCount: active,
-      resolvedCount: resolved,
+      activeCount: 0,
+      resolvedCount: 0,
       byCategory: [
         for (final entry in counts.entries)
-          if (entry.key != 'Other' || entry.value > 0)
-            AlertFrequencyData(category: entry.key, count: entry.value),
+          AlertFrequencyData(category: entry.key, count: entry.value),
       ],
     );
   }

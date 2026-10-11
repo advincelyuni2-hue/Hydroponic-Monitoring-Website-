@@ -41,6 +41,20 @@ class ReportsController extends ChangeNotifier {
 
   String lastUpdatedTimestamp = 'Loading sensor history...';
 
+    String get alertsDateRange {
+    final end = manilaNow();
+    final start = end.subtract(const Duration(days: 30));
+
+    String formatDate(DateTime date) {
+      final month = date.month.toString().padLeft(2, '0');
+      final day = date.day.toString().padLeft(2, '0');
+      final year = (date.year % 100).toString().padLeft(2, '0');
+      return '$month/$day/$year';
+    }
+
+    return '${formatDate(start)} – ${formatDate(end)}';
+  }
+
   ReportSummaryData summary = const ReportSummaryData(
     avgPh: 6.2,
     phStatus: 'In range',
@@ -48,8 +62,8 @@ class ReportsController extends ChangeNotifier {
     ecStatus: 'Stable',
     avgTemp: 24.5,
     tempStatus: 'In range',
-    criticalAlertsCount: 3,
-    alertsPeriod: 'This month',
+    criticalAlertsCount: 0,
+    alertsPeriod: 'Last 30 days',
   );
 
   List<AnalyticsPoint> trendPoints = [

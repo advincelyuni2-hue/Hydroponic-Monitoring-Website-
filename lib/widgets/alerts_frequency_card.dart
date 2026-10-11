@@ -7,12 +7,12 @@ import '../theme/app_text_styles.dart';
 
 class AlertFrequencyCard extends StatelessWidget {
   final List<AlertFrequencyData> alerts;
-  final int activeCount;
+  final String dateRangeLabel;
 
   const AlertFrequencyCard({
     super.key,
     required this.alerts,
-    required this.activeCount,
+    required this.dateRangeLabel,
   });
 
   @override
@@ -38,8 +38,13 @@ class AlertFrequencyCard extends StatelessWidget {
           Text(
             'Last 30 days',
             style: AppTextStyles.cardMeta,
-            ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            dateRangeLabel,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             height: 150,
             child: hasData
@@ -101,14 +106,6 @@ class AlertFrequencyCard extends StatelessWidget {
                       style: AppTextStyles.cardMeta,
                     ),
                   ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Total active unresolved: $activeCount',
-            style: AppTextStyles.cardMeta.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.alertText,
-            ),
           ),
         ],
       ),

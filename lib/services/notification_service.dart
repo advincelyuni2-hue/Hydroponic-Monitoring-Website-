@@ -8,6 +8,18 @@ import 'supabase_client.dart';
 class NotificationService {
   String? lastInterventionError;
 
+  List<Map<String, dynamic>> _visibleNotificationRows(
+    List<Map<String, dynamic>> rows, {
+    required bool isAdmin,
+  }) {
+    if (isAdmin) return rows;
+
+    return rows.where((row) {
+      final source = row['source']?.toString().toLowerCase();
+      return source == 'sensor' || source == 'sensor_threshold';
+    }).toList();
+  }
+
   String _saveError(Object error) {
     if (error is PostgrestException) {
       if (error.code == 'PGRST202') {
@@ -28,16 +40,25 @@ class NotificationService {
     final user = client?.auth.currentUser;
     if (client == null || user == null) return const [];
 
+    final isAdmin = appProfile.value?.isAdmin == true;
     final query = client.from('notifications').select();
+    final scopedQuery = isAdmin
+        ? query
+        : query.inFilter('source', ['sensor', 'sensor_threshold']);
+
     final rows = activeOnly
-        ? await query
+        ? await scopedQuery
             .eq('is_resolved', false)
             .order('created_at', ascending: false)
             .limit(limit)
-        : await query.order('created_at', ascending: false).limit(limit);
-    return _mapNotificationRows(
+        : await scopedQuery.order('created_at', ascending: false).limit(limit);
+
+    final visibleRows = _visibleNotificationRows(
       (rows as List).cast<Map<String, dynamic>>(),
+      isAdmin: isAdmin,
     );
+
+    return _mapNotificationRows(visibleRows);
   }
 
   Stream<List<AppNotificationItem>> streamNotificationItems() {
@@ -47,11 +68,17 @@ class NotificationService {
       return Stream.value(const <AppNotificationItem>[]);
     }
 
+    final isAdmin = appProfile.value?.isAdmin == true;
+
     return client
         .from('notifications')
         .stream(primaryKey: ['id'])
         .order('timestamp', ascending: false)
-        .asyncMap(_mapNotificationRows);
+        .asyncMap(
+          (rows) => _mapNotificationRows(
+            _visibleNotificationRows(rows, isAdmin: isAdmin),
+          ),
+        );
   }
 
   Future<List<AppNotificationItem>> _mapNotificationRows(

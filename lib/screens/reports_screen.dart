@@ -128,11 +128,12 @@ class ReportsScreenState extends State<ReportsScreen> {
                 value: '${summary.criticalAlertsCount}',
                 status: summary.alertsPeriod,
                 isWarning: summary.criticalAlertsCount > 0,
+                detail: _controller.alertsDateRange,
               ),
               const SizedBox(height: 20),
               AlertFrequencyCard(
                 alerts: _controller.alertFrequency,
-                activeCount: _controller.activeAlertsCount,
+                dateRangeLabel: _controller.alertsDateRange,
               ),
               const SizedBox(height: 20),
               TargetDistributionCard(
@@ -140,6 +141,7 @@ class ReportsScreenState extends State<ReportsScreen> {
                 selectedParam: _controller.selectedDistributionParam,
                 isLoading: _controller.isDistributionLoading,
                 errorMessage: _controller.distributionError,
+                dateRangeLabel: _controller.alertsDateRange,
                 onParamChanged: _controller.setDistributionParam,
               ),
               const SizedBox(height: 20),
@@ -223,6 +225,7 @@ class ReportsScreenState extends State<ReportsScreen> {
           value: '${summary.criticalAlertsCount}',
           status: summary.alertsPeriod,
           isWarning: summary.criticalAlertsCount > 0,
+          detail: _controller.alertsDateRange,
         ),
         const SizedBox(height: 16),
         ReportsAnalyticsCard(
@@ -258,7 +261,7 @@ class ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 16),
         AlertFrequencyCard(
           alerts: _controller.alertFrequency,
-          activeCount: _controller.activeAlertsCount,
+          dateRangeLabel: _controller.alertsDateRange,
         ),
         const SizedBox(height: 16),
         TargetDistributionCard(
@@ -266,6 +269,7 @@ class ReportsScreenState extends State<ReportsScreen> {
           selectedParam: _controller.selectedDistributionParam,
           isLoading: _controller.isDistributionLoading,
           errorMessage: _controller.distributionError,
+          dateRangeLabel: _controller.alertsDateRange,
           onParamChanged: _controller.setDistributionParam,
         ),
         const SizedBox(height: 16),
@@ -279,6 +283,7 @@ class ReportsScreenState extends State<ReportsScreen> {
     required String value,
     required String status,
     required bool isWarning,
+    String? detail,
   }) {
     return Container(
       width: double.infinity,
@@ -329,6 +334,13 @@ class ReportsScreenState extends State<ReportsScreen> {
               ),
             ],
           ),
+          if (detail != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              detail,
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            ),
+          ],
         ],
       ),
     );
