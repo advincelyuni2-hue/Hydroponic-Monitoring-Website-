@@ -168,7 +168,29 @@ class NotificationService {
   }
 
   String _formatStoredSensorText(String text, String parameter) {
+    if (parameter == 'Temperature') {
+      return text.replaceAllMapped(
+        RegExp(
+          r'(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)\s*°C|(-?\d+(?:\.\d+)?)\s*°C',
+        ),
+        (match) {
+          final minimumC = double.tryParse(match.group(1) ?? '');
+          final maximumC = double.tryParse(match.group(2) ?? '');
+
+          if (minimumC != null && maximumC != null) {
+            return formatTempRange(minimumC, maximumC);
+          }
+
+          final celsius = double.tryParse(match.group(3) ?? '');
+          return celsius == null
+              ? match.group(0)!
+              : formatTemperature(celsius);
+        },
+      );
+    }
+
     if (parameter != 'pH Level' && parameter != 'EC Level') return text;
+
     return text.replaceAllMapped(RegExp(r'-?\d+\.\d+'), (match) {
       final value = double.tryParse(match.group(0)!);
       return value == null ? match.group(0)! : formatSensorValue(value);

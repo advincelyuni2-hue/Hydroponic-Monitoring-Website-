@@ -36,6 +36,8 @@ class PdfReportService {
     required List<PredictedAnalyticsPoint> predictionPoints,
     required List<HistoryLogEntry> sensorLogs,
     required List<HistoryLogEntry> calibrationLogs,
+    required List<HistoryLogEntry> interventionLogs,
+    required bool includeInterventionLogs,
     required RangeValues phRange,
     required RangeValues ecRange,
     required bool includeSensorLogs,
@@ -195,6 +197,32 @@ class PdfReportService {
               ],
               rows: calibrationLogs.map((log) => log.values).toList(),
               emptyMessage: 'No calibration history records are available.',
+            ),
+          if (includeInterventionLogs)
+            ..._tableSection(
+              title: 'Intervention History Logs',
+              description:
+                  'Actions recorded while resolving notifications or entered manually.',
+              headers: const [
+                'Date',
+                'Time',
+                'Parameter',
+                'Action taken',
+                'Amount',
+                'Notes',
+                'Source',
+              ],
+              rows: interventionLogs.map((log) => log.values).toList(),
+              emptyMessage: 'No intervention history records are available.',
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.3),
+                1: pw.FlexColumnWidth(1.0),
+                2: pw.FlexColumnWidth(1.1),
+                3: pw.FlexColumnWidth(1.25),
+                4: pw.FlexColumnWidth(0.9),
+                5: pw.FlexColumnWidth(3.4),
+                6: pw.FlexColumnWidth(1.0),
+              },
             ),
           if (includePhOptimization)
             _section(
@@ -361,6 +389,7 @@ class PdfReportService {
     required List<String> headers,
     required List<List<String>> rows,
     required String emptyMessage,
+    Map<int, pw.TableColumnWidth>? columnWidths,
   }) {
     if (rows.isEmpty) {
       return [
@@ -376,7 +405,7 @@ class PdfReportService {
         _section(
           title: title,
           description: description,
-          children: [_table(headers, rows)],
+          children: [_table(headers, rows, columnWidths: columnWidths)],
         ),
       ];
     }
@@ -384,12 +413,16 @@ class PdfReportService {
       pw.NewPage(),
       _sectionTitle(title),
       _sectionNote(description),
-      _table(headers, rows),
+      _table(headers, rows, columnWidths: columnWidths),
       pw.SizedBox(height: 16),
     ];
   }
 
-  pw.Widget _table(List<String> headers, List<List<String>> rows) {
+  pw.Widget _table(
+    List<String> headers,
+    List<List<String>> rows, {
+    Map<int, pw.TableColumnWidth>? columnWidths,
+  }) {
     return pw.TableHelper.fromTextArray(
       headers: headers,
       data: rows
@@ -406,6 +439,7 @@ class PdfReportService {
       border: pw.TableBorder.all(color: borderColor, width: 0.5),
       oddRowDecoration:
           const pw.BoxDecoration(color: PdfColor(0.97, 0.98, 0.96)),
+      columnWidths: columnWidths,
     );
   }
 

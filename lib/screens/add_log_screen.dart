@@ -174,9 +174,13 @@ class RecordFixCardState extends State<RecordFixCard> {
     parameter = prefilledParam;
 
     final rawVal =
-        widget.notification?.currentValue.replaceAll(RegExp(r'[^0-9.]'), '') ??
+        widget.notification?.currentValue.replaceAll(RegExp(r'[^0-9.\-]'), '') ??
             '';
-    _currentValueController = TextEditingController(text: rawVal);
+    final numericValue = double.tryParse(rawVal);
+    final displayValue = parameter == 'Temperature' && numericValue != null
+        ? toDisplayTemp(numericValue).toStringAsFixed(1)
+        : rawVal;
+    _currentValueController = TextEditingController(text: displayValue);
     _notesController = TextEditingController(
       text: widget.notification?.recommendation ?? '',
     );

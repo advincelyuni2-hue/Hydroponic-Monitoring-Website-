@@ -119,11 +119,12 @@ class ReportsController extends ChangeNotifier {
   RangeValues ecRange = const RangeValues(1.2, 1.8);
 
   bool includeSensorLogs = true;
-  bool includeCalibrationLogs = false;
+  bool includeCalibrationLogs = true;
   bool includePhOptimization = true;
-  bool includeEcOptimization = false;
-  bool includeAllAnalytics = false;
-  bool includeInsightsAndDecisionSupport = false;
+  bool includeEcOptimization = true;
+  bool includeAllAnalytics = true;
+  bool includeInsightsAndDecisionSupport = true;
+  bool includeInterventionLogs = true;
 
   bool recommendationApplied = false;
   bool recommendationDismissed = false;
@@ -196,6 +197,11 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
+    void toggleInterventionLogs(bool? val) {
+    includeInterventionLogs = val ?? false;
+    notifyListeners();
+  }
+
   void dismissReportGeneration() {
     includeSensorLogs = false;
     includeCalibrationLogs = false;
@@ -203,6 +209,7 @@ class ReportsController extends ChangeNotifier {
     includeEcOptimization = false;
     includeAllAnalytics = false;
     includeInsightsAndDecisionSupport = false;
+    includeInterventionLogs = false;
     notifyListeners();
   }
 
@@ -243,14 +250,51 @@ class ReportsController extends ChangeNotifier {
     }
   }
 
-  /// Builds the PDF using the currently selected options.
-  Future<Uint8List> buildPdfBytes() async {
-    final List<HistoryLogEntry> sensorLogs = includeSensorLogs
-        ? await _monitoringService.getSensorLogs()
-        : const <HistoryLogEntry>[];
-    final List<HistoryLogEntry> calibrationLogs = includeCalibrationLogs
-        ? await _monitoringService.getCalibrationLogs()
-        : const <HistoryLogEntry>[];
+  /// Builds the PDF using the selected date range and report options.
+  Future<Uint8List> buildPdfBytes({
+    required DateTimeRange dateRange,
+    required HistoryAggregation aggregation,
+  }) async {
+    final reportSensorData = await _monitoringService.getSensorHistory(
+      start: dateRange.start,
+      end: dateRange.end,
+      aggregation: aggregation,
+    );
+
+    final sensorLogs =
+        includeSensorLogs ? reportSensorData : <HistoryLogEntry>[];
+
+    final calibrationLogs = includeCalibrationLogs
+        ? await _monitoringService.getCalibrationHistory(
+            start: dateRange.start,
+            end: dateRange.end,
+          )
+        : <HistoryLogEntry>[];
+
+    final interventionLogs = includeInterventionLogs
+        ? await _monitoringService.getInterventionHistory(
+            start: dateRange.start,
+            end: dateRange.end,
+          )
+        : <HistoryLogEntry>[];
+
+    List<AnalyticsPoint> trendFor(int valueIndex, String parameter) {
+      return reportSensorData.reversed
+          .where((log) => log.values.length > valueIndex)
+          .map((log) {
+            final value = double.tryParse(
+              log.values[valueIndex].trim().split(RegExp(r'\s+')).first,
+            );
+            if (value == null) return null;
+            return AnalyticsPoint(
+              label: log.values.first,
+              value: value,
+              parameter: parameter,
+            );
+          })
+          .whereType<AnalyticsPoint>()
+          .toList();
+    }
 
     final profileName = profile?.name.trim();
     final downloadedBy = profileName != null && profileName.isNotEmpty
@@ -260,15 +304,17 @@ class ReportsController extends ChangeNotifier {
     return _pdfReportService.buildReport(
       downloadedBy: downloadedBy,
       summary: summary,
-      phTrendPoints: phTrendPoints,
-      ecTrendPoints: ecTrendPoints,
+      phTrendPoints: trendFor(2, 'pH'),
+      ecTrendPoints: trendFor(3, 'EC'),
       predictionPoints: predictionPoints,
       sensorLogs: sensorLogs,
       calibrationLogs: calibrationLogs,
+      interventionLogs: interventionLogs,
       phRange: phRange,
       ecRange: ecRange,
       includeSensorLogs: includeSensorLogs,
       includeCalibrationLogs: includeCalibrationLogs,
+      includeInterventionLogs: includeInterventionLogs,
       includePhOptimization: includePhOptimization,
       includeEcOptimization: includeEcOptimization,
       includeAllAnalytics: includeAllAnalytics,
@@ -277,8 +323,14 @@ class ReportsController extends ChangeNotifier {
   }
 
   /// Builds the PDF and downloads it.
-  Future<void> generatePdfReport() async {
-    final bytes = await buildPdfBytes();
+  Future<void> generatePdfReport({
+    required DateTimeRange dateRange,
+    required HistoryAggregation aggregation,
+  }) async {
+    final bytes = await buildPdfBytes(
+      dateRange: dateRange,
+      aggregation: aggregation,
+    );
     await _pdfReportService.downloadPdf(bytes);
   }
 
