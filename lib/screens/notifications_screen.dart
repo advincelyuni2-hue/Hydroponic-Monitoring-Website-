@@ -266,7 +266,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                       child: Text(option.$1, style: AppTextStyles.bodySmall),
                     ),
                     if ((_filter?.name ?? 'all') == option.$2)
-                      Icon(Icons.check,
+                      const Icon(Icons.check,
                           size: 18, color: AppColors.primaryButton),
                   ]),
                 ),
