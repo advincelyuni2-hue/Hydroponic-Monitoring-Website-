@@ -33,7 +33,7 @@ class PredictionInsightsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: appThemeMode,
+      listenable: Listenable.merge([appThemeMode, appMeasurementUnits]),
       builder: (context, _) => ValueListenableBuilder<ParameterRangeConfig>(
         valueListenable: appParameterRanges,
         builder: (context, ranges, _) => _content(context, ranges),
@@ -166,8 +166,12 @@ class PredictionInsightsCard extends StatelessWidget {
           _divider(),
           Text('Contributing factors', style: AppTextStyles.bodyBold),
           const SizedBox(height: 6),
-          _fact('Temperature',
-              detail.temperature.isEmpty ? 'Unavailable' : detail.temperature),
+          _fact(
+            'Temperature',
+            detail.temperature.isEmpty
+                ? 'Unavailable'
+                : formatTempText(detail.temperature),
+          ),
           _fact(isPh ? 'EC level' : 'pH level',
               '${formatSensorValue(isPh ? currentEc : currentPh)}${isPh ? ' mS/cm' : ''}'),
           const SizedBox(height: 6),
@@ -179,7 +183,7 @@ class PredictionInsightsCard extends StatelessWidget {
             child: Text(
                 detail.calloutText.trim().isEmpty
                     ? 'Review the forecast alongside recent sensor readings.'
-                    : detail.calloutText,
+                    : _formatTemperatureMentions(detail.calloutText),
                 style: AppTextStyles.bodySmall
                     .copyWith(color: AppColors.textPrimary)),
           ),
@@ -213,6 +217,13 @@ class PredictionInsightsCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  String _formatTemperatureMentions(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'-?\d+(?:\.\d+)?\s*°C'),
+      (match) => formatTempText(match[0]!),
     );
   }
 

@@ -10,6 +10,7 @@ class TargetDistributionCard extends StatelessWidget {
   final String selectedParam;
   final bool isLoading;
   final String? errorMessage;
+  final String dateRangeLabel;
   final ValueChanged<String> onParamChanged;
 
   const TargetDistributionCard({
@@ -18,6 +19,7 @@ class TargetDistributionCard extends StatelessWidget {
     required this.selectedParam,
     this.isLoading = false,
     this.errorMessage,
+    required this.dateRangeLabel,
     required this.onParamChanged,
   });
 
@@ -53,6 +55,11 @@ class TargetDistributionCard extends StatelessWidget {
           Text(
             'Last 30 days',
             style: AppTextStyles.cardMeta,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            dateRangeLabel,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
           ),
           const SizedBox(height: 12),
           SizedBox(

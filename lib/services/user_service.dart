@@ -20,12 +20,29 @@ class UserService {
       if (row != null) {
         final authUser = client.auth.currentUser;
         final signedInEmail = authUser?.id == userId ? authUser?.email : null;
+        final profileEmail = signedInEmail?.trim();
+        final storedEmail = (row['email'] as String? ?? '').trim();
+
+        if (profileEmail != null &&
+            profileEmail.isNotEmpty &&
+            profileEmail.toLowerCase() != storedEmail.toLowerCase()) {
+          final updatedRows = await client
+              .from('profiles')
+              .update({'email': profileEmail})
+              .eq('id', userId)
+              .select('id');
+
+          if (updatedRows.isEmpty) {
+            throw StateError('Your profile email was not saved.');
+          }
+        }
+
         final profile = UserProfile(
           id: row['id'] as String,
           name: (row['full_name'] as String?)?.trim().isNotEmpty == true
               ? row['full_name'] as String
               : 'User',
-          email: signedInEmail ?? (row['email'] as String? ?? ''),
+          email: profileEmail ?? storedEmail,
           role: ((row['role'] as String?) ?? 'employee').toLowerCase(),
           isActive: row['is_active'] as bool? ?? true,
         );

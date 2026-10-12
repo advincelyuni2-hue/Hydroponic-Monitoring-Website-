@@ -231,7 +231,6 @@ class _HelpScreenState extends State<HelpScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (_isAdmin) _buildAdminActions(),
               if (_isAdmin && _loadError != null) _buildLoadError(),
               if (_busy || _loading) ...[
                 const LinearProgressIndicator(),
@@ -296,35 +295,28 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
-  Widget _buildAdminActions() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          FilledButton.icon(
-            onPressed: _busy ? null : _add,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primaryButton,
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add article'),
-          ),
-          if (_usingDefaults && _loadError == null && !_loading)
-            OutlinedButton.icon(
-              onPressed: _busy ? null : () => _runBusy(() => _saveDefaults()),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppColors.accentGreen),
-                foregroundColor: AppColors.accentGreen,
-              ),
-              icon: const Icon(Icons.save_alt_rounded, size: 18),
-              label: const Text('Save built-in guides'),
-            ),
-        ],
+  List<Widget> _buildAdminActions() {
+    return [
+      FilledButton.icon(
+        onPressed: _busy ? null : _add,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primaryButton,
+          foregroundColor: Colors.white,
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Add article'),
       ),
-    );
+      if (_usingDefaults && _loadError == null && !_loading)
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _runBusy(() => _saveDefaults()),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: AppColors.accentGreen),
+            foregroundColor: AppColors.accentGreen,
+          ),
+          icon: const Icon(Icons.save_alt_rounded, size: 18),
+          label: const Text('Save built-in guides'),
+        ),
+    ];
   }
 
   Widget _buildLoadError() {
@@ -356,6 +348,7 @@ class _HelpScreenState extends State<HelpScreen> {
       spacing: 8,
       runSpacing: 8,
       children: [
+        if (_isAdmin) ..._buildAdminActions(),
         for (final name in [_all, ...categories])
           ChoiceChip(
             label: Text(name),

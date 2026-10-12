@@ -9,6 +9,7 @@ import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
 import '../widgets/custom_calendar_popup.dart';
+import '../services/monitoring_service.dart';
 
 class GenerateReportScreen extends StatefulWidget {
   final ReportsController controller;
@@ -21,6 +22,32 @@ class GenerateReportScreen extends StatefulWidget {
 class GenerateReportScreenState extends State<GenerateReportScreen> {
   bool isGenerating = false;
   DateTime selectedDate = DateTime.now();
+  CalendarMode selectedMode = CalendarMode.daily;
+
+  DateTimeRange get _selectedReportRange {
+    final start =
+        DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+
+    switch (selectedMode) {
+      case CalendarMode.daily:
+        return DateTimeRange(
+            start: start, end: start.add(const Duration(days: 1)));
+      case CalendarMode.weekly:
+        return DateTimeRange(
+            start: start, end: start.add(const Duration(days: 7)));
+      case CalendarMode.monthly:
+        return DateTimeRange(
+          start: DateTime(start.year, start.month),
+          end: DateTime(start.year, start.month + 1),
+        );
+    }
+  }
+
+  HistoryAggregation get _reportAggregation => switch (selectedMode) {
+        CalendarMode.daily => HistoryAggregation.daily,
+        CalendarMode.weekly => HistoryAggregation.eightHours,
+        CalendarMode.monthly => HistoryAggregation.daily,
+      };
 
   ReportsController get _c => widget.controller;
 
@@ -30,9 +57,13 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       _c.includePhOptimization &&
       _c.includeEcOptimization &&
       _c.includeAllAnalytics &&
+      _c.includeInterventionLogs &&
       _c.includeInsightsAndDecisionSupport;
 
+
   String get _previewKey => [
+        selectedMode,
+        _c.includeInterventionLogs,
         _c.includeSensorLogs,
         _c.includeCalibrationLogs,
         _c.includePhOptimization,
@@ -42,7 +73,12 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         selectedDate.toIso8601String(),
       ].join('-');
 
-  Future<Uint8List> buildPreview(PdfPageFormat format) => _c.buildPdfBytes();
+  Future<Uint8List> buildPreview(PdfPageFormat format) {
+    return _c.buildPdfBytes(
+      dateRange: _selectedReportRange,
+      aggregation: _reportAggregation,
+    );
+  }
 
   void _toggleSelectAll() {
     final newValue = !isAllSelected;
@@ -50,6 +86,9 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       if (_c.includeSensorLogs != newValue) _c.toggleSensorLogs(newValue);
       if (_c.includeCalibrationLogs != newValue) {
         _c.toggleCalibrationLogs(newValue);
+      }
+      if (_c.includeInterventionLogs != newValue) {
+        _c.toggleInterventionLogs(newValue);
       }
       if (_c.includePhOptimization != newValue) {
         _c.togglePhOptimization(newValue);
@@ -68,7 +107,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     showDialog(
       context: context,
       builder: (context) => CustomCalendarPopup(
-        mode: CalendarMode.daily,
+        mode: selectedMode,
         initialDate: selectedDate,
         onDateSelected: (date, _) {
           setState(() {
@@ -81,16 +120,42 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
 
   String _formatDateLabel(DateTime date) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  String _formatSelectedPeriodLabel() {
+    final range = _selectedReportRange;
+    final lastDay = range.end.subtract(const Duration(days: 1));
+
+    switch (selectedMode) {
+      case CalendarMode.daily:
+        return _formatDateLabel(range.start);
+      case CalendarMode.weekly:
+      case CalendarMode.monthly:
+        return '${_formatDateLabel(range.start)} – ${_formatDateLabel(lastDay)}';
+    }
   }
 
   Future<void> onGeneratePdf() async {
     setState(() => isGenerating = true);
     try {
-      await _c.generatePdfReport();
+      await _c.generatePdfReport(
+        dateRange: _selectedReportRange,
+        aggregation: _reportAggregation,
+      );
       if (!mounted) return;
       _snack('PDF report generated successfully!');
     } catch (error) {
@@ -169,7 +234,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.statusCardGreen,
                   borderRadius: BorderRadius.circular(12),
@@ -199,7 +265,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 canChangeOrientation: false,
                 canDebug: false,
                 maxPageWidth: 560,
-                scrollViewDecoration: BoxDecoration(color: AppColors.calloutBackground),
+                scrollViewDecoration:
+                    BoxDecoration(color: AppColors.calloutBackground),
                 pdfPreviewPageDecoration: const BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
@@ -253,13 +320,36 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
           ),
           const SizedBox(height: 8),
+          DropdownButton<CalendarMode>(
+            value: selectedMode,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(
+                value: CalendarMode.daily,
+                child: Text('Daily'),
+              ),
+              DropdownMenuItem(
+                value: CalendarMode.weekly,
+                child: Text('Weekly'),
+              ),
+              DropdownMenuItem(
+                value: CalendarMode.monthly,
+                child: Text('Monthly'),
+              ),
+            ],
+            onChanged: (mode) {
+              if (mode != null) setState(() => selectedMode = mode);
+            },
+          ),
+          const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
             child: InkWell(
               onTap: _openCalendarPopup,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
                   color: AppColors.calloutBackground,
                   borderRadius: BorderRadius.circular(12),
@@ -275,7 +365,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _formatDateLabel(selectedDate),
+                      _formatSelectedPeriodLabel(),
                       style: AppTextStyles.cardMeta.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -303,7 +393,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 onTap: _toggleSelectAll,
                 borderRadius: BorderRadius.circular(4),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   child: Text(
                     isAllSelected ? 'Deselect all' : 'Select all',
                     style: AppTextStyles.cardMeta.copyWith(
@@ -332,6 +423,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                     title: 'Calibration history logs',
                     value: _c.includeCalibrationLogs,
                     onChanged: (v) => _c.toggleCalibrationLogs(v ?? false),
+                  ),
+                  _checkboxTile(
+                    title: 'Intervention history logs',
+                    value: _c.includeInterventionLogs,
+                    onChanged: (v) => _c.toggleInterventionLogs(v),
                   ),
                   _checkboxTile(
                     title: 'pH optimization results',

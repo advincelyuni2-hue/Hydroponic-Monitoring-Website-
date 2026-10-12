@@ -8,6 +8,18 @@ import 'supabase_client.dart';
 class NotificationService {
   String? lastInterventionError;
 
+  List<Map<String, dynamic>> _visibleNotificationRows(
+    List<Map<String, dynamic>> rows, {
+    required bool isAdmin,
+  }) {
+    if (isAdmin) return rows;
+
+    return rows.where((row) {
+      final source = row['source']?.toString().toLowerCase();
+      return source == 'sensor' || source == 'sensor_threshold';
+    }).toList();
+  }
+
   String _saveError(Object error) {
     if (error is PostgrestException) {
       if (error.code == 'PGRST202') {
@@ -28,16 +40,25 @@ class NotificationService {
     final user = client?.auth.currentUser;
     if (client == null || user == null) return const [];
 
+    final isAdmin = appProfile.value?.isAdmin == true;
     final query = client.from('notifications').select();
+    final scopedQuery = isAdmin
+        ? query
+        : query.inFilter('source', ['sensor', 'sensor_threshold']);
+
     final rows = activeOnly
-        ? await query
+        ? await scopedQuery
             .eq('is_resolved', false)
             .order('created_at', ascending: false)
             .limit(limit)
-        : await query.order('created_at', ascending: false).limit(limit);
-    return _mapNotificationRows(
+        : await scopedQuery.order('created_at', ascending: false).limit(limit);
+
+    final visibleRows = _visibleNotificationRows(
       (rows as List).cast<Map<String, dynamic>>(),
+      isAdmin: isAdmin,
     );
+
+    return _mapNotificationRows(visibleRows);
   }
 
   Stream<List<AppNotificationItem>> streamNotificationItems() {
@@ -47,11 +68,17 @@ class NotificationService {
       return Stream.value(const <AppNotificationItem>[]);
     }
 
+    final isAdmin = appProfile.value?.isAdmin == true;
+
     return client
         .from('notifications')
         .stream(primaryKey: ['id'])
         .order('timestamp', ascending: false)
-        .asyncMap(_mapNotificationRows);
+        .asyncMap(
+          (rows) => _mapNotificationRows(
+            _visibleNotificationRows(rows, isAdmin: isAdmin),
+          ),
+        );
   }
 
   Future<List<AppNotificationItem>> _mapNotificationRows(
@@ -141,7 +168,29 @@ class NotificationService {
   }
 
   String _formatStoredSensorText(String text, String parameter) {
+    if (parameter == 'Temperature') {
+      return text.replaceAllMapped(
+        RegExp(
+          r'(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)\s*°C|(-?\d+(?:\.\d+)?)\s*°C',
+        ),
+        (match) {
+          final minimumC = double.tryParse(match.group(1) ?? '');
+          final maximumC = double.tryParse(match.group(2) ?? '');
+
+          if (minimumC != null && maximumC != null) {
+            return formatTempRange(minimumC, maximumC);
+          }
+
+          final celsius = double.tryParse(match.group(3) ?? '');
+          return celsius == null
+              ? match.group(0)!
+              : formatTemperature(celsius);
+        },
+      );
+    }
+
     if (parameter != 'pH Level' && parameter != 'EC Level') return text;
+
     return text.replaceAllMapped(RegExp(r'-?\d+\.\d+'), (match) {
       final value = double.tryParse(match.group(0)!);
       return value == null ? match.group(0)! : formatSensorValue(value);
