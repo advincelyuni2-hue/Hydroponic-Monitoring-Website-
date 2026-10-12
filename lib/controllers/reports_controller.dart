@@ -238,7 +238,13 @@ class ReportsController extends ChangeNotifier {
         ? await _monitoringService.getCalibrationLogs()
         : const <HistoryLogEntry>[];
 
+    final profileName = profile?.name.trim();
+    final downloadedBy = profileName != null && profileName.isNotEmpty
+        ? profileName
+        : (supabaseClient?.auth.currentUser?.email ?? 'Current user');
+
     return _pdfReportService.buildReport(
+      downloadedBy: downloadedBy,
       summary: summary,
       phTrendPoints: phTrendPoints,
       ecTrendPoints: ecTrendPoints,

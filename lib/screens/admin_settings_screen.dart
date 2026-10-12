@@ -11,7 +11,6 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/parameter_config_card.dart';
 
-
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
 
@@ -58,7 +57,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
       final results = await Future.wait([
         client
             .from('profiles')
-            .select('id, email, role, is_active')
+            .select('id, email, role, is_active, deactivated_at')
             .order('email'),
         client
             .from('parameter_configurations')
@@ -168,107 +167,95 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _toggleUserActive(Map<String, dynamic> user, bool active) async {
+  Future<void> _toggleUserActive(
+    Map<String, dynamic> user,
+    bool active,
+  ) async {
     if (_isSelf(user)) {
       _message('You cannot deactivate your own account.');
       return;
     }
+
+    if (active && !_canReactivate(user)) {
+      _message('The 7-day reactivation window has expired.');
+      return;
+    }
+
     final client = supabaseClient;
     if (client == null) return;
 
+    final deactivatedAt =
+        active ? null : DateTime.now().toUtc().toIso8601String();
+
     try {
-      await client
+      final updatedRows = await client
           .from('profiles')
-          .update({'is_active': active}).eq('id', user['id']);
-      setState(() => user['is_active'] = active);
-      _message(active ? 'User activated.' : 'User deactivated.');
+          .update({
+            'is_active': active,
+            'deactivated_at': deactivatedAt,
+          })
+          .eq('id', user['id'])
+          .select('id');
+
+      if (updatedRows.isEmpty) {
+        throw StateError('The user status was not saved.');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        user['is_active'] = active;
+        user['deactivated_at'] = deactivatedAt;
+      });
+
+      _message(active ? 'User reactivated.' : 'User deactivated.');
     } catch (_) {
-      if (mounted) _message('Unable to update user status.');
+      if (mounted) {
+        _message('Unable to update user status.');
+      }
     }
   }
 
-  Future<void> _deleteUser(Map<String, dynamic> user) async {
-    final email = maskEmail(user['email'] as String? ?? 'this user');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          constraints: const BoxConstraints(maxWidth: 420),
-          decoration: AppDecorations.card(),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Delete User Account?',
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
-              const SizedBox(height: 12),
-              Text(
-                'Are you sure you want to permanently delete $email? This action cannot be undone.',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.textPrimary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primaryButton),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                    ),
-                    child: Text('Cancel',
-                        style: AppTextStyles.button.copyWith(
-                            color: AppColors.primaryButton, fontSize: 13)),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.alertText,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 10),
-                    ),
-                    child: Text('Delete',
-                        style: AppTextStyles.button
-                            .copyWith(color: Colors.white, fontSize: 13)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  DateTime? _getDeactivatedAt(Map<String, dynamic> user) {
+    final value = user['deactivated_at'];
+    if (value == null) return null;
 
-    if (confirmed != true) return;
+    return DateTime.tryParse(value.toString())?.toUtc();
+  }
 
-    final client = supabaseClient;
-    if (client == null) return;
+  bool _canReactivate(Map<String, dynamic> user) {
+    final isActive = user['is_active'] as bool? ?? false;
+    if (isActive) return true;
 
-    try {
-      await client.from('profiles').delete().eq('id', user['id']);
-      setState(() {
-        _users.removeWhere((u) => u['id'] == user['id']);
-      });
-      _message('User account deleted.');
-    } catch (_) {
-      _message('Unable to delete this user.');
+    final rawTimestamp = user['deactivated_at'];
+
+    // Older inactive profiles with no timestamp remain reactivatable.
+    if (rawTimestamp == null) return true;
+
+    final deactivatedAt = _getDeactivatedAt(user);
+    if (deactivatedAt == null) return false;
+
+    final deadline = deactivatedAt.add(const Duration(days: 7));
+    return DateTime.now().toUtc().isBefore(deadline);
+  }
+
+  String _statusLabel(Map<String, dynamic> user) {
+    final isActive = user['is_active'] as bool? ?? false;
+    if (isActive) return 'Active';
+
+    final rawTimestamp = user['deactivated_at'];
+    if (rawTimestamp == null) return 'Deactivated';
+
+    final deactivatedAt = _getDeactivatedAt(user);
+    if (deactivatedAt == null) return 'Deactivation date unavailable';
+
+    final deadline = deactivatedAt.add(const Duration(days: 7));
+
+    if (DateTime.now().toUtc().isBefore(deadline)) {
+      return 'Reactivate by ${deadline.toLocal()}';
     }
+
+    return 'Reactivation window expired';
   }
 
   bool _isSelf(Map<String, dynamic> user) {
@@ -358,9 +345,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          (user['is_active'] as bool? ?? false)
-                              ? 'Active'
-                              : 'Disabled',
+                          _statusLabel(user),
                           style: AppTextStyles.cardMeta.copyWith(
                             color: (user['is_active'] as bool? ?? false)
                                 ? const Color(0xFF16A34A)
@@ -402,17 +387,11 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   Switch.adaptive(
                     value: user['is_active'] as bool? ?? false,
                     activeThumbColor: AppColors.primaryButton,
-                    onChanged: _isSelf(user)
+                    onChanged: _isSelf(user) || !_canReactivate(user)
                         ? null
                         : (active) => _toggleUserActive(user, active),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Delete user account',
-                    icon: const Icon(Icons.delete_outline_rounded,
-                        color: AppColors.alertText, size: 20),
-                    onPressed: _isSelf(user) ? null : () => _deleteUser(user),
-                  ),
                 ],
               ),
             ),
