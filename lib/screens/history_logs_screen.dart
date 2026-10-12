@@ -498,6 +498,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
                   AppHeader(
                     title: 'History logs',
                     profile: _controller.profile,
+                    onHistoryDateSelected: _controller.selectDateFromSearch,
                   ),
                   const SizedBox(height: 24),
                   Container(

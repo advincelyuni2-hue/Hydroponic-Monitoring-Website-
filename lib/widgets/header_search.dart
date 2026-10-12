@@ -10,7 +10,11 @@ import '../theme/theme_mode_controller.dart';
 import '../utils/app_navigation.dart';
 
 /// Opens the page, help article or alert that was picked in the search.
-void handleSearchResult(NavigatorState navigator, SearchResult result) {
+void handleSearchResult(
+  NavigatorState navigator,
+  SearchResult result, {
+  HistoryDateSelection? onHistoryDateSelected,
+}) {
   switch (result.kind) {
     case SearchResultKind.page:
       final index = result.pageIndex;
@@ -21,6 +25,11 @@ void handleSearchResult(NavigatorState navigator, SearchResult result) {
         );
       } else {
         openAppPage(navigator, index);
+      }
+    case SearchResultKind.historyDate:
+      final date = result.historyDate;
+      if (date != null) {
+        onHistoryDateSelected?.call(date, result.historyMonth);
       }
     case SearchResultKind.help:
       final article = result.article;
@@ -71,7 +80,9 @@ void _showHelpArticle(NavigatorState navigator, HelpArticle article) {
 /// Search box for the header on tablets and desktops. Shows a results list
 /// under the box while typing.
 class HeaderSearchField extends StatefulWidget {
-  const HeaderSearchField({super.key});
+  final HistoryDateSelection? onHistoryDateSelected;
+
+  const HeaderSearchField({super.key, this.onHistoryDateSelected});
 
   @override
   State<HeaderSearchField> createState() => _HeaderSearchFieldState();
@@ -132,7 +143,10 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
   void _refreshResults() {
     if (!mounted) return;
     setState(() {
-      _results = _service.search(_controller.text);
+      _results = _service.search(
+        _controller.text,
+        includeHistoryDates: widget.onHistoryDateSelected != null,
+      );
       _highlight = 0;
     });
     _entry?.markNeedsBuild();
@@ -187,7 +201,11 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
     _close();
     _controller.clear();
     _refreshResults();
-    handleSearchResult(navigator, result);
+    handleSearchResult(
+      navigator,
+      result,
+      onHistoryDateSelected: widget.onHistoryDateSelected,
+    );
   }
 
   void _selectHighlighted() {
@@ -283,7 +301,10 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
 }
 
 /// Opens the search as a bottom sheet (phones).
-void showMobileSearchSheet(BuildContext context) {
+void showMobileSearchSheet(
+  BuildContext context, {
+  HistoryDateSelection? onHistoryDateSelected,
+}) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -291,12 +312,16 @@ void showMobileSearchSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => const _MobileSearchSheet(),
+    builder: (_) => _MobileSearchSheet(
+      onHistoryDateSelected: onHistoryDateSelected,
+    ),
   );
 }
 
 class _MobileSearchSheet extends StatefulWidget {
-  const _MobileSearchSheet();
+  final HistoryDateSelection? onHistoryDateSelected;
+
+  const _MobileSearchSheet({this.onHistoryDateSelected});
 
   @override
   State<_MobileSearchSheet> createState() => _MobileSearchSheetState();
@@ -327,18 +352,30 @@ class _MobileSearchSheetState extends State<_MobileSearchSheet> {
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _results = _service.search(_controller.text);
+      _results = _service.search(
+        _controller.text,
+        includeHistoryDates: widget.onHistoryDateSelected != null,
+      );
     });
   }
 
   void _onChanged(String value) {
-    setState(() => _results = _service.search(value));
+    setState(() {
+      _results = _service.search(
+        value,
+        includeHistoryDates: widget.onHistoryDateSelected != null,
+      );
+    });
   }
 
   void _select(SearchResult result) {
     final navigator = Navigator.of(context);
     navigator.pop();
-    handleSearchResult(navigator, result);
+    handleSearchResult(
+      navigator,
+      result,
+      onHistoryDateSelected: widget.onHistoryDateSelected,
+    );
   }
 
   @override
@@ -467,6 +504,7 @@ class _ResultTile extends StatelessWidget {
 
   String get _kindLabel => switch (result.kind) {
         SearchResultKind.page => 'Page',
+        SearchResultKind.historyDate => 'History',
         SearchResultKind.help => 'Help',
         SearchResultKind.alert => 'Alert',
       };

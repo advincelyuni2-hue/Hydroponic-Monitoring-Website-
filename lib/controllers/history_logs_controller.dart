@@ -137,6 +137,13 @@ class HistoryLogsController extends ChangeNotifier {
     loadSelectedLogs();
   }
 
+  void selectDateFromSearch(DateTime date, bool wholeMonth) {
+    selectedRange = wholeMonth ? 'Monthly' : 'Daily';
+    selectedDate = DateTime(date.year, date.month, date.day);
+    initWeekRange();
+    loadSelectedLogs();
+  }
+
   Future<void> loadSelectedLogs() async {
     selectedRowIndices.clear();
     if (selectedTab == 'Calibration logs') {
@@ -190,7 +197,7 @@ class HistoryLogsController extends ChangeNotifier {
       final aggregation = switch (selectedRange) {
         'Weekly' => HistoryAggregation.eightHours,
         'Monthly' => HistoryAggregation.daily,
-        _ => HistoryAggregation.fiveMinutes,
+        _ => HistoryAggregation.hourly,
       };
 
       final sensorRows = await monitoringService.getSensorHistory(
@@ -380,7 +387,6 @@ class HistoryLogsController extends ChangeNotifier {
         recordStart: oldEntry.recordStart,
         recordDuration: oldEntry.recordDuration,
       );
-
       notifyListeners();
     }
   }

@@ -13,12 +13,14 @@ import '../utils/responsive.dart';
 import 'notification_overlay_widget.dart';
 import 'header_search.dart';
 import '../services/app_state.dart';
+import '../services/global_search_service.dart';
 
 class AppHeader extends StatelessWidget {
   final String title;
   final UserProfile? profile;
   final VoidCallback? onBellTap;
   final VoidCallback? onProfileTap;
+  final HistoryDateSelection? onHistoryDateSelected;
 
   const AppHeader({
     super.key,
@@ -26,6 +28,7 @@ class AppHeader extends StatelessWidget {
     this.profile,
     this.onBellTap,
     this.onProfileTap,
+    this.onHistoryDateSelected,
   });
 
   void showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
@@ -182,15 +185,20 @@ class AppHeader extends StatelessWidget {
 
         // Search Control
         if (!isMobile) ...[
-          const Expanded(
+          Expanded(
             flex: 2,
-            child: HeaderSearchField(),
+            child: HeaderSearchField(
+              onHistoryDateSelected: onHistoryDateSelected,
+            ),
           ),
           const SizedBox(width: 16),
         ] else ...[
           _iconCircle(
             Icons.search,
-            () => showMobileSearchSheet(context),
+            () => showMobileSearchSheet(
+              context,
+              onHistoryDateSelected: onHistoryDateSelected,
+            ),
             size: iconSize,
           ),
           const SizedBox(width: 8),

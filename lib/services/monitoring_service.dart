@@ -7,7 +7,7 @@ import '../utils/manila_time.dart';
 import '../utils/parameter_severity.dart';
 import '../utils/sensor_value_format.dart';
 
-enum HistoryAggregation { fiveMinutes, eightHours, daily }
+enum HistoryAggregation { fiveMinutes, hourly, eightHours, daily }
 
 class MonitoringService {
   static const Duration sensorOfflineAfter = Duration(minutes: 10);
@@ -68,15 +68,18 @@ class MonitoringService {
         ? '—'
         : '$amount ${row['amount_unit']?.toString() ?? 'mL'}';
     final notes = row['notes']?.toString().trim();
-    return HistoryLogEntry([
-      date,
-      formatManilaClockTime(local),
-      row['parameter']?.toString() ?? '—',
-      action == null || action.isEmpty ? '—' : action,
-      amountText,
-      notes == null || notes.isEmpty ? '—' : notes,
-      row['source'] == 'notification_fix' ? 'Notification' : 'Manual',
-    ]);
+    return HistoryLogEntry(
+      [
+        date,
+        formatManilaClockTime(local),
+        row['parameter']?.toString() ?? '—',
+        action == null || action.isEmpty ? '—' : action,
+        amountText,
+        notes == null || notes.isEmpty ? '—' : notes,
+        row['source'] == 'notification_fix' ? 'Notification' : 'Manual',
+      ],
+      recordStart: local,
+    );
   }
 
   /// Column headers for the "Calibration logs" tab. Different shape from
@@ -414,6 +417,7 @@ class MonitoringService {
         recordStart: summary.recordedAt,
         recordDuration: switch (aggregation) {
           HistoryAggregation.fiveMinutes => const Duration(minutes: 5),
+          HistoryAggregation.hourly => const Duration(hours: 1),
           HistoryAggregation.eightHours => const Duration(hours: 8),
           HistoryAggregation.daily => const Duration(days: 1),
         },
@@ -582,6 +586,13 @@ class MonitoringService {
           timestamp.hour,
           (timestamp.minute ~/ 5) * 5,
         );
+      case HistoryAggregation.hourly:
+        return DateTime(
+          timestamp.year,
+          timestamp.month,
+          timestamp.day,
+          timestamp.hour,
+        );
       case HistoryAggregation.eightHours:
         return DateTime(
           timestamp.year,
@@ -619,6 +630,10 @@ class MonitoringService {
     switch (aggregation) {
       case HistoryAggregation.fiveMinutes:
         return formatManilaClockTime(bucket);
+      case HistoryAggregation.hourly:
+        final end = bucket.add(const Duration(hours: 1));
+        return '${formatManilaClockTime(bucket)} - '
+            '${formatManilaClockTime(end)}';
       case HistoryAggregation.eightHours:
         final end = bucket.add(const Duration(hours: 8));
         return '${formatManilaClockTime(bucket)} - '

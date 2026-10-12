@@ -215,7 +215,7 @@ const List<HelpArticle> kDefaultHelpArticles = [
         '2. Choose a tab: Sensor logs, Calibration logs or Intervention logs.\n'
         '3. Tap Daily, Weekly or Monthly. A calendar opens so you can pick the date, week or month.\n'
         '4. The date button next to them shows what you chose. Tap it to pick a different period.\n'
-        '5. Daily shows 10-minute averages, Weekly shows 8-hour averages and Monthly shows daily averages.',
+        '5. Daily shows 1-hour averages, Weekly shows 8-hour averages and Monthly shows daily averages.',
   ),
   HelpArticle(
     type: 'tutorial',
@@ -249,7 +249,7 @@ const List<HelpArticle> kDefaultHelpArticles = [
     category: 'History logs',
     title: 'What do the average columns mean?',
     body:
-        'Each row is an average of the readings in that time slot: 10 minutes for Daily, 8 hours for Weekly and one day for Monthly. '
+        'Each row is an average of the readings in that time slot: 1 hour for Daily, 8 hours for Weekly and one day for Monthly. '
         'Switching between Daily, Weekly and Monthly changes how much detail you see.',
   ),
   HelpArticle(

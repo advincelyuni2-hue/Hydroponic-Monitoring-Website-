@@ -4,11 +4,14 @@ import 'app_state.dart';
 import 'help_article_service.dart';
 import 'help_content.dart';
 import 'notification_service.dart';
+import '../utils/manila_time.dart';
 
 /// Page index used for the Notifications screen (it is not in the side menu).
 const int kNotificationsPageIndex = -1;
 
-enum SearchResultKind { page, help, alert }
+typedef HistoryDateSelection = void Function(DateTime date, bool wholeMonth);
+
+enum SearchResultKind { page, historyDate, help, alert }
 
 class SearchResult {
   final SearchResultKind kind;
@@ -19,6 +22,8 @@ class SearchResult {
   final int? pageIndex;
   final HelpArticle? article;
   final AppNotificationItem? notification;
+  final DateTime? historyDate;
+  final bool historyMonth;
 
   const SearchResult({
     required this.kind,
@@ -29,6 +34,8 @@ class SearchResult {
     this.pageIndex,
     this.article,
     this.notification,
+    this.historyDate,
+    this.historyMonth = false,
   });
 }
 
@@ -214,11 +221,43 @@ class GlobalSearchService {
     ];
   }
 
-  List<SearchResult> search(String rawQuery, {int limit = 10}) {
+  List<SearchResult> search(
+    String rawQuery, {
+    int limit = 10,
+    bool includeHistoryDates = false,
+  }) {
     final query = _normalize(rawQuery);
     if (query.isEmpty) return quickLinks();
     final tokens = query.split(' ');
     final results = <SearchResult>[];
+
+    final historyDate =
+        includeHistoryDates ? parseHistorySearchDate(rawQuery) : null;
+    final historyMonth = includeHistoryDates && historyDate == null
+        ? parseHistorySearchMonth(rawQuery)
+        : null;
+    if (historyDate != null) {
+      results.add(SearchResult(
+        kind: SearchResultKind.historyDate,
+        title: 'History logs — ${_formatHistoryDate(historyDate)}',
+        subtitle: 'Show logs recorded on this date',
+        icon: Icons.calendar_today_outlined,
+        score: 120,
+        pageIndex: 2,
+        historyDate: historyDate,
+      ));
+    } else if (historyMonth != null) {
+      results.add(SearchResult(
+        kind: SearchResultKind.historyDate,
+        title: 'History logs — ${_formatHistoryMonth(historyMonth)}',
+        subtitle: 'Show logs recorded during this month',
+        icon: Icons.calendar_month_outlined,
+        score: 120,
+        pageIndex: 2,
+        historyDate: historyMonth,
+        historyMonth: true,
+      ));
+    }
 
     for (final page in _pages) {
       if (page.adminOnly && !_isAdmin) continue;
@@ -336,4 +375,202 @@ class GlobalSearchService {
     return '${start > 0 ? '…' : ''}${text.substring(start, end)}'
         '${end < text.length ? '…' : ''}';
   }
+
+  String _formatHistoryDate(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  String _formatHistoryMonth(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[date.month - 1]} ${date.year}';
+  }
+}
+
+DateTime? parseHistorySearchDate(String rawQuery, {int? defaultYear}) {
+  final query = rawQuery.trim().toLowerCase();
+  if (query.isEmpty) return null;
+  final fallbackYear = defaultYear ?? manilaNow().year;
+
+  final isoMatch =
+      RegExp(r'^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$').firstMatch(query);
+  if (isoMatch != null) {
+    return _validDate(
+      int.parse(isoMatch.group(1)!),
+      int.parse(isoMatch.group(2)!),
+      int.parse(isoMatch.group(3)!),
+    );
+  }
+
+  final numericMatch =
+      RegExp(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$').firstMatch(query);
+  if (numericMatch != null) {
+    return _validDate(
+      int.parse(numericMatch.group(3)!),
+      int.parse(numericMatch.group(1)!),
+      int.parse(numericMatch.group(2)!),
+    );
+  }
+
+  final shortNumericMatch =
+      RegExp(r'^(\d{1,2})[-/.](\d{1,2})$').firstMatch(query);
+  if (shortNumericMatch != null) {
+    return _validDate(
+      fallbackYear,
+      int.parse(shortNumericMatch.group(1)!),
+      int.parse(shortNumericMatch.group(2)!),
+    );
+  }
+
+  const monthNames = <String, int>{
+    'january': 1,
+    'jan': 1,
+    'february': 2,
+    'feb': 2,
+    'march': 3,
+    'mar': 3,
+    'april': 4,
+    'apr': 4,
+    'may': 5,
+    'june': 6,
+    'jun': 6,
+    'july': 7,
+    'jul': 7,
+    'august': 8,
+    'aug': 8,
+    'september': 9,
+    'sep': 9,
+    'sept': 9,
+    'october': 10,
+    'oct': 10,
+    'november': 11,
+    'nov': 11,
+    'december': 12,
+    'dec': 12,
+  };
+  final normalized = query.replaceAll(',', ' ').replaceAll(RegExp(r'\s+'), ' ');
+  final monthFirst =
+      RegExp(r'^([a-z]+) (\d{1,2}) (\d{4})$').firstMatch(normalized);
+  if (monthFirst != null) {
+    final month = monthNames[monthFirst.group(1)];
+    if (month != null) {
+      return _validDate(
+        int.parse(monthFirst.group(3)!),
+        month,
+        int.parse(monthFirst.group(2)!),
+      );
+    }
+  }
+
+  final dayFirst =
+      RegExp(r'^(\d{1,2}) ([a-z]+) (\d{4})$').firstMatch(normalized);
+  if (dayFirst != null) {
+    final month = monthNames[dayFirst.group(2)];
+    if (month != null) {
+      return _validDate(
+        int.parse(dayFirst.group(3)!),
+        month,
+        int.parse(dayFirst.group(1)!),
+      );
+    }
+  }
+
+  final shortMonthFirst =
+      RegExp(r'^([a-z]+) (\d{1,2})$').firstMatch(normalized);
+  if (shortMonthFirst != null) {
+    final month = monthNames[shortMonthFirst.group(1)];
+    if (month != null) {
+      return _validDate(
+        fallbackYear,
+        month,
+        int.parse(shortMonthFirst.group(2)!),
+      );
+    }
+  }
+
+  final shortDayFirst = RegExp(r'^(\d{1,2}) ([a-z]+)$').firstMatch(normalized);
+  if (shortDayFirst != null) {
+    final month = monthNames[shortDayFirst.group(2)];
+    if (month != null) {
+      return _validDate(
+        fallbackYear,
+        month,
+        int.parse(shortDayFirst.group(1)!),
+      );
+    }
+  }
+  return null;
+}
+
+DateTime? _validDate(int year, int month, int day) {
+  final date = DateTime(year, month, day);
+  return date.year == year && date.month == month && date.day == day
+      ? date
+      : null;
+}
+
+DateTime? parseHistorySearchMonth(String rawQuery, {int? defaultYear}) {
+  final query = rawQuery.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  if (query.isEmpty) return null;
+
+  const monthNames = <String, int>{
+    'january': 1,
+    'jan': 1,
+    'february': 2,
+    'feb': 2,
+    'march': 3,
+    'mar': 3,
+    'april': 4,
+    'apr': 4,
+    'may': 5,
+    'june': 6,
+    'jun': 6,
+    'july': 7,
+    'jul': 7,
+    'august': 8,
+    'aug': 8,
+    'september': 9,
+    'sep': 9,
+    'sept': 9,
+    'october': 10,
+    'oct': 10,
+    'november': 11,
+    'nov': 11,
+    'december': 12,
+    'dec': 12,
+  };
+  final match = RegExp(r'^([a-z]+)(?: (\d{4}))?$').firstMatch(query);
+  if (match == null) return null;
+  final month = monthNames[match.group(1)];
+  if (month == null) return null;
+  final year = match.group(2) == null
+      ? (defaultYear ?? manilaNow().year)
+      : int.parse(match.group(2)!);
+  return DateTime(year, month);
 }
