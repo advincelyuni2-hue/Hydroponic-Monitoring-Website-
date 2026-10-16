@@ -41,7 +41,7 @@ class ReportsController extends ChangeNotifier {
 
   String lastUpdatedTimestamp = 'Loading sensor history...';
 
-    String get alertsDateRange {
+  String get alertsDateRange {
     final end = manilaNow();
     final start = end.subtract(const Duration(days: 30));
 
@@ -197,7 +197,7 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
-    void toggleInterventionLogs(bool? val) {
+  void toggleInterventionLogs(bool? val) {
     includeInterventionLogs = val ?? false;
     notifyListeners();
   }
@@ -255,28 +255,33 @@ class ReportsController extends ChangeNotifier {
     required DateTimeRange dateRange,
     required HistoryAggregation aggregation,
   }) async {
-    final reportSensorData = await _monitoringService.getSensorHistory(
-      start: dateRange.start,
-      end: dateRange.end,
-      aggregation: aggregation,
-    );
+    final reportData = await Future.wait<List<HistoryLogEntry>>([
+      (includeSensorLogs || includeAllAnalytics)
+          ? _monitoringService.getSensorHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+              aggregation: aggregation,
+            )
+          : Future.value(<HistoryLogEntry>[]),
+      includeCalibrationLogs
+          ? _monitoringService.getCalibrationHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+            )
+          : Future.value(<HistoryLogEntry>[]),
+      includeInterventionLogs
+          ? _monitoringService.getInterventionHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+            )
+          : Future.value(<HistoryLogEntry>[]),
+    ]);
 
+    final reportSensorData = reportData[0];
     final sensorLogs =
         includeSensorLogs ? reportSensorData : <HistoryLogEntry>[];
-
-    final calibrationLogs = includeCalibrationLogs
-        ? await _monitoringService.getCalibrationHistory(
-            start: dateRange.start,
-            end: dateRange.end,
-          )
-        : <HistoryLogEntry>[];
-
-    final interventionLogs = includeInterventionLogs
-        ? await _monitoringService.getInterventionHistory(
-            start: dateRange.start,
-            end: dateRange.end,
-          )
-        : <HistoryLogEntry>[];
+    final calibrationLogs = reportData[1];
+    final interventionLogs = reportData[2];
 
     List<AnalyticsPoint> trendFor(int valueIndex, String parameter) {
       return reportSensorData.reversed

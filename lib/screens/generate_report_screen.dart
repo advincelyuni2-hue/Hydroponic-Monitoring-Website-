@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
 import '../widgets/custom_calendar_popup.dart';
 import '../services/monitoring_service.dart';
+import 'dart:async';
 
 class GenerateReportScreen extends StatefulWidget {
   final ReportsController controller;
@@ -23,6 +24,9 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
   bool isGenerating = false;
   DateTime selectedDate = DateTime.now();
   CalendarMode selectedMode = CalendarMode.daily;
+  Timer? _previewRefreshTimer;
+  int _previewRevision = 0;
+  late String _lastPreviewKey;
 
   DateTimeRange get _selectedReportRange {
     final start =
@@ -60,7 +64,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       _c.includeInterventionLogs &&
       _c.includeInsightsAndDecisionSupport;
 
-
   String get _previewKey => [
         selectedMode,
         _c.includeInterventionLogs,
@@ -72,6 +75,48 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         _c.includeInsightsAndDecisionSupport,
         selectedDate.toIso8601String(),
       ].join('-');
+
+  @override
+  void initState() {
+    super.initState();
+    _lastPreviewKey = _previewKey;
+    _c.addListener(_onReportOptionsChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant GenerateReportScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onReportOptionsChanged);
+      _lastPreviewKey = _previewKey;
+      _c.addListener(_onReportOptionsChanged);
+    }
+  }
+
+  void _onReportOptionsChanged() {
+    final currentKey = _previewKey;
+    if (currentKey == _lastPreviewKey) return;
+
+    _lastPreviewKey = currentKey;
+    _queuePreviewRefresh();
+  }
+
+  void _queuePreviewRefresh() {
+    _previewRefreshTimer?.cancel();
+    _previewRefreshTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() => _previewRevision++);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _previewRefreshTimer?.cancel();
+    _c.removeListener(_onReportOptionsChanged);
+    super.dispose();
+  }
 
   Future<Uint8List> buildPreview(PdfPageFormat format) {
     return _c.buildPdfBytes(
@@ -112,6 +157,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         onDateSelected: (date, _) {
           setState(() {
             selectedDate = date;
+            _lastPreviewKey = _previewKey;
+            _queuePreviewRefresh();
           });
         },
       ),
@@ -256,7 +303,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: PdfPreview(
-                key: ValueKey(_previewKey),
+                key: ValueKey(_previewRevision),
                 build: buildPreview,
                 useActions: false,
                 allowPrinting: false,
@@ -265,6 +312,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 canChangeOrientation: false,
                 canDebug: false,
                 maxPageWidth: 560,
+                dpi: 60,
                 scrollViewDecoration:
                     BoxDecoration(color: AppColors.calloutBackground),
                 pdfPreviewPageDecoration: const BoxDecoration(
@@ -338,7 +386,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
               ),
             ],
             onChanged: (mode) {
-              if (mode != null) setState(() => selectedMode = mode);
+              if (mode == null || mode == selectedMode) return;
+
+              setState(() => selectedMode = mode);
+              _lastPreviewKey = _previewKey;
+              _queuePreviewRefresh();
             },
           ),
           const SizedBox(height: 8),
