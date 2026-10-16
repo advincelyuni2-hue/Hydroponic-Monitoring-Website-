@@ -1,0 +1,16 @@
+{
+<<<<<<< HEAD
+    "chat.tools.terminal.autoApprove": {
+        "/^flutter analyze$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Get-ChildItem -Force -Recurse -File -Path Hydroponic-Monitoring-Website- \\| ForEach-Object \\{ \\$_\\.FullName \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+=======
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+>>>>>>> 2ca2dfb6b5f8a9d94bea8570e02d6c83c2f281df
+}
