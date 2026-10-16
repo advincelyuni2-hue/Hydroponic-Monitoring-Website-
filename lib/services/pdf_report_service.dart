@@ -7,6 +7,7 @@ import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
 import '../utils/sensor_value_format.dart';
 import 'app_state.dart';
+import 'pdf_report_output.dart' as platform_pdf_output;
 
 const _primaryGreen = PdfColor(0.15, 0.39, 0.08);
 const borderColor = PdfColor(0.72, 0.74, 0.72);
@@ -24,10 +25,7 @@ class PdfReportService {
 
   PdfReportService({
     Future<void> Function(Uint8List bytes, String filename)? output,
-  }) : outputPdf = output ?? _defaultOutputPdf;
-
-  static Future<void> _defaultOutputPdf(
-      Uint8List bytes, String filename) async {}
+  }) : outputPdf = output ?? platform_pdf_output.outputPdf;
 
   Future<Uint8List> buildReport({
     required ReportSummaryData summary,
