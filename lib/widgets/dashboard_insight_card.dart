@@ -44,36 +44,28 @@ class DashboardInsightCard extends StatefulWidget {
 }
 
 class _DashboardInsightCardState extends State<DashboardInsightCard> {
-  /// Height of the wide (desktop) body strip. Lower it to shrink the card more.
-  static const double _bodyHeight = 116;
-
   String _selected = 'pH';
 
-  bool get _isPh => _selected == 'pH';
-
-  List<ForecastPoint> get _points =>
-      _isPh ? widget.phForecast : widget.ecForecast;
-
-  ForecastInsightSummary get _summary {
+  ForecastInsightSummary _summaryFor(bool isPh) {
     final ranges = appParameterRanges.value;
     return ForecastInsightSummary(
-      forecast: _points
+      forecast: (isPh ? widget.phForecast : widget.ecForecast)
           .map((p) => forecasting.ForecastingChartPoint(
               hour: p.hour,
               value: p.value,
               isPredicted: p.isPredicted,
               isFallback: p.isFallback))
           .toList(),
-      minimum: _isPh ? ranges.phMin : ranges.ecMin,
-      maximum: _isPh ? ranges.phMax : ranges.ecMax,
+      minimum: isPh ? ranges.phMin : ranges.ecMin,
+      maximum: isPh ? ranges.phMax : ranges.ecMax,
     );
   }
 
-  bool get _modelOffline =>
+  bool _modelOffline(bool isPh) =>
       widget.isOffline ||
       widget.isCalibrating ||
       widget.forecastIssue != null ||
-      _summary.points.isEmpty;
+      _summaryFor(isPh).points.isEmpty;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -87,39 +79,44 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
   Widget _buildCard(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      padding: MediaQuery.sizeOf(context).width <= 600
+          ? const EdgeInsets.all(16)
+          : const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: AppDecorations.card(radius: 18),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 820 ||
+          final narrow = constraints.maxWidth < 700 ||
               MediaQuery.textScalerOf(context).scale(14) > 16.8;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _header(narrow),
               const SizedBox(height: 8),
-              if (_modelOffline)
-                Container(
-                  width: double.infinity,
-                  height: narrow ? null : _bodyHeight,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'model is offline',
-                      style: AppTextStyles.bodyBold.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                _forecastBody(narrow),
+              // Both bodies participate in layout; only the selected one paints.
+              // Longer EC units and different warnings cannot resize the card.
+              IndexedStack(
+                index: _selected == 'pH' ? 0 : 1,
+                children: [
+                  for (final isPh in [true, false])
+                    if (_modelOffline(isPh))
+                      Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(minHeight: 140),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.cardBorder),
+                        ),
+                        child: Center(
+                            child: Text('model is offline',
+                                style: AppTextStyles.bodyBold
+                                    .copyWith(color: AppColors.textSecondary))),
+                      )
+                    else
+                      _forecastBody(narrow, isPh, constraints.maxWidth),
+                ],
+              ),
             ],
           );
         },
@@ -151,7 +148,7 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
         padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
         foregroundColor: AppColors.accentGreen,
       ),
-      child: const Text('View forecast details'),
+      child: Text(narrow ? 'View forecast details' : 'View insight details'),
     );
 
     final toggle = _selector<String>(
@@ -167,12 +164,12 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
         children: [
           title,
           const SizedBox(height: 8),
-          Row(
-            children: [
-              toggle,
-              const Spacer(),
-              Flexible(child: details),
-            ],
+          OverflowBar(
+            alignment: MainAxisAlignment.spaceBetween,
+            overflowAlignment: OverflowBarAlignment.start,
+            spacing: 12,
+            overflowSpacing: 4,
+            children: [toggle, details],
           ),
         ],
       );
@@ -242,9 +239,10 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
     );
   }
 
-  Widget _forecastBody(bool narrow) {
-    final summary = _summary;
-    final threshold = summary.thresholdLabel(unit: _isPh ? '' : 'mS/cm');
+  Widget _forecastBody(bool narrow, bool isPh, double width) {
+    final summary = _summaryFor(isPh);
+    final selected = isPh ? 'pH' : 'EC';
+    final threshold = summary.thresholdLabel(unit: isPh ? '' : 'mS/cm');
     final crossing = summary.crossingLabel;
     final severity = ForecastSeverityStyle(summary.severity);
 
@@ -269,15 +267,14 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
             ),
           ),
           const SizedBox(height: 2),
-          Text('$_selected, next 12h', style: AppTextStyles.cardMeta),
+          Text('$selected, next 12h', style: AppTextStyles.cardMeta),
         ],
       ),
     );
 
-    final horizonPanel = LayoutBuilder(builder: (context, constraints) {
+    final horizonPanel = Builder(builder: (context) {
       final stacked = narrow &&
-          constraints.maxWidth <
-              270 * MediaQuery.textScalerOf(context).scale(14) / 14;
+          (width - 16) < 270 * MediaQuery.textScalerOf(context).scale(14) / 14;
       final tiles = [4, 8, 12].map((hour) {
         final value = summary.valueAt(hour);
         final style = ForecastSeverityStyle(summary.severityAt(hour));
@@ -327,7 +324,7 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
     });
 
     final outlookPanel = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: narrow ? 8 : 14, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -338,14 +335,9 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
           const SizedBox(height: 3),
           _outlookRow('Crosses in:', crossing, color: severity.text),
           const SizedBox(height: 6),
-          Flexible(
-            flex: narrow ? 0 : 1,
-            child: Text(
-              summary.explanation(_selected),
-              style: AppTextStyles.cardMeta.copyWith(height: 1.35),
-              maxLines: narrow ? null : 2,
-              overflow: narrow ? TextOverflow.visible : TextOverflow.ellipsis,
-            ),
+          Text(
+            summary.explanation(selected),
+            style: AppTextStyles.cardMeta.copyWith(height: 1.35),
           ),
         ],
       ),
@@ -373,27 +365,27 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
     }
 
     return Container(
-      height: _bodyHeight,
-      clipBehavior: Clip.antiAlias,
+      constraints: const BoxConstraints(minHeight: 140),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.cardBorder),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: IntrinsicHeight(
+          child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(flex: 20, child: trendPanel),
+          Expanded(flex: 18, child: trendPanel),
           Expanded(
-            flex: 46,
+            flex: 42,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
               child: horizonPanel,
             ),
           ),
           VerticalDivider(width: 1, thickness: 1, color: AppColors.cardBorder),
-          Expanded(flex: 34, child: outlookPanel),
+          Expanded(flex: 40, child: outlookPanel),
         ],
-      ),
+      )),
     );
   }
 

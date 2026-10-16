@@ -1,3 +1,4 @@
+import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/dashboard_controller.dart';
@@ -6,13 +7,13 @@ import '../models/monitoring_models.dart' show ParameterStatus;
 import '../services/app_state.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/parameter_severity.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/dashboard_forecast_overview.dart';
-import '../widgets/dashboard_parameter_gauge.dart';
+import '../widgets/dashboard_realtime_section.dart';
+import '../widgets/dashboard_layout.dart';
 import 'forecasting_dashboard_screen.dart';
 import '../widgets/dashboard_insight_card.dart';
 
@@ -25,6 +26,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardController _controller = DashboardController();
+  final PageStorageBucket _graphStorage = PageStorageBucket();
 
   @override
   void dispose() {
@@ -52,53 +54,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
             if (_controller.errorMessage != null) return _buildErrorState();
 
-            return LayoutBuilder(
-              builder: (context, viewport) {
-                final isMobile = viewport.maxWidth < 600;
-                final useSideColumn = viewport.maxWidth >= 1150;
-                return SingleChildScrollView(
-                  padding: EdgeInsets.all(isMobile ? 16 : 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppHeader(
-                        title: 'Dashboard',
-                        profile: _controller.profile,
-                      ),
-                      const SizedBox(height: 22),
-                      if (useSideColumn)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _buildRealtimeParameterSection(false),
-                            ),
-                            const SizedBox(width: 18),
-                            Expanded(
-                              flex: 7,
-                              child: _buildDashboardMain(false),
-                            ),
-                          ],
-                        )
-                      else
-                        Column(
-                          children: [
-                            _buildRealtimeParameterSection(isMobile),
-                            const SizedBox(height: 16),
-                            _buildDashboardMain(isMobile),
-                          ],
-                        ),
-                    ],
-                  ),
-                );
-              },
+            return DashboardLayout(
+              header:
+                  AppHeader(title: 'Dashboard', profile: _controller.profile),
+              realtime: DashboardRealtimeSection(
+                statuses: _controller.parameterStatuses,
+                isOffline: _controller.isSensorOffline,
+                isCalibrating: _controller.isCalibrating,
+              ),
+              insight: _buildLatestInsightCard(false),
+              overview: MobileGraphCard(
+                title: 'Forecast Overview',
+                actionLabel: 'View Forecast Overview Graph',
+                listenable: _controller,
+                storageBucket: _graphStorage,
+                builder: (_) => _buildForecastOverview(),
+              ),
             );
           },
         ),
       ),
     );
   }
+
+  Widget _buildForecastOverview() => DashboardForecastOverview(
+                phPoints: _controller.phForecast,
+                ecPoints: _controller.ecForecast,
+                summaries: _controller.forecastSummaries,
+                generatedAt: _controller.forecastGeneratedAt,
+                isOffline: _controller.isSensorOffline,
+                isCalibrating: _controller.isCalibrating,
+                forecastIssue: _controller.forecastIssue,
+                latestSensorRecordedAt: _controller.latestSensorRecordedAt,
+                onViewDetails: _openForecastingScreen,
+              );
 
   Widget _buildErrorState() {
     return Center(
@@ -113,88 +102,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildRealtimeParameterSection(bool compact) {
-    final statuses = _controller.parameterStatuses;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(compact ? 14 : 16),
-      decoration: AppDecorations.card(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Realtime Parameter Status',
-                  style: AppTextStyles.sectionTitle.copyWith(
-                    fontSize: compact ? 17 : 19,
-                  ),
-                ),
-              ),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _controller.isSensorOffline
-                      ? AppColors.textSecondary
-                      : AppColors.primaryButton,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _controller.isCalibrating
-                    ? 'Calibrating'
-                    : (_controller.isSensorOffline ? 'Offline' : 'Live'),
-                style: AppTextStyles.cardMeta,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (compact)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < statuses.length; i++) ...[
-                    DashboardParameterGauge(data: statuses[i], compact: true),
-                    if (i != statuses.length - 1) const SizedBox(width: 12),
-                  ],
-                ],
-              ),
-            )
-          else
-            for (var i = 0; i < statuses.length; i++) ...[
-              DashboardParameterGauge(data: statuses[i], dense: true),
-              if (i != statuses.length - 1) const SizedBox(height: 8),
-            ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDashboardMain(bool isMobile) {
-    return Column(
-      children: [
-        _buildLatestInsightCard(isMobile),
-        const SizedBox(height: 18),
-        DashboardForecastOverview(
-          phPoints: _controller.phForecast,
-          ecPoints: _controller.ecForecast,
-          summaries: _controller.forecastSummaries,
-          generatedAt: _controller.forecastGeneratedAt,
-          isOffline: _controller.isSensorOffline,
-          isCalibrating: _controller.isCalibrating,
-          forecastIssue: _controller.forecastIssue,
-          latestSensorRecordedAt: _controller.latestSensorRecordedAt,
-          onViewDetails: _openForecastingScreen,
-        ),
-      ],
     );
   }
 

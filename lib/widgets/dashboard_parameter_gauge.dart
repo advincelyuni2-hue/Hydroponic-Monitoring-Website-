@@ -23,19 +23,21 @@ class DashboardParameterGauge extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: appMeasurementUnits,
-      builder: (context, units, child) => _buildCard(),
+      builder: (context, units, child) => _buildCard(context),
     );
   }
 
-  Widget _buildCard() {
+  Widget _buildCard(BuildContext context) {
     final value = _displayNumber;
     final scale = _displayScale;
     final status = _displayStatus(data.status);
     final statusColor = _statusColor(data.status);
 
     return Container(
-      width: compact ? 190 : double.infinity,
-      padding: EdgeInsets.all(dense ? 10 : (compact ? 12 : 16)),
+      width: compact
+          ? (MediaQuery.sizeOf(context).width - 88).clamp(240.0, 300.0)
+          : double.infinity,
+      padding: EdgeInsets.all(dense ? 8 : (compact ? 12 : 16)),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(12),
@@ -51,6 +53,7 @@ class DashboardParameterGauge extends StatelessWidget {
                   _shortLabel(data.label),
                   style: AppTextStyles.sectionTitle.copyWith(
                     fontSize: dense ? 14 : (compact ? 15 : 17),
+                    height: 1.2,
                   ),
                 ),
               ),
@@ -80,6 +83,7 @@ class DashboardParameterGauge extends StatelessWidget {
                       style: AppTextStyles.cardMeta.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.w700,
+                        height: 1.2,
                       ),
                     ),
                   ],
@@ -89,32 +93,38 @@ class DashboardParameterGauge extends StatelessWidget {
           ),
           SizedBox(height: dense ? 5 : (compact ? 6 : 10)),
           if (dense)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  flex: 11,
-                  child: _buildGauge(
-                    value: value,
-                    scale: scale,
-                    statusColor: statusColor,
-                    height: 140,
-                    valueFontSize: 28,
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 11,
+                    child: _buildGauge(
+                      context: context,
+                      value: value,
+                      scale: scale,
+                      statusColor: statusColor,
+                      valueFontSize: 22,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 9,
-                  child: _buildMetadata(vertical: true, condensed: false),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 9,
+                    child: Center(
+                        child:
+                            _buildMetadata(vertical: true, condensed: false)),
+                  ),
+                ],
+              ),
             )
           else ...[
             _buildGauge(
+              context: context,
               value: value,
               scale: scale,
               statusColor: statusColor,
-              height: compact ? 120 : 155,
+              height: (compact ? 190 : 205) *
+                  (MediaQuery.textScalerOf(context).scale(14) / 14),
               valueFontSize: compact ? 25 : 30,
             ),
             SizedBox(height: compact ? 10 : 14),
@@ -128,10 +138,11 @@ class DashboardParameterGauge extends StatelessWidget {
   }
 
   Widget _buildGauge({
+    required BuildContext context,
     required double value,
     required _GaugeScale scale,
     required Color statusColor,
-    required double height,
+    double? height,
     required double valueFontSize,
   }) {
     if (data.isOffline) {
@@ -144,7 +155,9 @@ class DashboardParameterGauge extends StatelessWidget {
             children: [
               Icon(Icons.sensors_off, color: AppColors.textSecondary, size: 34),
               const SizedBox(height: 8),
-              Text('No data', style: AppTextStyles.title),
+              Text('No data',
+                  style: AppTextStyles.title
+                      .copyWith(fontSize: valueFontSize, height: 1.1)),
               const SizedBox(height: 4),
               Text('Sensor offline', style: AppTextStyles.cardMeta),
             ],
@@ -155,43 +168,45 @@ class DashboardParameterGauge extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: height,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
+      child: Column(
         children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _GaugePainter(
-                value: value,
-                minimum: scale.minimum,
-                maximum: scale.maximum,
-                color: statusColor,
-                backgroundColor: AppColors.cardBorder,
-                textColor: AppColors.textSecondary,
-                decimals: _isTemp ? 0 : 6,
+          // The painter owns only the arc and ticks. Text below never shares
+          // its canvas, so full-precision EC values cannot collide with ticks.
+          Expanded(
+            child: SizedBox(
+              width: double.infinity,
+              child: CustomPaint(
+                key: ValueKey('gauge-dial-${_shortLabel(data.label)}'),
+                painter: _GaugePainter(
+                  value: value,
+                  minimum: scale.minimum,
+                  maximum: scale.maximum,
+                  color: statusColor,
+                  backgroundColor: AppColors.cardBorder,
+                  textColor: AppColors.textSecondary,
+                  decimals: 0,
+                  textScaler: MediaQuery.textScalerOf(context),
+                ),
               ),
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _valueText,
-                style: AppTextStyles.title.copyWith(fontSize: valueFontSize),
-              ),
-              if (_unitText.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    _unitText,
-                    style: AppTextStyles.cardMeta.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          const SizedBox(height: 4),
+          Text(
+            _valueText,
+            key: ValueKey('gauge-reading-${_shortLabel(data.label)}'),
+            textAlign: TextAlign.center,
+            style: AppTextStyles.title
+                .copyWith(fontSize: valueFontSize, height: 1.1),
+          ),
+          const SizedBox(height: 2),
+          // Reserve the same unit line for pH as EC and temperature, keeping
+          // all three dials aligned and equally sized.
+          Text(
+            _unitText.isEmpty ? ' ' : _unitText,
+            key: ValueKey('gauge-unit-${_shortLabel(data.label)}'),
+            textAlign: TextAlign.center,
+            style: AppTextStyles.cardMeta
+                .copyWith(fontWeight: FontWeight.w600, height: 1.2),
           ),
         ],
       ),
@@ -205,12 +220,14 @@ class DashboardParameterGauge extends StatelessWidget {
     final range = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Ideal range', style: AppTextStyles.cardMeta),
+        Text('Ideal range',
+            style: AppTextStyles.cardMeta.copyWith(height: 1.2)),
         const SizedBox(height: 2),
         Text(
           _rangeText,
           style: AppTextStyles.bodyBold.copyWith(
-            fontSize: condensed ? 12 : 13,
+            fontSize: 12,
+            height: 1.2,
           ),
         ),
       ],
@@ -230,17 +247,18 @@ class DashboardParameterGauge extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             Expanded(
-              child: Text('Last updated', style: AppTextStyles.cardMeta),
+              child: Text('Last updated',
+                  style: AppTextStyles.cardMeta
+                      .copyWith(fontSize: 11, height: 1.2)),
             ),
           ],
         ),
         const SizedBox(height: 2),
         Text(
           data.lastUpdated,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
           style: AppTextStyles.cardMeta.copyWith(
-            fontSize: condensed ? 10 : 11,
+            fontSize: 11,
+            height: 1.2,
           ),
         ),
       ],
@@ -253,7 +271,7 @@ class DashboardParameterGauge extends StatelessWidget {
         children: [
           range,
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: Divider(height: 1, color: AppColors.cardBorder),
           ),
           updated,
@@ -340,6 +358,7 @@ class _GaugePainter extends CustomPainter {
   final Color backgroundColor;
   final Color textColor;
   final int decimals;
+  final TextScaler textScaler;
 
   const _GaugePainter({
     required this.value,
@@ -349,12 +368,26 @@ class _GaugePainter extends CustomPainter {
     required this.backgroundColor,
     required this.textColor,
     required this.decimals,
+    required this.textScaler,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.62);
-    final radius = math.min(size.width * 0.38, size.height * 0.50);
+    final minimumPainter = _textPainter(minimum.toStringAsFixed(decimals));
+    final maximumPainter = _textPainter(maximum.toStringAsFixed(decimals));
+    final tickHeight = math.max(minimumPainter.height, maximumPainter.height);
+    // Fill the available semicircle area, reserving a complete tick-label row.
+    // Unlike the former 0.36 * height radius, readings do not shrink the arc
+    // twice: their space has already been allocated by the parent Column.
+    final stroke = (size.width * 0.085).clamp(10.0, 18.0);
+    final tickGap = stroke / 2 + 3;
+    final radius = math.max(
+        0.0,
+        math.min(
+          (size.width - stroke) / 2,
+          size.height - tickHeight - tickGap - stroke / 2,
+        ));
+    final center = Offset(size.width / 2, radius + stroke / 2);
     const startAngle = math.pi;
     const sweepAngle = math.pi;
     final normalized = ((value - minimum) / (maximum - minimum)).clamp(0, 1);
@@ -362,12 +395,12 @@ class _GaugePainter extends CustomPainter {
     final trackPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.height * 0.14
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.butt;
     final valuePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.height * 0.14
+      ..strokeWidth = stroke
       ..strokeCap = StrokeCap.butt;
     final arcRect = Rect.fromCircle(center: center, radius: radius);
     canvas.drawArc(arcRect, startAngle, sweepAngle, false, trackPaint);
@@ -394,26 +427,24 @@ class _GaugePainter extends CustomPainter {
     );
     canvas.drawCircle(
       center,
-      size.height * 0.075,
+      stroke * 0.5,
       Paint()..color = AppColors.textPrimary,
     );
 
-    final minimumText = minimum.toStringAsFixed(decimals);
-    final minimumPainter = _textPainter(minimumText);
     minimumPainter.paint(
       canvas,
       Offset(
-        center.dx - radius - (minimumPainter.width / 2),
-        center.dy + 8,
+        (center.dx - radius - (minimumPainter.width / 2))
+            .clamp(0.0, math.max(0.0, size.width - minimumPainter.width)),
+        center.dy + tickGap,
       ),
     );
-    final maximumText = maximum.toStringAsFixed(decimals);
-    final painter = _textPainter(maximumText);
-    painter.paint(
+    maximumPainter.paint(
       canvas,
       Offset(
-        center.dx + radius - (painter.width / 2),
-        center.dy + 8,
+        (center.dx + radius - (maximumPainter.width / 2))
+            .clamp(0.0, math.max(0.0, size.width - maximumPainter.width)),
+        center.dy + tickGap,
       ),
     );
   }
@@ -424,10 +455,12 @@ class _GaugePainter extends CustomPainter {
         text: text,
         style: AppTextStyles.cardMeta.copyWith(
           color: textColor,
-          fontSize: 10,
+          fontSize: 11,
+          height: 1.2,
         ),
       ),
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
     )..layout();
   }
 
@@ -437,6 +470,8 @@ class _GaugePainter extends CustomPainter {
         oldDelegate.minimum != minimum ||
         oldDelegate.maximum != maximum ||
         oldDelegate.color != color ||
-        oldDelegate.backgroundColor != backgroundColor;
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.textScaler != textScaler ||
+        oldDelegate.textColor != textColor;
   }
 }

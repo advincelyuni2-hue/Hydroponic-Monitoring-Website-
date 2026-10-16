@@ -5,9 +5,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
+import 'mobile_graph_card.dart';
 
 class ReportsAnalyticsCard extends StatefulWidget {
   final String selectedParameter;
+  final bool compact;
   final String selectedTimeframe;
   final List<AnalyticsPoint> points;
   final double minThreshold;
@@ -18,6 +20,7 @@ class ReportsAnalyticsCard extends StatefulWidget {
   const ReportsAnalyticsCard({
     super.key,
     required this.selectedParameter,
+    this.compact = false,
     required this.selectedTimeframe,
     required this.points,
     required this.minThreshold,
@@ -40,9 +43,10 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: AppDecorations.card(),
-      child: Column(
+      padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile || widget.compact ? 16 : 20),
+      decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+      child: MobileGraphComposition(
+        chartIndex: 4,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(isMobile),
@@ -51,10 +55,15 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
             'Historical sensor trends and parameter telemetry',
             style: AppTextStyles.cardMeta,
           ),
-          SizedBox(height: isMobile ? 16 : 22),
+          SizedBox(height: isMobile || widget.compact ? 16 : 22),
           SizedBox(
-            height: isMobile ? 230 : 350,
-            child: LineChart(_buildTrendChartData(isMobile)),
+            height: isMobile
+                ? (context.findAncestorWidgetOfExactType<MobileGraphPage>() != null ? 320 : 230)
+                : (widget.compact ? 260 : 350),
+            child: MobileGraphTimeline(
+              pointCount: widget.points.length,
+              child: MobileLineChart(_buildTrendChartData(isMobile)),
+            ),
           ),
           const SizedBox(height: 12),
           _buildLegend(),
@@ -94,7 +103,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       ],
     );
 
-    if (isMobile) {
+    if (MobileGraphPage.isActive(context)) return controls;
+    if (!Responsive.isDesktop(context) || widget.compact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [title, const SizedBox(height: 12), controls],

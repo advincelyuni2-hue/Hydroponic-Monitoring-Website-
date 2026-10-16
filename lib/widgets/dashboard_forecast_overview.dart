@@ -1,3 +1,4 @@
+import 'mobile_graph_card.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -42,27 +43,59 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   String _parameter = 'Both';
   int _hours = 4;
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final saved = PageStorage.maybeOf(context)?.readState(context,
+        identifier: 'forecast-overview-filters');
+    if (saved is Map<String, Object>) {
+      _parameter = saved['parameter'] as String;
+      _hours = saved['hours'] as int;
+    }
+  }
+
+  void _saveFilters() {
+    PageStorage.maybeOf(context)?.writeState(context,
+        <String, Object>{'parameter': _parameter, 'hours': _hours},
+        identifier: 'forecast-overview-filters');
+  }
+
   static Color get _phColor => AppColors.accentGreen;
   static Color get _ecColor => AppColors.accentTeal;
+  static const Color _forecastColor = Color(0xFFF57C00);
 
   @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.sizeOf(context).width < 600;
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+          final narrow = constraints.maxWidth < 760 * scale;
+          if (MobileGraphPage.isActive(context)) return _buildCard(context, narrow);
+          return SizedBox(
+            height: constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : (narrow ? 600 : 440) * scale,
+            child: _buildCard(context, narrow),
+          );
+        },
+      );
+
+  Widget _buildCard(BuildContext context, bool isMobile) {
     if (widget.isOffline || widget.forecastIssue != null) {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
       return Container(
         width: double.infinity,
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: AppDecorations.card(),
-        child: Column(
+        padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+        child: MobileGraphComposition(
+          chartIndex: 1,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(isMobile),
-            SizedBox(
-              height: isMobile ? 230 : 350,
-              child: Center(
+            Expanded(
+              child: SingleChildScrollView(
+                  child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -88,7 +121,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                     ],
                   ],
                 ),
-              ),
+              )),
             ),
           ],
         ),
@@ -110,139 +143,123 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         : _parameter == 'pH'
             ? phRange
             : ecRange;
-    final currentLabel = _readingLabel(ph, ec, predicted: false);
-    final forecastLabel = _readingLabel(ph, ec, predicted: true);
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: AppDecorations.card(),
-      child: Column(
+      padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+      child: MobileGraphComposition(
+        chartIndex: 4,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(isMobile),
-          const SizedBox(height: 5),
-          SizedBox(height: isMobile ? 16 : 22),
-          SizedBox(
-            height: isMobile ? 230 : 350,
-            child: Stack(
-              children: [
-                LineChart(
-                  LineChartData(
-                    minX: -_hours.toDouble(),
-                    maxX: _hours.toDouble(),
-                    minY: chartRange.minimum,
-                    maxY: chartRange.maximum,
-                    gridData: FlGridData(
-                      show: true,
-                      drawVerticalLine: true,
-                      getDrawingHorizontalLine: (_) => FlLine(
-                        color: AppColors.chartGrid.withValues(alpha: 0.65),
-                        strokeWidth: 1,
-                      ),
-                      getDrawingVerticalLine: (_) => FlLine(
-                        color: AppColors.chartGrid.withValues(alpha: 0.35),
-                        strokeWidth: 1,
-                      ),
-                    ),
-                    borderData: FlBorderData(
-                      show: true,
-                      border: Border.all(color: AppColors.chartGrid),
-                    ),
-                    titlesData: _titlesData(
-                      chartRange: chartRange,
-                      isMobile: isMobile,
-                    ),
-                    extraLinesData: ExtraLinesData(
-                      verticalLines: [
-                        VerticalLine(
-                          x: 0,
-                          color: AppColors.textSecondary,
-                          strokeWidth: 1,
-                          dashArray: [5, 4],
-                          label: VerticalLineLabel(
-                            show: false,
-                            alignment: Alignment.topCenter,
-                            style: AppTextStyles.cardMeta.copyWith(
-                              fontSize: isMobile ? 9 : 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    lineTouchData: LineTouchData(
-                      touchTooltipData: LineTouchTooltipData(
-                        getTooltipColor: (_) => AppColors.cardBackground,
-                        tooltipRoundedRadius: 8,
-                        getTooltipItems: (spots) => spots.map((spot) {
-                          // Each predicted line includes the current historical
-                          // point so the two segments connect. Suppress that
-                          // duplicate connector in the tooltip.
-                          final isPredictedConnector =
-                              spot.x <= 0 && spot.barIndex.isOdd;
-                          if (isPredictedConnector) return null;
-
-                          final isPh = _parameter == 'pH' ||
-                              (_parameter == 'Both' && spot.barIndex < 2);
-                          final label = isPh ? 'pH' : 'EC';
-                          final color = isPh ? _phColor : _ecColor;
-                          final unit = isPh ? '' : ' mS/cm';
-                          return LineTooltipItem(
-                            '$label ${spot.y.toStringAsFixed(6)}$unit',
-                            AppTextStyles.bodyBold.copyWith(color: color),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    lineBarsData: [
-                      if (_parameter != 'EC')
-                        ..._seriesBars(
-                          ph,
-                          color: _phColor,
-                        ),
-                      if (_parameter != 'pH')
-                        ..._seriesBars(
-                          ec,
-                          color: _ecColor,
-                        ),
-                    ],
-                  ),
+          const SizedBox(height: 8),
+          IndexedStack(
+            index: const ['Both', 'pH', 'EC'].indexOf(_parameter),
+            children: [
+              for (final parameter in ['Both', 'pH', 'EC'])
+                _buildReadingSummary(
+                  _readingLabel(ph, ec, predicted: false, parameter: parameter),
+                  _readingLabel(ph, ec, predicted: true, parameter: parameter),
                 ),
-                Positioned(
-                  top: 8,
-                  left: isMobile ? 35 : 50,
-                  right: isMobile ? 35 : 50,
-                  child: IgnorePointer(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text.rich(
-                        TextSpan(
-                          style: AppTextStyles.cardMeta.copyWith(
-                            fontSize: isMobile ? 9 : 11,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: MobileGraphTimeline(
+              pointCount: _parameter == 'pH' ? ph.length
+                  : _parameter == 'EC' ? ec.length : math.max(ph.length, ec.length),
+              child: Padding(
+              padding: EdgeInsets.only(right: isMobile ? 8 : 0),
+              child: LayoutBuilder(
+                  builder: (context, chartSpace) => MobileLineChart(
+                        LineChartData(
+                          clipData: const FlClipData.all(),
+                          minX: -_hours.toDouble(),
+                          maxX: _hours.toDouble(),
+                          minY: chartRange.minimum,
+                          maxY: chartRange.maximum,
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: true,
+                            getDrawingHorizontalLine: (_) => FlLine(
+                              color:
+                                  AppColors.chartGrid.withValues(alpha: 0.65),
+                              strokeWidth: 1,
+                            ),
+                            getDrawingVerticalLine: (_) => FlLine(
+                              color:
+                                  AppColors.chartGrid.withValues(alpha: 0.35),
+                              strokeWidth: 1,
+                            ),
                           ),
-                          children: [
-                            const TextSpan(text: 'Current '),
-                            TextSpan(
-                              text: currentLabel,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                          borderData: FlBorderData(
+                            show: true,
+                            border: Border.all(color: AppColors.chartGrid),
+                          ),
+                          titlesData: _titlesData(
+                            chartRange: chartRange,
+                            isMobile: isMobile,
+                            chartWidth: chartSpace.maxWidth,
+                          ),
+                          extraLinesData: ExtraLinesData(
+                            verticalLines: [
+                              VerticalLine(
+                                x: 0,
+                                color: AppColors.textSecondary,
+                                strokeWidth: 1,
+                                dashArray: [5, 4],
+                                label: VerticalLineLabel(
+                                  show: false,
+                                  alignment: Alignment.topCenter,
+                                  style: AppTextStyles.cardMeta.copyWith(
+                                    fontSize: isMobile ? 9 : 11,
+                                  ),
+                                ),
                               ),
+                            ],
+                          ),
+                          lineTouchData: LineTouchData(
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipColor: (_) => AppColors.cardBackground,
+                              tooltipRoundedRadius: 8,
+                              fitInsideHorizontally: true,
+                              fitInsideVertically: true,
+                              getTooltipItems: (spots) => spots.map((spot) {
+                                // Each predicted line includes the current historical
+                                // point so the two segments connect. Suppress that
+                                // duplicate connector in the tooltip.
+                                final isPredictedConnector =
+                                    spot.x <= 0 && spot.barIndex.isOdd;
+                                if (isPredictedConnector) return null;
+
+                                final isPh = _parameter == 'pH' ||
+                                    (_parameter == 'Both' && spot.barIndex < 2);
+                                final label = isPh ? 'pH' : 'EC';
+                                final color = isPh ? _phColor : _ecColor;
+                                final unit = isPh ? '' : ' mS/cm';
+                                return LineTooltipItem(
+                                  '$label ${spot.y.toStringAsFixed(6)}$unit',
+                                  AppTextStyles.bodyBold.copyWith(color: color),
+                                );
+                              }).toList(),
                             ),
-                            const TextSpan(text: '  |  Forecast '),
-                            TextSpan(
-                              text: forecastLabel,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                          ),
+                          lineBarsData: [
+                            if (_parameter != 'EC')
+                              ..._seriesBars(
+                                ph,
+                                color: _phColor,
                               ),
-                            ),
+                            if (_parameter != 'pH')
+                              ..._seriesBars(
+                                ec,
+                                color: _ecColor,
+                              ),
                           ],
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                      )),
+            ),
             ),
           ),
           const SizedBox(height: 12),
@@ -258,28 +275,40 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
       children: [
         const Icon(Icons.show_chart, color: AppColors.primaryButton),
         const SizedBox(width: 8),
-        Text('Forecast Overview', style: AppTextStyles.sectionTitle),
+        Flexible(
+            child: Text('Forecast Overview',
+                style: AppTextStyles.sectionTitle
+                    .copyWith(fontSize: isMobile ? 17 : 19))),
       ],
     );
 
+    final selectors = <Widget>[
+      _selector<String>(
+        compact: isMobile,
+        values: const ['Both', 'pH', 'EC'],
+        selected: _parameter,
+        label: (value) => value,
+        onSelected: (value) {
+          setState(() => _parameter = value);
+          _saveFilters();
+        },
+      ),
+      _selector<int>(
+        compact: isMobile,
+        values: const [4, 8, 12],
+        selected: _hours,
+        label: (value) => '${value}h',
+        onSelected: (value) {
+          setState(() => _hours = value);
+          _saveFilters();
+        },
+      ),
+    ];
     final controls = Wrap(
       spacing: 10,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        _selector<String>(
-          values: const ['Both', 'pH', 'EC'],
-          selected: _parameter,
-          label: (value) => value,
-          onSelected: (value) => setState(() => _parameter = value),
-        ),
-        _selector<int>(
-          values: const [4, 8, 12],
-          selected: _hours,
-          label: (value) => '${value}h',
-          onSelected: (value) => setState(() => _hours = value),
-        ),
-      ],
+      children: selectors,
     );
 
     final details = TextButton(
@@ -294,10 +323,16 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          title,
-          const SizedBox(height: 8),
-          controls,
-          Align(alignment: Alignment.centerRight, child: details),
+          if (!MobileGraphPage.isActive(context)) ...[
+            title,
+            const SizedBox(height: 8),
+          ],
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [...selectors, details],
+          ),
         ],
       );
     }
@@ -315,6 +350,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   }
 
   Widget _selector<T>({
+    bool compact = false,
     required List<T> values,
     required T selected,
     required String Function(T) label,
@@ -337,8 +373,8 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                 onTap: () => onSelected(value),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 10 : 13,
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
@@ -367,57 +403,95 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   FlTitlesData _titlesData({
     required _ChartRange chartRange,
     required bool isMobile,
+    required double chartWidth,
   }) {
     final singleInterval = (chartRange.maximum - chartRange.minimum) / 4;
-    const axisDecimals = 6;
+    const axisDecimals = 2;
     final centerTime = widget.generatedAt ?? manilaNow();
-    final horizontalInterval = isMobile ? _hours.toDouble() : _hours / 2;
+    final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    // Keep complete clock labels on one line. Reduce tick count according to
+    // the actual plot width and scaled text instead of splitting AM/PM below.
+    var labelWidth = 0.0;
+    if (isMobile) {
+      for (final hour in [-_hours, 0, _hours]) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: formatManilaClockTime(centerTime.add(Duration(hours: hour))),
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        labelWidth = math.max(labelWidth, painter.width);
+        painter.dispose();
+      }
+    }
+    final plotWidth = math.max(0.0, chartWidth - 46 * textScale);
+    final tickCount =
+        isMobile ? (plotWidth / (labelWidth + 16)).floor().clamp(1, 3) : 5;
+    final horizontalInterval =
+        isMobile ? _hours * (tickCount == 2 ? 2.0 : 1.0) : _hours / 2;
     return FlTitlesData(
       topTitles: const AxisTitles(
         sideTitles: SideTitles(showTitles: false),
       ),
       leftTitles: AxisTitles(
-        axisNameWidget: Text(
-          'Value',
-          style: AppTextStyles.cardMeta,
-        ),
+        axisNameWidget:
+            isMobile ? null : Text('Value', style: AppTextStyles.cardMeta),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 62 : 72,
+          reservedSize: 46 * MediaQuery.textScalerOf(context).scale(12) / 12,
           interval: singleInterval,
-          getTitlesWidget: (value, _) => Text(
-            value.toStringAsFixed(axisDecimals),
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
-          ),
+          getTitlesWidget: (value, meta) {
+            final label = Text(
+              value.toStringAsFixed(axisDecimals),
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+            );
+            if (!isMobile) return label;
+            return SideTitleWidget(
+              axisSide: meta.axisSide,
+              space: 6,
+              fitInside: SideTitleFitInsideData(
+                enabled: true,
+                axisPosition: meta.axisPosition,
+                parentAxisSize: meta.parentAxisSize,
+                distanceFromEdge: 0,
+              ),
+              child: label,
+            );
+          },
         ),
       ),
-      rightTitles: AxisTitles(
-        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: isMobile ? 62 : 72,
-          interval: singleInterval,
-          getTitlesWidget: (value, _) => Text(
-            value.toStringAsFixed(axisDecimals),
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
-          ),
-        ),
+      rightTitles: const AxisTitles(
+        sideTitles: SideTitles(showTitles: false),
       ),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 30,
+          reservedSize: 34 * textScale,
           interval: horizontalInterval,
-          getTitlesWidget: (value, _) {
+          getTitlesWidget: (value, meta) {
+            if (isMobile && tickCount == 1 && value.abs() > 0.001) {
+              return const SizedBox.shrink();
+            }
             final time = centerTime.add(
               Duration(minutes: (value * 60).round()),
             );
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
+            return SideTitleWidget(
+              axisSide: meta.axisSide,
+              space: 8,
+              fitInside: SideTitleFitInsideData(
+                enabled: true,
+                axisPosition: meta.axisPosition,
+                parentAxisSize: meta.parentAxisSize,
+                distanceFromEdge: 0,
+              ),
               child: Text(
                 formatManilaClockTime(time),
+                softWrap: false,
+                maxLines: 1,
                 style: AppTextStyles.cardMeta.copyWith(
-                  fontSize: isMobile ? 10 : null,
+                  fontSize: 11,
                 ),
               ),
             );
@@ -427,25 +501,62 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     );
   }
 
-  Widget _buildLegend(bool hasFallbackHistory) {
+  Widget _buildReadingSummary(String current, String forecast) {
     return Wrap(
-      spacing: 18,
-      runSpacing: 8,
+      spacing: 20,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (_parameter != 'EC')
+        for (final entry
+            in {'Current:': current, 'Forecast:': forecast}.entries)
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '${entry.key} ',
+                  style: AppTextStyles.cardMeta,
+                ),
+                TextSpan(
+                  text: entry.value,
+                  style: AppTextStyles.bodyBold.copyWith(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLegend(bool hasFallbackHistory) {
+    // Reserve the largest mode's height without leaving a hidden pH slot
+    // before the EC-only legend.
+    return IndexedStack(
+      index: const ['Both', 'pH', 'EC'].indexOf(_parameter),
+      alignment: Alignment.topLeft,
+      children: [
+        for (final parameter in ['Both', 'pH', 'EC'])
+          _buildLegendItems(parameter, hasFallbackHistory),
+      ],
+    );
+  }
+
+  Widget _buildLegendItems(String parameter, bool hasFallbackHistory) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (parameter != 'EC')
           _legendItem(
-            hasFallbackHistory
-                ? 'pH estimated / predicted'
-                : 'pH measured / predicted',
+            hasFallbackHistory ? 'pH estimated' : 'pH measured',
             _phColor,
           ),
-        if (_parameter != 'pH')
+        if (parameter != 'pH')
           _legendItem(
-            hasFallbackHistory
-                ? 'EC estimated / predicted'
-                : 'EC measured / predicted',
+            hasFallbackHistory ? 'EC estimated' : 'EC measured',
             _ecColor,
           ),
+        _legendItem('Forecast', _forecastColor, dashed: true),
       ],
     );
   }
@@ -463,12 +574,16 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
       return Wrap(
         spacing: 16,
         runSpacing: 8,
-        alignment: WrapAlignment.spaceBetween,
+        alignment: WrapAlignment.start,
         crossAxisAlignment: WrapCrossAlignment.center,
-        children: [_buildLegend(hasFallbackHistory), generated],
+        children: [
+          _buildLegend(hasFallbackHistory),
+          generated,
+        ],
       );
     }
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: _buildLegend(hasFallbackHistory)),
         const SizedBox(width: 16),
@@ -477,17 +592,27 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     );
   }
 
-  Widget _legendItem(String label, Color color) {
+  Widget _legendItem(String label, Color color, {bool dashed = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 9,
-          height: 9,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        SizedBox(
+          width: 26,
+          height: 12,
+          child: Center(
+            child: dashed
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Container(width: 6, height: 2, color: color),
+                    ],
+                  )
+                : Container(height: 2, color: color),
+          ),
         ),
         const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.cardMeta),
+        Flexible(child: Text(label, style: AppTextStyles.cardMeta)),
       ],
     );
   }
@@ -496,6 +621,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     List<ForecastPoint> ph,
     List<ForecastPoint> ec, {
     required bool predicted,
+    required String parameter,
   }) {
     String? valueFor(List<ForecastPoint> points) {
       final matching = points.where(
@@ -512,11 +638,11 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     }
 
     final values = <String>[];
-    if (_parameter != 'EC') {
+    if (parameter != 'EC') {
       final value = valueFor(ph);
       if (value != null) values.add('pH $value');
     }
-    if (_parameter != 'pH') {
+    if (parameter != 'pH') {
       final value = valueFor(ec);
       if (value != null) values.add('EC $value');
     }
@@ -560,16 +686,25 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     required Color color,
     required bool predicted,
   }) {
+    final lineColor = predicted ? _forecastColor : color;
     return LineChartBarData(
       spots: spots,
       isCurved: true,
-      color: color,
+      color: lineColor,
       barWidth: predicted ? 2 : 2.5,
       dashArray: predicted ? [6, 4] : null,
-      dotData: FlDotData(show: predicted),
+      dotData: FlDotData(
+        show: predicted,
+        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+          radius: 3,
+          color: _forecastColor,
+          strokeWidth: 1,
+          strokeColor: _forecastColor,
+        ),
+      ),
       belowBarData: BarAreaData(
         show: true,
-        color: color.withValues(alpha: predicted ? 0.05 : 0.10),
+        color: lineColor.withValues(alpha: predicted ? 0.05 : 0.10),
       ),
     );
   }

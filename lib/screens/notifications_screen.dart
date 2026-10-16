@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/mobile_page_header.dart';
 import '../controllers/notification_controller.dart';
 import '../models/notification_models.dart';
 import '../theme/app_colors.dart';
@@ -31,8 +32,6 @@ class NotificationsScreenState extends State<NotificationsScreen> {
   bool _newestFirst = true;
   bool _dialogOpen = false;
   bool _mobileOpen = false;
-  final Set<String> _selectedIds = {};
-  String _searchQuery = '';
 
   @override
   void initState() {
@@ -56,13 +55,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
             ? _controller.activeNotifications
             : _controller.resolvedNotifications)
         .where((item) => _filter == null || item.type == _filter)
-        .where((item) {
-      final query = _searchQuery.trim().toLowerCase();
-      if (query.isEmpty) return true;
-      return '${item.title} ${item.subtitle} ${item.currentStatus}'
-          .toLowerCase()
-          .contains(query);
-    }).toList();
+        .toList();
     list.sort((a, b) {
       if (a.createdAt == null) {
         return b.createdAt == null ? a.id.compareTo(b.id) : 1;
@@ -157,8 +150,9 @@ class NotificationsScreenState extends State<NotificationsScreen> {
     await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (context) => Scaffold(
               backgroundColor: AppColors.background,
-              appBar: AppBar(title: const Text('Notification details')),
-              body: ListenableBuilder(
+              body: SafeArea(child: Column(children: [
+                const MobilePageHeader(title: 'Notification Details'),
+                Expanded(child: ListenableBuilder(
                   listenable: _controller,
                   builder: (context, _) {
                     final matches =
@@ -169,7 +163,8 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                             ? const Text(
                                 'This notification is no longer available.')
                             : _details(matches.first, mobile: true));
-                  }),
+                  })),
+              ])),
             )));
     _mobileOpen = false;
     if (mounted) setState(() => highlightedNotificationId = null);
@@ -212,14 +207,6 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                       NotificationInboxRow(
                           item: item,
                           selected: highlightedNotificationId == item.id,
-                          checked: _selectedIds.contains(item.id),
-                          onChecked: (checked) => setState(() {
-                                if (checked == true) {
-                                  _selectedIds.add(item.id);
-                                } else {
-                                  _selectedIds.remove(item.id);
-                                }
-                              }),
                           onOpen: () => _open(item, wide)),
                     ],
                   ]),
@@ -243,31 +230,30 @@ class NotificationsScreenState extends State<NotificationsScreen> {
               side: BorderSide(color: AppColors.cardBorder),
             ),
             onSelected: (value) {
-              setState(() {
-                _filter = value == 'all'
-                    ? null
-                    : NotificationType.values.firstWhere(
-                        (type) => type.name == value,
-                      );
-                _syncSelection();
-              });
-            },
+  setState(() {
+    _filter = value == 'all'
+        ? null
+        : NotificationType.values.firstWhere(
+            (type) => type.name == value,
+          );
+    _syncSelection();
+  });
+},
             itemBuilder: (context) => [
               for (final option in <(String, String)>[
-                ('all', 'all'),
-                ('critical', 'critical'),
-                ('warning', 'warning'),
-                ('information', 'info'),
-              ])
-                PopupMenuItem<String>(
-                  value: option.$2,
+  ('All', 'all'),
+  ('Critical', 'critical'),
+  ('Warning', 'warning'),
+  ('Information', 'info'),
+])
+  PopupMenuItem<String>(
+    value: option.$2,
                   child: Row(children: [
                     Expanded(
                       child: Text(option.$1, style: AppTextStyles.bodySmall),
                     ),
-                    if ((_filter?.name ?? 'all') == option.$2)
-                      const Icon(Icons.check,
-                          size: 18, color: AppColors.primaryButton),
+                    if (_filter == option.$2)
+                      Icon(Icons.check, size: 18, color: AppColors.primaryButton),
                   ]),
                 ),
             ],
@@ -283,8 +269,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                   style: AppTextStyles.bodySmall,
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down,
-                    size: 18, color: AppColors.textSecondary),
+                Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.textSecondary),
               ]),
             ),
           );
@@ -332,25 +317,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                             _buildTab('Resolved')
                           ]),
                           Divider(height: 1, color: AppColors.cardBorder),
-                          TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'Search notifications',
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                            onChanged: (value) => setState(() {
-                              _searchQuery = value;
-                              _syncSelection();
-                            }),
-                          ),
                           _toolbar(),
-                          if (_selectedIds.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'Selected (${_selectedIds.length})',
-                                style: AppTextStyles.bodySmall,
-                              ),
-                            ),
                           if (_controller.errorMessage != null)
                             Padding(
                                 padding: const EdgeInsets.only(bottom: 12),

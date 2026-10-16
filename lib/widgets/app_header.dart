@@ -22,6 +22,13 @@ class AppHeader extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final HistoryDateSelection? onHistoryDateSelected;
 
+  /// Optional widget shown right next to the page title (desktop/tablet only).
+  /// On mobile it is ignored; the screen is expected to place it elsewhere.
+  final Widget? titleAction;
+
+  /// Opt-in compact header for Reports at narrow viewport widths.
+  final bool compactLayout;
+
   const AppHeader({
     super.key,
     required this.title,
@@ -29,6 +36,8 @@ class AppHeader extends StatelessWidget {
     this.onBellTap,
     this.onProfileTap,
     this.onHistoryDateSelected,
+    this.titleAction,
+    this.compactLayout = false,
   });
 
   void showNotificationOverlay(BuildContext context, GlobalKey bellKey) {
@@ -126,9 +135,30 @@ class AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
+    final isMobile = compactLayout || Responsive.isMobile(context);
     final iconSize = isMobile ? 35.0 : 40.0;
     final GlobalKey bellKey = GlobalKey();
+
+    // On mobile there's no room next to the title, so the action is ignored
+    // here (the screen shows it under the header instead).
+    final Widget? action = isMobile ? null : titleAction;
+
+    // Room for the title + action. A wider action (e.g. button + timestamp)
+    // needs more space on desktop than on tablet.
+    final double titleSectionWidth = action == null
+        ? 340
+        : (Responsive.isDesktop(context) ? 600 : 480);
+
+    final Widget titleText = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
+      style: AppTextStyles.pageHeading.copyWith(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontSize: isMobile ? 18 : 24,
+      ),
+    );
 
     final Widget titleSection = Row(
       children: [
@@ -151,22 +181,19 @@ class AppHeader extends StatelessWidget {
         ),
         SizedBox(width: isMobile ? 8 : 16),
 
-        // Page Title with automatic font scaling for longer text
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: AppTextStyles.pageHeading.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: isMobile ? 18 : 24,
-              ),
+        // Page title, with the optional action right next to it
+        if (action == null)
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: titleText,
             ),
-          ),
-        ),
+          )
+        else ...[
+          Flexible(child: titleText),
+          const SizedBox(width: 16),
+          action,
+        ],
       ],
     );
 
@@ -175,13 +202,13 @@ class AppHeader extends StatelessWidget {
       children: [
         if (!isMobile)
           SizedBox(
-            width: 340,
+            width: titleSectionWidth,
             child: titleSection,
           )
         else
           Expanded(child: titleSection),
 
-        const Spacer(),
+        if (!compactLayout) const Spacer(),
 
         // Search Control
         if (!isMobile) ...[

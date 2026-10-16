@@ -1,3 +1,4 @@
+import 'mobile_graph_card.dart';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -54,12 +55,14 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
+
       return Container(
         width: double.infinity,
-        height: isDesktop ? 689 : 420,
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: AppDecorations.card(),
-        child: Column(
+        height: MobileGraphPage.isActive(context) ? null : (isDesktop ? 689 : 420),
+        padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
+        decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+        child: MobileGraphComposition(
+          chartIndex: 1,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(isMobile),
@@ -68,14 +71,18 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(widget.isCalibrating ? Icons.tune : Icons.cloud_off,
-                        size: 46, color: AppColors.textSecondary),
+                    Icon(
+                      widget.isCalibrating ? Icons.tune : Icons.cloud_off,
+                      size: 46,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(height: 12),
                     Text(
-                        widget.isCalibrating
-                            ? 'Calibration in progress'
-                            : 'Sensor offline',
-                        style: AppTextStyles.sectionTitle),
+                      widget.isCalibrating
+                          ? 'Calibration in progress'
+                          : 'Sensor offline',
+                      style: AppTextStyles.sectionTitle,
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       widget.isCalibrating
@@ -100,47 +107,42 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     final showPh = widget.activeTab == 'pH' || widget.activeTab == 'Both';
     final showEc = widget.activeTab == 'EC' || widget.activeTab == 'Both';
 
-    // Extract pH and EC points from real model streams
     final allFiltered = _filterPoints(widget.points);
     final ecFiltered = _filterPoints(widget.ecPoints ?? []);
 
-    // If activeTab == 'Both' and ecPoints was omitted, extract EC spots vs pH spots by value range
     final phFiltered = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
-        ? allFiltered.where((p) => p.value > 3.0).toList()
+        ? allFiltered.where((p) => p.value >= 3.0).toList()
         : (showPh ? allFiltered : <ForecastPoint>[]);
 
     final ecPointsResolved = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
         ? allFiltered.where((p) => p.value <= 3.0).toList()
-        : (showEc
-            ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered)
-            : <ForecastPoint>[]);
+        : (showEc ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered) : <ForecastPoint>[]);
 
     final hasFallbackHistory = [...phFiltered, ...ecPointsResolved].any(
       (point) => !point.isPredicted && point.isFallback,
     );
 
-    final phRange =
-        _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
-    final ecRange =
-        _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
+    final phRange = _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
+    final ecRange = _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
 
-    late _ChartRange chartRange;
+    late ChartRange chartRange;
     if (widget.activeTab == 'EC') {
       chartRange = ecRange;
     } else if (widget.activeTab == 'pH') {
       chartRange = phRange;
     } else {
-      chartRange = const _ChartRange(0.0, 15.0);
+      chartRange = const ChartRange(0.0, 15.0);
     }
 
-    final currentLabel = _getReadingLabel(
+    final currentLabel = getReadingLabel(
       phFiltered,
       ecPointsResolved,
       showPh,
       showEc,
       predicted: false,
     );
-    final forecastLabel = _getReadingLabel(
+
+    final forecastLabel = getReadingLabel(
       phFiltered,
       ecPointsResolved,
       showPh,
@@ -151,39 +153,32 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     return Container(
       width: double.infinity,
       height: isDesktop ? 689 : null,
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: AppDecorations.card(),
-      child: Column(
+      padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+      child: MobileGraphComposition(
+        chartIndex: 2,
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: isDesktop ? MainAxisSize.max : MainAxisSize.min,
         children: [
           _buildHeader(isMobile),
-          const SizedBox(height: 6),
-          Text(
-            hasFallbackHistory
-                ? 'Sensor data unavailable: estimated baseline vs. machine-learning forecast'
-                : 'Real-time sensor tracking vs. machine-learning forecast trajectory',
-            style: AppTextStyles.cardMeta,
-          ),
-          SizedBox(height: isMobile ? 12 : 16),
-
-          // Scrollable Chart Viewport
+           SizedBox(height: isMobile ? 12 : 16),
           Expanded(
             flex: isDesktop ? 1 : 0,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Stack(
                 children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.vertical,
-                    physics: const BouncingScrollPhysics(),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 28), // Space for callout badge & hover tooltips
                     child: SizedBox(
-                      height: widget.activeTab == 'Both'
-                          ? 750
-                          : (isDesktop ? 500 : 320),
+                      height: MobileGraphPage.isActive(context)
+                          ? null
+                          : widget.activeTab == 'Both' ? 750 : (isDesktop ? 500 : 320),
                       width: double.infinity,
-                      child: LineChart(
-                        _buildChartData(
+                      child: MobileGraphTimeline(
+                        pointCount: math.max(phFiltered.length, ecPointsResolved.length),
+                        child: MobileLineChart(
+                        buildChartData(
                           chartRange,
                           isMobile,
                           phFiltered,
@@ -192,14 +187,14 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                           showEc,
                         ),
                       ),
+                      ),
                     ),
                   ),
-                  _buildCalloutBadge(isMobile, currentLabel, forecastLabel),
+                  buildCalloutBadge(isMobile, currentLabel, forecastLabel),
                 ],
               ),
             ),
           ),
-
           const SizedBox(height: 12),
           _buildLegendAndDate(isMobile, hasFallbackHistory),
         ],
@@ -207,10 +202,13 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  Widget _buildCalloutBadge(
-      bool isMobile, String currentLabel, String forecastLabel) {
+  Widget buildCalloutBadge(
+    bool isMobile,
+    String currentLabel,
+    String forecastLabel,
+  ) {
     return Positioned(
-      top: 8,
+      top: 0,
       left: isMobile ? 35 : 50,
       right: isMobile ? 35 : 50,
       child: IgnorePointer(
@@ -227,7 +225,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                   text: currentLabel,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const TextSpan(text: '  Forecast '),
+                const TextSpan(text: '   Forecast '),
                 TextSpan(
                   text: forecastLabel,
                   style: TextStyle(
@@ -244,8 +242,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  LineChartData _buildChartData(
-    _ChartRange chartRange,
+  LineChartData buildChartData(
+    ChartRange chartRange,
     bool isMobile,
     List<ForecastPoint> phFiltered,
     List<ForecastPoint> ecFiltered,
@@ -253,6 +251,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     bool showEc,
   ) {
     return LineChartData(
+      clipData: const FlClipData.none(), // Allow hover tooltips to render without clipping
       minX: -widget.selectedHours.toDouble(),
       maxX: widget.selectedHours.toDouble(),
       minY: chartRange.minimum,
@@ -260,11 +259,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       gridData: FlGridData(
         show: true,
         drawVerticalLine: true,
-        getDrawingHorizontalLine: (_) => FlLine(
+        getDrawingHorizontalLine: (value) => FlLine(
           color: AppColors.chartGrid.withValues(alpha: 0.65),
           strokeWidth: 1,
         ),
-        getDrawingVerticalLine: (_) => FlLine(
+        getDrawingVerticalLine: (value) => FlLine(
           color: AppColors.chartGrid.withValues(alpha: 0.35),
           strokeWidth: 1,
         ),
@@ -285,9 +284,13 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         ],
       ),
       lineTouchData: LineTouchData(
+        enabled: true,
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => AppColors.cardBackground,
           tooltipRoundedRadius: 8,
+          fitInsideHorizontally: true,
+          fitInsideVertically: true,
+          tooltipMargin: 8,
           getTooltipItems: (spots) => spots.map((spot) {
             final isConnector = spot.x <= 0 && spot.barIndex.isOdd;
             if (isConnector) return null;
@@ -302,7 +305,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
 
             return LineTooltipItem(
               '$label ${spot.y.toStringAsFixed(6)}$unit',
-              AppTextStyles.bodyBold.copyWith(color: color),
+              AppTextStyles.bodyBold.copyWith(color: color, fontSize: 11),
             );
           }).toList(),
         ),
@@ -317,16 +320,13 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    final tabs = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: ['pH Forecast', 'EC Forecast', 'Both'].map((tabLabel) {
+    final tabItems = ['pH Forecast', 'EC Forecast', 'Both'].map((tabLabel) {
         final key = tabLabel.contains('pH')
             ? 'pH'
             : tabLabel.contains('EC')
                 ? 'EC'
                 : 'Both';
         final isSelected = widget.activeTab == key;
-
         return GestureDetector(
           onTap: () => widget.onTabChanged(key),
           child: Container(
@@ -335,8 +335,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color:
-                      isSelected ? AppColors.primaryButton : Colors.transparent,
+                  color: isSelected ? AppColors.primaryButton : Colors.transparent,
                   width: 2,
                 ),
               ),
@@ -345,15 +344,15 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               tabLabel,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: isMobile ? 14 : 16,
-                color: isSelected
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
               ),
             ),
           ),
         );
-      }).toList(),
-    );
+      }).toList();
+    final tabs = isMobile
+        ? Wrap(spacing: 0, runSpacing: 4, children: tabItems)
+        : Row(mainAxisSize: MainAxisSize.min, children: tabItems);
 
     final hourControls = Container(
       padding: const EdgeInsets.all(3),
@@ -372,8 +371,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
               decoration: BoxDecoration(
-                color:
-                    isSelected ? AppColors.primaryButton : Colors.transparent,
+                color: isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -409,13 +407,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  FlTitlesData _buildTitlesData(_ChartRange range, bool isMobile) {
-    final interval =
-        math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
+  FlTitlesData _buildTitlesData(ChartRange range, bool isMobile) {
+    final interval = math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
     const decimals = 6;
     final centerTime = widget.generatedAt ?? manilaNow();
-    final horizontalInterval =
-        isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
+    final horizontalInterval = isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
 
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -425,7 +421,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           showTitles: true,
           reservedSize: isMobile ? 62 : 72,
           interval: interval,
-          getTitlesWidget: (val, _) => Text(
+          getTitlesWidget: (val, meta) => Text(
             val.toStringAsFixed(decimals),
             style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
           ),
@@ -437,7 +433,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           showTitles: true,
           reservedSize: isMobile ? 62 : 72,
           interval: interval,
-          getTitlesWidget: (val, _) => Text(
+          getTitlesWidget: (val, meta) => Text(
             val.toStringAsFixed(decimals),
             style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
           ),
@@ -448,14 +444,13 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           showTitles: true,
           reservedSize: 30,
           interval: horizontalInterval,
-          getTitlesWidget: (val, _) {
+          getTitlesWidget: (val, meta) {
             final time = centerTime.add(Duration(minutes: (val * 60).round()));
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 formatManilaClockTime(time),
-                style: AppTextStyles.cardMeta
-                    .copyWith(fontSize: isMobile ? 10 : null),
+                style: AppTextStyles.cardMeta.copyWith(fontSize: isMobile ? 10 : null),
               ),
             );
           },
@@ -542,13 +537,14 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     }).toList();
   }
 
-  List<LineChartBarData> _buildSeriesBars(List<ForecastPoint> points,
-      {required Color color}) {
+  List<LineChartBarData> _buildSeriesBars(
+    List<ForecastPoint> points, {
+    required Color color,
+  }) {
     final historical = points.where((p) => !p.isPredicted).toList();
     final predicted = points.where((p) => p.isPredicted).toList();
 
-    final historicalSpots =
-        historical.map((p) => FlSpot(p.hour, p.value)).toList();
+    final historicalSpots = historical.map((p) => FlSpot(p.hour, p.value)).toList();
     final predictedSpots = <FlSpot>[
       if (historical.isNotEmpty)
         FlSpot(historical.last.hour, historical.last.value),
@@ -584,7 +580,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     ];
   }
 
-  String _getReadingLabel(
+  String getReadingLabel(
     List<ForecastPoint> ph,
     List<ForecastPoint> ec,
     bool showPh,
@@ -595,10 +591,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       final matching = pts.where((p) => p.isPredicted == predicted).toList();
       if (matching.isEmpty) return null;
       final point = predicted
-          ? matching.reduce((a, b) => (a.hour - widget.selectedHours).abs() <=
-                  (b.hour - widget.selectedHours).abs()
-              ? a
-              : b)
+          ? matching.reduce((a, b) =>
+              (a.hour - widget.selectedHours).abs() <=
+                      (b.hour - widget.selectedHours).abs()
+                  ? a
+                  : b)
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
       return point.value.toStringAsFixed(6);
     }
@@ -616,28 +613,29 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     return values.isEmpty ? '--' : values.join(' / ');
   }
 
-  _ChartRange _computeRange(
+  ChartRange _computeRange(
     List<ForecastPoint> points, {
     required double defaultMin,
     required double defaultMax,
   }) {
     if (points.isEmpty) {
-      return _ChartRange(defaultMin, defaultMax);
+      return ChartRange(defaultMin, defaultMax);
     }
     final values = points.map((p) => p.value).toList();
     final minVal = values.reduce(math.min);
     final maxVal = values.reduce(math.max);
     final spread = maxVal - minVal;
     final padding = math.max(spread * 0.18, 0.2);
-    return _ChartRange(
+
+    return ChartRange(
       math.max(0, minVal - padding),
       maxVal + padding,
     );
   }
 }
 
-class _ChartRange {
+class ChartRange {
   final double minimum;
   final double maximum;
-  const _ChartRange(this.minimum, this.maximum);
+  const ChartRange(this.minimum, this.maximum);
 }

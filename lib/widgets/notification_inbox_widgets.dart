@@ -44,16 +44,12 @@ class NotificationAppearance {
 class NotificationInboxRow extends StatelessWidget {
   final AppNotificationItem item;
   final bool selected;
-  final bool checked;
   final VoidCallback onOpen;
-  final ValueChanged<bool?> onChecked;
   const NotificationInboxRow(
       {super.key,
       required this.item,
       required this.selected,
-      required this.checked,
-      required this.onOpen,
-      required this.onChecked});
+      required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -64,14 +60,6 @@ class NotificationInboxRow extends StatelessWidget {
         border: Border(left: BorderSide(color: appearance.color, width: 4)),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 6, top: 8),
-          child: Checkbox(
-            key: ValueKey('check-${item.id}'),
-            value: checked,
-            onChanged: onChecked,
-          ),
-        ),
         Expanded(
             child: InkWell(
           key: ValueKey('open-${item.id}'),
@@ -200,8 +188,7 @@ class NotificationDetailsPanel extends StatelessWidget {
                   CustomButton(
                       text: 'Record action',
                       backgroundColor: AppColors.primaryButton,
-                      textStyle: AppTextStyles.button
-                          .copyWith(color: Colors.white, fontSize: 13),
+                      textStyle: AppTextStyles.button.copyWith(color: Colors.white, fontSize: 13),
                       onPressed: busy ? null : onRecord,
                       isLoading: busy,
                       height: 40,

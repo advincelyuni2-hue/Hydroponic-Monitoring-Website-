@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
+import 'mobile_graph_card.dart';
 
 class ReportPredictionCard extends StatelessWidget {
   final ModelEvaluation evaluation;
@@ -42,17 +43,26 @@ class ReportPredictionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: AppDecorations.card(),
-      child: Column(
+      padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+      child: MobileGraphComposition(
+        chartIndex: 2,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(isMobile),
-          SizedBox(height: isMobile ? 16 : 22),
-          SizedBox(
-            height: isMobile ? 230 : 350,
-            child: _buildBody(isMobile),
-          ),
+          _buildHeader(context, isMobile),
+          const SizedBox(height: 16),
+          LayoutBuilder(builder: (context, constraints) {
+            final chartHeight = isMobile
+                ? (context.findAncestorWidgetOfExactType<MobileGraphPage>() != null ? 320.0 : 230.0)
+                : (constraints.maxWidth * 0.42).clamp(240.0, 280.0);
+            return SizedBox(
+              height: MobileGraphPage.isActive(context) ? constraints.maxHeight : chartHeight,
+              child: MobileGraphTimeline(
+                pointCount: isLoading || evaluation.samples.isEmpty ? 0 : evaluation.samples.length,
+                child: _buildBody(isMobile),
+              ),
+            );
+          }),
           const SizedBox(height: 12),
           _buildLegend(),
         ],
@@ -91,7 +101,7 @@ class ReportPredictionCard extends StatelessWidget {
     return _buildChart(isMobile);
   }
 
-  Widget _buildHeader(bool isMobile) {
+  Widget _buildHeader(BuildContext context, bool isMobile) {
     final accuracy = evaluation.accuracyFor(selectedParameter);
 
     final title = Wrap(
@@ -99,8 +109,12 @@ class ReportPredictionCard extends StatelessWidget {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        if (!MobileGraphPage.isActive(context)) ...[
         Icon(Icons.show_chart, color: AppColors.accentGreen),
-        Text('Forecast Model Evaluation', style: AppTextStyles.sectionTitle),
+        Text('Forecast Model Evaluation', style: isMobile
+            ? AppTextStyles.sectionTitle
+            : AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
+        ],
         TextButton.icon(
           onPressed: onViewTable,
           icon: const Icon(Icons.table_chart_outlined, size: 17),
@@ -133,28 +147,31 @@ class ReportPredictionCard extends StatelessWidget {
 
     final horizonControls = _horizonSelector();
 
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [parameterControls, horizonControls],
-          ),
-        ],
-      );
-    }
+    final controls = Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [parameterControls, horizonControls],
+    );
 
-    return Row(
-      children: [
-        Expanded(child: title),
-        parameterControls,
-        const SizedBox(width: 8),
-        horizonControls,
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+        if (isMobile || constraints.maxWidth < 640 * textScale) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [title, const SizedBox(height: 12), controls],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: title),
+            const SizedBox(width: 16),
+            controls,
+          ],
+        );
+      },
     );
   }
 
@@ -285,7 +302,7 @@ class ReportPredictionCard extends StatelessWidget {
     final labelInterval =
         math.max(1, (samples.length / (isMobile ? 3 : 4)).ceil());
 
-    return LineChart(
+    return MobileLineChart(
       LineChartData(
         minX: 0,
         maxX: math.max(samples.length - 1, 1).toDouble(),

@@ -37,22 +37,24 @@ class SensorHealthCard extends StatelessWidget {
     }
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: AppDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
+          Row(
+            children: [
+              Expanded(
                 child: Text('Sensor Calibration',
-                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 18))),
-            const SizedBox(width: 8),
-            _badge(
-                '${sensors.length} ${sensors.length == 1 ? 'sensor' : 'sensors'}',
-                AppColors.surfaceMuted,
-                AppColors.textPrimary),
-          ]),
-          const SizedBox(height: 16),
+                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
+              ),
+              const SizedBox(width: 8),
+              _badge('${sensors.length} sensors',
+                  AppColors.surfaceMuted, AppColors.textPrimary),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (sensors.isEmpty)
             Text('No sensors reporting yet.', style: AppTextStyles.cardMeta),
           for (var i = 0; i < sensors.length; i++) ...[
@@ -61,31 +63,17 @@ class SensorHealthCard extends StatelessWidget {
           ],
           if (counts.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Wrap(spacing: 16, runSpacing: 8, children: [
-              for (final entry in counts.entries)
-                Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                          color: _colors(entry.key).accent,
-                          shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: '${entry.key} ', style: AppTextStyles.cardMeta),
-                    TextSpan(
-                        text: '${entry.value}',
-                        style: AppTextStyles.bodyBold.copyWith(fontSize: 12)),
-                  ])),
-                ]),
-            ]),
+            Text(
+              counts.entries
+                  .map((entry) => '${entry.value} ${entry.key}')
+                  .join(' • '),
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+            ),
           ],
         ],
       ),
     );
   }
-
   Widget _badge(String label, Color background, Color foreground) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
@@ -98,49 +86,32 @@ class SensorHealthCard extends StatelessWidget {
   Widget _buildSensorItem(SensorHealthItem item) {
     final colors = _colors(item.statusLabel);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
           color: colors.panel, borderRadius: BorderRadius.circular(12)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        LayoutBuilder(builder: (context, constraints) {
-          final name = Text(item.sensorName,
-              style: AppTextStyles.bodyBold.copyWith(fontSize: 13));
-          final badge = _badge(item.statusLabel,
-              colors.accent.withValues(alpha: 0.12), colors.accent);
-          if (constraints.maxWidth < 230 ||
-              MediaQuery.textScalerOf(context).scale(13) > 18) {
-            return Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                alignment: WrapAlignment.spaceBetween,
-                children: [name, badge]);
-          }
-          return Row(children: [
-            Expanded(child: name),
-            const SizedBox(width: 8),
-            badge
-          ]);
-        }),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: (item.healthPercentage / 100).clamp(0.0, 1.0),
-            minHeight: 8,
-            backgroundColor: AppColors.pillBackground,
-            valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
-          ),
-        ),
+        Text(item.sensorName,
+            style: AppTextStyles.bodyBold.copyWith(fontSize: 12)),
         const SizedBox(height: 6),
-        Text(
-            item.statusLabel == 'Awaiting device'
-                ? 'Calibration saved; waiting for ESP32 confirmation'
-                : item.daysSinceCalibration < 0
-                    ? 'No calibration recorded'
-                    : item.daysSinceCalibration == 0
-                        ? 'Calibrated today'
-                        : 'Last cal: ${item.daysSinceCalibration}d ago',
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 11)),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('Status', style: AppTextStyles.cardMeta.copyWith(fontSize: 10)),
+            _badge(item.statusLabel,
+                colors.accent.withValues(alpha: 0.12), colors.accent),
+            Text(
+                item.statusLabel == 'Awaiting device'
+                    ? 'Calibration saved; waiting for ESP32 confirmation'
+                    : item.daysSinceCalibration < 0
+                        ? 'No calibration recorded'
+                        : item.daysSinceCalibration == 0
+                            ? 'Calibrated today'
+                            : 'Last cal: ${item.daysSinceCalibration}d ago',
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 11)),
+          ],
+        ),
       ]),
     );
   }

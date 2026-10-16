@@ -1,3 +1,4 @@
+import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
 import '../controllers/forecasting_controller.dart';
 import '../models/monitoring_models.dart';
@@ -28,6 +29,19 @@ class _ForecastingDashboardScreenState
     _controller.dispose();
     super.dispose();
   }
+
+  Widget _buildForecastingGraph() => ForecastingChartCard(
+              activeTab: _controller.selectedTab,
+              onTabChanged: _controller.selectTab,
+              selectedHours: _controller.selectedHours,
+              onHoursChanged: _controller.selectHours,
+              points: _mapToForecastPoint(_controller.phPoints),
+              ecPoints: _mapToForecastPoint(_controller.ecPoints),
+              isOffline: _controller.isSensorOffline,
+              isCalibrating: _controller.isCalibrating,
+              forecastIssue: _controller.forecastIssue,
+              latestSensorRecordedAt: _controller.latestSensorRecordedAt,
+            );
 
   List<ForecastPoint> _mapToForecastPoint(List<dynamic> points) {
     return points.map((p) {
@@ -73,108 +87,90 @@ class _ForecastingDashboardScreenState
             final isDesktop = Responsive.isDesktop(context);
             final isMobile = Responsive.isMobile(context);
 
-            final phPointsMapped = _mapToForecastPoint(_controller.phPoints);
-            final ecPointsMapped = _mapToForecastPoint(_controller.ecPoints);
 
             final insight = _controller.activeInsightDetail;
             final isBothTab = _controller.selectedTab == 'Both';
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final fitDesktop = isDesktop && textScale <= 1.2;
+            Widget buildInsights({bool fillHeight = false}) {
+              return IndexedStack(
+                index: _controller.isPhInsight ? 0 : 1,
+                sizing: fillHeight ? StackFit.expand : StackFit.loose,
+                alignment: Alignment.topLeft,
                 children: [
-                  AppHeader(
-                    title: 'Forecasting dashboard',
-                    profile: _controller.profile,
-                  ),
-                  const SizedBox(height: 24),
-                  if (!isDesktop) ...[
-                    ForecastingChartCard(
-                      activeTab: _controller.selectedTab,
-                      onTabChanged: _controller.selectTab,
-                      selectedHours: _controller.selectedHours,
-                      onHoursChanged: _controller.selectHours,
-                      points: phPointsMapped,
-                      ecPoints: ecPointsMapped,
-                      isOffline: _controller.isSensorOffline,
-                      isCalibrating: _controller.isCalibrating,
-                      forecastIssue: _controller.forecastIssue,
-                      latestSensorRecordedAt:
-                          _controller.latestSensorRecordedAt,
-                    ),
-                    const SizedBox(height: 16),
-                    if (insight != null)
+                  for (final isPh in [true, false])
+                    if ((isPh ? _controller.phInsightDetail : _controller.ecInsightDetail) != null)
                       PredictionInsightsCard(
-                        detail: insight,
-                        forecastPoints: _controller.activeInsightPoints,
+                        detail: (isPh ? _controller.phInsightDetail : _controller.ecInsightDetail)!,
+                        forecastPoints: isPh ? _controller.phInsightPoints : _controller.ecInsightPoints,
                         currentPh: _controller.currentPh,
                         currentEc: _controller.currentEc,
                         showParamSelector: isBothTab,
-                        selectedInsightParam:
-                            _controller.selectedBothInsightParam,
+                        selectedInsightParam: _controller.selectedBothInsightParam,
                         onInsightParamChanged: _controller.setBothInsightParam,
-                      ),
-                    const SizedBox(height: 16),
-                    ReportIssueCard(
-                      onAlertAdmin: () => showAlertAdminDialog(
-                        context,
-                        source: 'Forecasting screen',
-                      ),
-                    ),
-                  ] else ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // LEFT SIDEBAR: SINGLE CLEAN INSIGHT CARD WITH OPTIONAL INNER PILL
-                        Expanded(
-                          flex: 4,
-                          child: Column(
+                        fitHeight: fillHeight,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                ],
+              );
+            }
+            final chart = MobileGraphCard(
+              title: 'Forecasting',
+              actionLabel: 'View Forecasting Graph',
+              listenable: _controller,
+              builder: (_) => _buildForecastingGraph(),
+            );
+            final report = ReportIssueCard(
+              onAlertAdmin: () => showAlertAdminDialog(
+                context, source: 'Forecasting screen',
+              ),
+            );
+            return Padding(
+              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              child: Column(
+                children: [
+                  AppHeader(title: 'Forecasting dashboard', profile: _controller.profile),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: LayoutBuilder(builder: (context, available) {
+                      if (!fitDesktop) {
+                        return SingleChildScrollView(
+                          child: Column(children: [
+                            chart,
+                            const SizedBox(height: 12),
+                            if (insight != null) buildInsights(),
+                            const SizedBox(height: 12),
+                            report,
+                          ]),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        child: SizedBox(
+                          height: available.maxHeight.clamp(640.0 * textScale, double.infinity),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              if (insight != null)
-                                PredictionInsightsCard(
-                                  detail: insight,
-                                  forecastPoints:
-                                      _controller.activeInsightPoints,
-                                  currentPh: _controller.currentPh,
-                                  currentEc: _controller.currentEc,
-                                  showParamSelector: isBothTab,
-                                  selectedInsightParam:
-                                      _controller.selectedBothInsightParam,
-                                  onInsightParamChanged:
-                                      _controller.setBothInsightParam,
-                                ),
-                              const SizedBox(height: 16),
-                              ReportIssueCard(
-                                onAlertAdmin: () => showAlertAdminDialog(
-                                  context,
-                                  source: 'Forecasting screen',
-                                ),
+                              Expanded(
+                                flex: 4,
+                                child: Column(children: [
+                                  if (insight != null)
+                                    Expanded(child: buildInsights(fillHeight: true))
+                                  else
+                                    const Spacer(),
+                                  const SizedBox(height: 12),
+                                  report,
+                                ]),
                               ),
+                              const SizedBox(width: 20),
+                              Expanded(flex: 6, child: chart),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        // RIGHT MAIN CHART
-                        Expanded(
-                          flex: 6,
-                          child: ForecastingChartCard(
-                            activeTab: _controller.selectedTab,
-                            onTabChanged: _controller.selectTab,
-                            selectedHours: _controller.selectedHours,
-                            onHoursChanged: _controller.selectHours,
-                            points: phPointsMapped,
-                            ecPoints: ecPointsMapped,
-                            isOffline: _controller.isSensorOffline,
-                            isCalibrating: _controller.isCalibrating,
-                            forecastIssue: _controller.forecastIssue,
-                            latestSensorRecordedAt:
-                                _controller.latestSensorRecordedAt,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      );
+                    }),
+                  ),
                 ],
               ),
             );
