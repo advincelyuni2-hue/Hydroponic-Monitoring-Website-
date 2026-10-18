@@ -1,3 +1,4 @@
+import 'app_footer.dart';
 import 'package:flutter/material.dart';
 
 /// Presentation-only shell; the header is measured before allocating the body.
@@ -29,7 +30,7 @@ class DashboardLayout extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(builder: (context, body) {
                 if (!desktop || scale > 1.2) {
-                  return SingleChildScrollView(
+                  return AppFooterScrollView(
                     child: Column(
                       children: [
                         realtime,
@@ -42,9 +43,10 @@ class DashboardLayout extends StatelessWidget {
                   );
                 }
                 // Short windows scroll instead of compressing readable cards.
-                final height =
-                    body.maxHeight.clamp(640.0 * scale, double.infinity);
-                return SingleChildScrollView(
+                final height = (body.maxHeight -
+                        AppFooter.heightFor(context, body.maxWidth))
+                    .clamp(640.0 * scale, double.infinity);
+                return AppFooterScrollView(
                   child: SizedBox(
                     height: height,
                     child: Row(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/app_footer.dart';
 import '../services/calibration_service.dart';
 import '../services/app_state.dart';
 import '../theme/app_colors.dart';
@@ -750,9 +751,11 @@ class CalibrationScreenState extends State<CalibrationScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
-              child: ListView(
+              child: AppFooterScrollView(
                 padding: const EdgeInsets.all(20),
-                children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   _header(context),
                   const SizedBox(height: 20),
                   if (_error != null) ...[
@@ -972,7 +975,8 @@ class CalibrationScreenState extends State<CalibrationScreen> {
                     const SizedBox(height: 12),
                     _infoNote(),
                   ],
-                ],
+                  ],
+                ),
               ),
             ),
           ),

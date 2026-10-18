@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../utils/email_mask.dart';
 import '../theme/app_colors.dart';
@@ -98,7 +99,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   Expanded(
                     flex: 1,
                     child: Center(
-                      child: SingleChildScrollView(
+                      child: AppFooterScrollView(
+                        centerContent: true,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 48, vertical: 32),
                         child: formSection,
@@ -109,7 +111,7 @@ class _SignupScreenState extends State<SignupScreen> {
               );
             }
 
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Center(child: formSection),
             );

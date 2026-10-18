@@ -46,6 +46,14 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   static Color get ecHistoricalColor => AppColors.accentTeal;
   static Color get predictedColor => AppColors.warningYellow;
 
+  // Steps used to pick "nice" axis ticks (5, 6, 7 ... / 1.5, 2, 2.5 ...).
+  static const List<double> _niceSteps = [
+    0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250,
+    500, 1000,
+  ];
+
+  static double _identity(double value) => value;
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = Responsive.isDesktop(context);
@@ -250,29 +258,81 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     bool showPh,
     bool showEc,
   ) {
+    final hasPh = showPh && phFiltered.isNotEmpty;
+    final hasEc = showEc && ecFiltered.isNotEmpty;
+    final dual = hasPh && hasEc;
+    final maxIntervals = isMobile ? 5 : 8;
+
+    // Left axis follows pH (or EC when it is the only parameter). With both
+    // parameters EC gets its own right-hand axis: it is drawn scaled into the
+    // pH range, while labels and tooltips show the real EC values.
+    final _AxisRange left;
+    _AxisRange? right;
+    if (dual) {
+      final phRange =
+          _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
+      final ecRange =
+          _computeRange(ecFiltered, defaultMin: 0.0, defaultMax: 3.0);
+      left = _niceAxis(phRange.minimum, phRange.maximum,
+          maxIntervals: maxIntervals);
+      right = _alignedAxis(ecRange.minimum, ecRange.maximum, left.intervals);
+    } else {
+      left = _niceAxis(chartRange.minimum, chartRange.maximum,
+          maxIntervals: maxIntervals);
+    }
+    final r = right;
+    final scale =
+        r == null ? 1.0 : (left.max - left.min) / (r.max - r.min);
+    double ecToPlot(double v) => r == null ? v : left.min + (v - r.min) * scale;
+    double ecToReal(double y) => r == null ? y : r.min + (y - left.min) / scale;
+
+    final plots = <_PlotBar>[
+      if (hasPh)
+        ..._buildSeriesBars(
+          phFiltered,
+          param: 'pH',
+          color: phHistoricalColor,
+          fillHistorical: true,
+          fillPredicted: !dual,
+        ),
+      if (hasEc)
+        ..._buildSeriesBars(
+          ecFiltered,
+          param: 'EC',
+          color: ecHistoricalColor,
+          toPlot: ecToPlot,
+          toReal: ecToReal,
+          fillHistorical: !hasPh,
+          fillPredicted: !dual,
+        ),
+    ];
+    final infos = [for (final p in plots) p.info];
+
     return LineChartData(
       clipData: const FlClipData.none(), // Allow hover tooltips to render without clipping
       minX: -widget.selectedHours.toDouble(),
       maxX: widget.selectedHours.toDouble(),
-      minY: chartRange.minimum,
-      maxY: chartRange.maximum,
+      minY: left.min,
+      maxY: left.max,
       gridData: FlGridData(
         show: true,
-        drawVerticalLine: true,
+        drawVerticalLine: false,
+        horizontalInterval: left.step,
         getDrawingHorizontalLine: (value) => FlLine(
-          color: AppColors.chartGrid.withValues(alpha: 0.65),
-          strokeWidth: 1,
-        ),
-        getDrawingVerticalLine: (value) => FlLine(
-          color: AppColors.chartGrid.withValues(alpha: 0.35),
+          color: AppColors.chartGrid.withValues(alpha: 0.55),
           strokeWidth: 1,
         ),
       ),
       borderData: FlBorderData(
         show: true,
-        border: Border.all(color: AppColors.chartGrid),
+        border: Border(bottom: BorderSide(color: AppColors.chartGrid)),
       ),
-      titlesData: _buildTitlesData(chartRange, isMobile),
+      titlesData: _buildTitlesData(
+        left: left,
+        right: right,
+        leftIsEc: hasEc && !hasPh,
+        isMobile: isMobile,
+      ),
       extraLinesData: ExtraLinesData(
         verticalLines: [
           VerticalLine(
@@ -285,37 +345,93 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       ),
       lineTouchData: LineTouchData(
         enabled: true,
+        handleBuiltInTouches: true,
+        // Dots only appear on the hovered point, one per line.
+        getTouchedSpotIndicator: (barData, indexes) => [
+          for (final _ in indexes)
+            TouchedSpotIndicatorData(
+              FlLine(
+                color: AppColors.textSecondary.withValues(alpha: 0.4),
+                strokeWidth: 1,
+                dashArray: [4, 4],
+              ),
+              FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, bar, index) {
+                  // The forecast line starts at the last measured point;
+                  // skip its duplicate dot at "now".
+                  final isConnector = bar.dashArray != null && spot.x <= 0;
+                  return FlDotCirclePainter(
+                    radius: isConnector ? 0 : 5,
+                    color: bar.color ?? phHistoricalColor,
+                    strokeWidth: isConnector ? 0 : 2.5,
+                    strokeColor: AppColors.cardBackground,
+                  );
+                },
+              ),
+            ),
+        ],
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => AppColors.cardBackground,
-          tooltipRoundedRadius: 8,
+          tooltipRoundedRadius: 10,
+          tooltipPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          maxContentWidth: 220,
           fitInsideHorizontally: true,
           fitInsideVertically: true,
-          tooltipMargin: 8,
-          getTooltipItems: (spots) => spots.map((spot) {
-            final isConnector = spot.x <= 0 && spot.barIndex.isOdd;
-            if (isConnector) return null;
+          tooltipMargin: 10,
+          tooltipBorder: BorderSide(color: AppColors.chartGrid),
+          getTooltipItems: (spots) {
+            var headerShown = false;
+            return spots.map((spot) {
+              final info = infos[spot.barIndex];
+              final isConnector = spot.x <= 0 && info.predicted;
+              if (isConnector) return null;
 
-            final isPh = spot.y > 3.0;
-            final label = isPh ? 'pH' : 'EC';
-            final isPredicted = spot.barIndex.isOdd;
-            final color = isPredicted
-                ? predictedColor
-                : (isPh ? phHistoricalColor : ecHistoricalColor);
-            final unit = isPh ? '' : ' mS/cm';
+              final isPh = info.param == 'pH';
+              final value = info.toReal(spot.y).toStringAsFixed(isPh ? 2 : 3);
+              final unit = isPh ? '' : ' mS/cm';
+              final name = info.predicted ? '${info.param} forecast' : info.param;
+              final dotColor = info.predicted
+                  ? predictedColor
+                  : (isPh ? phHistoricalColor : ecHistoricalColor);
+              // Yellow text is hard to read on white; darken it for the value.
+              final textColor = info.predicted
+                  ? Color.lerp(predictedColor, Colors.black, 0.35)!
+                  : dotColor;
+              final header = headerShown ? '' : '${_timeAtHour(spot.x)}\n';
+              headerShown = true;
 
-            return LineTooltipItem(
-              '$label ${spot.y.toStringAsFixed(6)}$unit',
-              AppTextStyles.bodyBold.copyWith(color: color, fontSize: 11),
-            );
-          }).toList(),
+              return LineTooltipItem(
+                header,
+                AppTextStyles.cardMeta.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.left,
+                children: [
+                  TextSpan(
+                    text: '● ',
+                    style: TextStyle(color: dotColor, fontSize: 12),
+                  ),
+                  TextSpan(
+                    text: '$name  ',
+                    style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
+                  ),
+                  TextSpan(
+                    text: '$value$unit',
+                    style: AppTextStyles.bodyBold.copyWith(
+                      color: textColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
         ),
       ),
-      lineBarsData: [
-        if (showPh && phFiltered.isNotEmpty)
-          ..._buildSeriesBars(phFiltered, color: phHistoricalColor),
-        if (showEc && ecFiltered.isNotEmpty)
-          ..._buildSeriesBars(ecFiltered, color: ecHistoricalColor),
-      ],
+      lineBarsData: [for (final p in plots) p.bar],
     );
   }
 
@@ -407,38 +523,69 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  FlTitlesData _buildTitlesData(ChartRange range, bool isMobile) {
-    final interval = math.max(1.0, ((range.maximum - range.minimum) / 8).roundToDouble());
-    const decimals = 6;
+  FlTitlesData _buildTitlesData({
+    required _AxisRange left,
+    required _AxisRange? right,
+    required bool leftIsEc,
+    required bool isMobile,
+  }) {
     final centerTime = widget.generatedAt ?? manilaNow();
     final horizontalInterval = isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
+
+    TextStyle axisNameStyle(Color color) => AppTextStyles.cardMeta.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        );
+
+    final r = right;
 
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       leftTitles: AxisTitles(
-        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+        axisNameSize: 20,
+        axisNameWidget: Text(
+          leftIsEc ? 'EC (mS/cm)' : 'pH',
+          style: axisNameStyle(leftIsEc ? ecHistoricalColor : phHistoricalColor),
+        ),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: isMobile ? 62 : 72,
-          interval: interval,
-          getTitlesWidget: (val, meta) => Text(
-            val.toStringAsFixed(decimals),
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+          reservedSize: isMobile ? 38 : 44,
+          interval: left.step,
+          getTitlesWidget: (val, meta) => Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              _tickLabel(val, left.step),
+              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            ),
           ),
         ),
       ),
-      rightTitles: AxisTitles(
-        axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: isMobile ? 62 : 72,
-          interval: interval,
-          getTitlesWidget: (val, meta) => Text(
-            val.toStringAsFixed(decimals),
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
-          ),
-        ),
-      ),
+      rightTitles: r == null
+          ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+          : AxisTitles(
+              axisNameSize: 20,
+              axisNameWidget: Text(
+                'EC (mS/cm)',
+                style: axisNameStyle(ecHistoricalColor),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: isMobile ? 38 : 44,
+                interval: left.step,
+                getTitlesWidget: (val, meta) {
+                  final real = r.min +
+                      (val - left.min) * (r.max - r.min) / (left.max - left.min);
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: Text(
+                      _tickLabel(real, r.step),
+                      style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                    ),
+                  );
+                },
+              ),
+            ),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
@@ -513,14 +660,24 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 12,
-          height: 3,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
+        if (isDashed)
+          Row(
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                Container(width: 4, height: 3, color: color),
+                if (i < 2) const SizedBox(width: 2),
+              ],
+            ],
+          )
+        else
+          Container(
+            width: 14,
+            height: 3,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
         const SizedBox(width: 6),
         Text(label, style: AppTextStyles.cardMeta),
       ],
@@ -537,45 +694,69 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     }).toList();
   }
 
-  List<LineChartBarData> _buildSeriesBars(
+  LinearGradient _fade(Color color, double alpha) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          color.withValues(alpha: alpha),
+          color.withValues(alpha: 0.0),
+        ],
+      );
+
+  List<_PlotBar> _buildSeriesBars(
     List<ForecastPoint> points, {
+    required String param,
     required Color color,
+    double Function(double) toPlot = _identity,
+    double Function(double) toReal = _identity,
+    required bool fillHistorical,
+    required bool fillPredicted,
   }) {
     final historical = points.where((p) => !p.isPredicted).toList();
     final predicted = points.where((p) => p.isPredicted).toList();
 
-    final historicalSpots = historical.map((p) => FlSpot(p.hour, p.value)).toList();
+    final historicalSpots =
+        historical.map((p) => FlSpot(p.hour, toPlot(p.value))).toList();
     final predictedSpots = <FlSpot>[
       if (historical.isNotEmpty)
-        FlSpot(historical.last.hour, historical.last.value),
-      ...predicted.map((p) => FlSpot(p.hour, p.value)),
+        FlSpot(historical.last.hour, toPlot(historical.last.value)),
+      ...predicted.map((p) => FlSpot(p.hour, toPlot(p.value))),
     ];
 
     return [
       if (historicalSpots.isNotEmpty)
-        LineChartBarData(
-          spots: historicalSpots,
-          isCurved: true,
-          color: color,
-          barWidth: 2.5,
-          dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(
-            show: true,
-            color: color.withValues(alpha: 0.10),
+        _PlotBar(
+          LineChartBarData(
+            spots: historicalSpots,
+            isCurved: true,
+            color: color,
+            barWidth: 2.25,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: fillHistorical,
+              gradient: _fade(color, 0.16),
+            ),
           ),
+          _BarInfo(param, false, toReal),
         ),
       if (predictedSpots.isNotEmpty)
-        LineChartBarData(
-          spots: predictedSpots,
-          isCurved: true,
-          color: predictedColor,
-          barWidth: 2,
-          dashArray: [6, 4],
-          dotData: const FlDotData(show: true),
-          belowBarData: BarAreaData(
-            show: true,
-            color: predictedColor.withValues(alpha: 0.06),
+        _PlotBar(
+          LineChartBarData(
+            spots: predictedSpots,
+            isCurved: true,
+            color: predictedColor,
+            barWidth: 1.75,
+            isStrokeCapRound: true,
+            dashArray: [6, 4],
+            // No resting dots: they only appear on hover.
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: fillPredicted,
+              gradient: _fade(predictedColor, 0.10),
+            ),
           ),
+          _BarInfo(param, true, toReal),
         ),
     ];
   }
@@ -587,7 +768,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     bool showEc, {
     required bool predicted,
   }) {
-    String? valueFor(List<ForecastPoint> pts) {
+    String? valueFor(List<ForecastPoint> pts, int decimals) {
       final matching = pts.where((p) => p.isPredicted == predicted).toList();
       if (matching.isEmpty) return null;
       final point = predicted
@@ -597,16 +778,16 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                   ? a
                   : b)
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
-      return point.value.toStringAsFixed(6);
+      return point.value.toStringAsFixed(decimals);
     }
 
     final values = <String>[];
     if (showPh && ph.isNotEmpty) {
-      final val = valueFor(ph);
+      final val = valueFor(ph, 2);
       if (val != null) values.add('pH $val');
     }
     if (showEc && ec.isNotEmpty) {
-      final val = valueFor(ec);
+      final val = valueFor(ec, 3);
       if (val != null) values.add('EC $val');
     }
 
@@ -632,10 +813,87 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       maxVal + padding,
     );
   }
+
+  String _timeAtHour(double hour) {
+    final center = widget.generatedAt ?? manilaNow();
+    return formatManilaClockTime(
+      center.add(Duration(minutes: (hour * 60).round())),
+    );
+  }
+
+  /// Round axis bounds + step covering [low]..[high] with at most
+  /// [maxIntervals] gridlines.
+  static _AxisRange _niceAxis(
+    double low,
+    double high, {
+    required int maxIntervals,
+  }) {
+    for (final step in _niceSteps) {
+      var lo = (low / step).floorToDouble() * step;
+      if (lo < 0) lo = 0;
+      var hi = (high / step).ceilToDouble() * step;
+      var n = ((hi - lo) / step).round();
+      if (n < 2) {
+        hi = lo + 2 * step;
+        n = 2;
+      }
+      if (n <= maxIntervals) return _AxisRange(lo, hi, step);
+    }
+    final lo = math.max(low, 0.0);
+    return _AxisRange(lo, high, (high - lo) / maxIntervals);
+  }
+
+  /// Round axis bounds covering [low]..[high] with exactly [intervals]
+  /// gridlines, so a second axis lines up with the first one.
+  static _AxisRange _alignedAxis(double low, double high, int intervals) {
+    for (final step in _niceSteps) {
+      var lo = (low / step).floorToDouble() * step;
+      if (lo < 0) lo = 0;
+      final hi = lo + intervals * step;
+      if (hi >= high - 1e-9) return _AxisRange(lo, hi, step);
+    }
+    final span = math.max(high - low, 0.1);
+    return _AxisRange(low, low + span, span / intervals);
+  }
+
+  static String _tickLabel(double value, double step) {
+    if (step >= 1 && (step - step.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(0);
+    }
+    final tenths = step * 10;
+    if ((tenths - tenths.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(1);
+    }
+    return value.toStringAsFixed(2);
+  }
 }
 
 class ChartRange {
   final double minimum;
   final double maximum;
   const ChartRange(this.minimum, this.maximum);
+}
+
+class _AxisRange {
+  final double min;
+  final double max;
+  final double step;
+  const _AxisRange(this.min, this.max, this.step);
+
+  int get intervals => ((max - min) / step).round();
+}
+
+/// Which parameter a plotted line belongs to, so tooltips can show the real
+/// value even when a series is drawn scaled onto the other axis.
+class _BarInfo {
+  final String param;
+  final bool predicted;
+  final double Function(double) toReal;
+  const _BarInfo(this.param, this.predicted, this.toReal);
+}
+
+class _PlotBar {
+  final LineChartBarData bar;
+  final _BarInfo info;
+  const _PlotBar(this.bar, this.info);
 }

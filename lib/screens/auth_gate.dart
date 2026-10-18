@@ -42,6 +42,10 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     return _home ??
-        const Scaffold(body: Center(child: CircularProgressIndicator()));
+        const Scaffold(
+          body: SafeArea(
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
   }
 }

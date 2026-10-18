@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../services/app_state.dart';
 import '../services/help_article_service.dart';
@@ -207,7 +208,8 @@ class _HelpScreenState extends State<HelpScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 5),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: AppFooterScrollView(
+          showFooter: !_loading,
           padding: EdgeInsets.all(isMobile ? 16 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

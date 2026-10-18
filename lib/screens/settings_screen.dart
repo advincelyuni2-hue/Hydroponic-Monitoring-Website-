@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../utils/email_mask.dart';
 import '../screens/login_screen.dart';
@@ -48,7 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: -1),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: AppFooterScrollView(
           padding: EdgeInsets.all(isMobile ? 16 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

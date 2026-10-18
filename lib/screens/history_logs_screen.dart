@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../controllers/history_logs_controller.dart';
 import '../services/notification_service.dart';
@@ -532,7 +533,8 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (_controller.errorMessage != null) {
-              return Center(
+              return AppFooterScrollView(
+                centerContent: true,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -551,7 +553,7 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
             final isAdmin = appProfile.value?.isAdmin == true &&
                 _controller.selectedTab != 'Intervention logs';
 
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.fromLTRB(
                 isMobile ? 16 : 24,
                 isMobile ? 16 : 24,

@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
 import '../controllers/forecasting_controller.dart';
@@ -69,7 +70,8 @@ class _ForecastingDashboardScreenState
             }
 
             if (_controller.errorMessage != null) {
-              return Center(
+              return AppFooterScrollView(
+                centerContent: true,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -136,7 +138,7 @@ class _ForecastingDashboardScreenState
                   Expanded(
                     child: LayoutBuilder(builder: (context, available) {
                       if (!fitDesktop) {
-                        return SingleChildScrollView(
+                        return AppFooterScrollView(
                           child: Column(children: [
                             chart,
                             const SizedBox(height: 12),
@@ -146,9 +148,11 @@ class _ForecastingDashboardScreenState
                           ]),
                         );
                       }
-                      return SingleChildScrollView(
+                      return AppFooterScrollView(
                         child: SizedBox(
-                          height: available.maxHeight.clamp(640.0 * textScale, double.infinity),
+                          height: (available.maxHeight -
+                                  AppFooter.heightFor(context, available.maxWidth))
+                              .clamp(640.0 * textScale, double.infinity),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [

@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
@@ -320,7 +321,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         child: ListenableBuilder(
           listenable: _c,
           builder: (context, _) {
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

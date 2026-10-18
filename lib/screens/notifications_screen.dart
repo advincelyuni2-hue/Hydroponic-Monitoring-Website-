@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../widgets/mobile_page_header.dart';
 import '../controllers/notification_controller.dart';
@@ -157,7 +158,8 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                   builder: (context, _) {
                     final matches =
                         _controller.notifications.where((n) => n.id == item.id);
-                    return SingleChildScrollView(
+                    return AppFooterScrollView(
+                      showFooter: !_controller.isLoading,
                         padding: const EdgeInsets.all(16),
                         child: matches.isEmpty
                             ? const Text(
@@ -302,7 +304,8 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                   final selected = items
                       .where((item) => item.id == highlightedNotificationId)
                       .firstOrNull;
-                  return SingleChildScrollView(
+                  return AppFooterScrollView(
+                    showFooter: !_controller.isLoading,
                     key: const PageStorageKey('notification-list-scroll'),
                     padding: EdgeInsets.all(
                         MediaQuery.sizeOf(context).width < 600 ? 16 : 24),

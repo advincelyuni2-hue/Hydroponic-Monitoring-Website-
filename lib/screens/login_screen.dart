@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
@@ -84,7 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   Expanded(
                     flex: 1,
                     child: Center(
-                      child: SingleChildScrollView(
+                      child: AppFooterScrollView(
+                        centerContent: true,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 48, vertical: 32),
                         child: formSection,
@@ -95,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             }
 
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Center(child: formSection),
             );

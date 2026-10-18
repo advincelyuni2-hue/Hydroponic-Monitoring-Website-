@@ -64,6 +64,14 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   static Color get _ecColor => AppColors.accentTeal;
   static const Color _forecastColor = Color(0xFFF57C00);
 
+  // Steps used to pick "nice" axis ticks (5.5, 6, 6.5 ... / 1.4, 1.6 ...).
+  static const List<double> _niceSteps = [
+    0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250,
+    500, 1000,
+  ];
+
+  static double _identity(double value) => value;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
@@ -144,6 +152,52 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
             ? phRange
             : ecRange;
 
+    // Which series are drawn. With both parameters, EC gets its own
+    // right-hand axis: it is drawn scaled into the pH range, while labels
+    // and tooltips show the real EC values.
+    final showPhBars = _parameter != 'EC' && ph.isNotEmpty;
+    final showEcBars = _parameter != 'pH' && ec.isNotEmpty;
+    final dual = showPhBars && showEcBars;
+    final maxIntervals = isMobile ? 4 : 6;
+    final _AxisRange left = dual
+        ? _niceAxis(phRange.minimum, phRange.maximum,
+            maxIntervals: maxIntervals)
+        : _niceAxis(chartRange.minimum, chartRange.maximum,
+            maxIntervals: maxIntervals);
+    final _AxisRange? right = dual
+        ? _alignedAxis(ecRange.minimum, ecRange.maximum, left.intervals)
+        : null;
+    final r = right;
+    final axisScale =
+        r == null ? 1.0 : (left.max - left.min) / (r.max - r.min);
+    double ecToPlot(double v) =>
+        r == null ? v : left.min + (v - r.min) * axisScale;
+    double ecToReal(double y) =>
+        r == null ? y : r.min + (y - left.min) / axisScale;
+
+    final plots = <_PlotBar>[
+      if (_parameter != 'EC')
+        ..._seriesBars(
+          ph,
+          param: 'pH',
+          color: _phColor,
+          fillHistorical: true,
+          fillPredicted: !dual,
+        ),
+      if (_parameter != 'pH')
+        ..._seriesBars(
+          ec,
+          param: 'EC',
+          color: _ecColor,
+          toPlot: ecToPlot,
+          toReal: ecToReal,
+          fillHistorical: !showPhBars,
+          fillPredicted: !dual,
+        ),
+    ];
+    final infos = [for (final p in plots) p.info];
+    final leftIsEc = showEcBars && !showPhBars;
+
     return Container(
       width: double.infinity,
       padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
@@ -177,28 +231,28 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                           clipData: const FlClipData.all(),
                           minX: -_hours.toDouble(),
                           maxX: _hours.toDouble(),
-                          minY: chartRange.minimum,
-                          maxY: chartRange.maximum,
+                          minY: left.min,
+                          maxY: left.max,
                           gridData: FlGridData(
                             show: true,
-                            drawVerticalLine: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: left.step,
                             getDrawingHorizontalLine: (_) => FlLine(
                               color:
-                                  AppColors.chartGrid.withValues(alpha: 0.65),
-                              strokeWidth: 1,
-                            ),
-                            getDrawingVerticalLine: (_) => FlLine(
-                              color:
-                                  AppColors.chartGrid.withValues(alpha: 0.35),
+                                  AppColors.chartGrid.withValues(alpha: 0.55),
                               strokeWidth: 1,
                             ),
                           ),
                           borderData: FlBorderData(
                             show: true,
-                            border: Border.all(color: AppColors.chartGrid),
+                            border: Border(
+                              bottom: BorderSide(color: AppColors.chartGrid),
+                            ),
                           ),
                           titlesData: _titlesData(
-                            chartRange: chartRange,
+                            left: left,
+                            right: right,
+                            leftIsEc: leftIsEc,
                             isMobile: isMobile,
                             chartWidth: chartSpace.maxWidth,
                           ),
@@ -220,43 +274,118 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                             ],
                           ),
                           lineTouchData: LineTouchData(
+                            handleBuiltInTouches: true,
+                            // Dots only appear on the hovered point,
+                            // one per line.
+                            getTouchedSpotIndicator: (barData, indexes) => [
+                              for (final _ in indexes)
+                                TouchedSpotIndicatorData(
+                                  FlLine(
+                                    color: AppColors.textSecondary
+                                        .withValues(alpha: 0.4),
+                                    strokeWidth: 1,
+                                    dashArray: [4, 4],
+                                  ),
+                                  FlDotData(
+                                    show: true,
+                                    getDotPainter:
+                                        (spot, percent, bar, index) {
+                                      // The forecast line starts at the last
+                                      // measured point; skip its duplicate
+                                      // dot at "now".
+                                      final isConnector =
+                                          bar.dashArray != null && spot.x <= 0;
+                                      return FlDotCirclePainter(
+                                        radius: isConnector ? 0 : 5,
+                                        color: bar.color ?? _phColor,
+                                        strokeWidth: isConnector ? 0 : 2.5,
+                                        strokeColor: AppColors.cardBackground,
+                                      );
+                                    },
+                                  ),
+                                ),
+                            ],
                             touchTooltipData: LineTouchTooltipData(
                               getTooltipColor: (_) => AppColors.cardBackground,
-                              tooltipRoundedRadius: 8,
+                              tooltipRoundedRadius: 10,
+                              tooltipPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              tooltipMargin: 10,
+                              maxContentWidth: 220,
                               fitInsideHorizontally: true,
                               fitInsideVertically: true,
-                              getTooltipItems: (spots) => spots.map((spot) {
-                                // Each predicted line includes the current historical
-                                // point so the two segments connect. Suppress that
-                                // duplicate connector in the tooltip.
-                                final isPredictedConnector =
-                                    spot.x <= 0 && spot.barIndex.isOdd;
-                                if (isPredictedConnector) return null;
+                              tooltipBorder:
+                                  BorderSide(color: AppColors.chartGrid),
+                              getTooltipItems: (spots) {
+                                var headerShown = false;
+                                return spots.map((spot) {
+                                  final info = infos[spot.barIndex];
+                                  // Each predicted line includes the current
+                                  // historical point so the two segments
+                                  // connect. Suppress that duplicate
+                                  // connector in the tooltip.
+                                  final isPredictedConnector =
+                                      spot.x <= 0 && info.predicted;
+                                  if (isPredictedConnector) return null;
 
-                                final isPh = _parameter == 'pH' ||
-                                    (_parameter == 'Both' && spot.barIndex < 2);
-                                final label = isPh ? 'pH' : 'EC';
-                                final color = isPh ? _phColor : _ecColor;
-                                final unit = isPh ? '' : ' mS/cm';
-                                return LineTooltipItem(
-                                  '$label ${spot.y.toStringAsFixed(6)}$unit',
-                                  AppTextStyles.bodyBold.copyWith(color: color),
-                                );
-                              }).toList(),
+                                  final isPh = info.param == 'pH';
+                                  final value = info
+                                      .toReal(spot.y)
+                                      .toStringAsFixed(isPh ? 2 : 3);
+                                  final unit = isPh ? '' : ' mS/cm';
+                                  final name = info.predicted
+                                      ? '${info.param} forecast'
+                                      : info.param;
+                                  final dotColor = info.predicted
+                                      ? _forecastColor
+                                      : (isPh ? _phColor : _ecColor);
+                                  // Orange text is hard to read on white;
+                                  // darken it for the value.
+                                  final textColor = info.predicted
+                                      ? Color.lerp(
+                                          _forecastColor, Colors.black, 0.3)!
+                                      : dotColor;
+                                  final header = headerShown
+                                      ? ''
+                                      : '${_timeAtHour(spot.x)}\n';
+                                  headerShown = true;
+
+                                  return LineTooltipItem(
+                                    header,
+                                    AppTextStyles.cardMeta.copyWith(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    textAlign: TextAlign.left,
+                                    children: [
+                                      TextSpan(
+                                        text: '● ',
+                                        style: TextStyle(
+                                          color: dotColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: '$name  ',
+                                        style: AppTextStyles.cardMeta
+                                            .copyWith(fontSize: 12),
+                                      ),
+                                      TextSpan(
+                                        text: '$value$unit',
+                                        style: AppTextStyles.bodyBold.copyWith(
+                                          color: textColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList();
+                              },
                             ),
                           ),
-                          lineBarsData: [
-                            if (_parameter != 'EC')
-                              ..._seriesBars(
-                                ph,
-                                color: _phColor,
-                              ),
-                            if (_parameter != 'pH')
-                              ..._seriesBars(
-                                ec,
-                                color: _ecColor,
-                              ),
-                          ],
+                          lineBarsData: [for (final p in plots) p.bar],
                         ),
                       )),
             ),
@@ -401,14 +530,18 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
   }
 
   FlTitlesData _titlesData({
-    required _ChartRange chartRange,
+    required _AxisRange left,
+    required _AxisRange? right,
+    required bool leftIsEc,
     required bool isMobile,
     required double chartWidth,
   }) {
-    final singleInterval = (chartRange.maximum - chartRange.minimum) / 4;
-    const axisDecimals = 2;
+    final r = right;
+    final dual = r != null;
     final centerTime = widget.generatedAt ?? manilaNow();
     final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    final leftReserved = (isMobile ? 34 : 40) * textScale;
+    final rightReserved = dual ? (isMobile ? 34 : 40) * textScale : 0.0;
     // Keep complete clock labels on one line. Reduce tick count according to
     // the actual plot width and scaled text instead of splitting AM/PM below.
     var labelWidth = 0.0;
@@ -426,45 +559,91 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         painter.dispose();
       }
     }
-    final plotWidth = math.max(0.0, chartWidth - 46 * textScale);
+    final axisNameSize = dual || !isMobile ? 18.0 : 0.0;
+    final plotWidth = math.max(
+      0.0,
+      chartWidth - leftReserved - rightReserved - (dual ? axisNameSize * 2 : 0),
+    );
     final tickCount =
         isMobile ? (plotWidth / (labelWidth + 16)).floor().clamp(1, 3) : 5;
     final horizontalInterval =
         isMobile ? _hours * (tickCount == 2 ? 2.0 : 1.0) : _hours / 2;
+
+    TextStyle axisNameStyle(Color color) => AppTextStyles.cardMeta.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        );
+
+    Widget tickLabel(String text, TitleMeta meta, {required bool onRight}) {
+      final label = Text(
+        text,
+        style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
+      );
+      if (!isMobile) {
+        return Padding(
+          padding: onRight
+              ? const EdgeInsets.only(left: 6)
+              : const EdgeInsets.only(right: 6),
+          child: label,
+        );
+      }
+      return SideTitleWidget(
+        axisSide: meta.axisSide,
+        space: 6,
+        fitInside: SideTitleFitInsideData(
+          enabled: true,
+          axisPosition: meta.axisPosition,
+          parentAxisSize: meta.parentAxisSize,
+          distanceFromEdge: 0,
+        ),
+        child: label,
+      );
+    }
+
     return FlTitlesData(
       topTitles: const AxisTitles(
         sideTitles: SideTitles(showTitles: false),
       ),
       leftTitles: AxisTitles(
-        axisNameWidget:
-            isMobile ? null : Text('Value', style: AppTextStyles.cardMeta),
+        axisNameSize: axisNameSize,
+        // On mobile a single parameter keeps the axis name hidden (as before).
+        axisNameWidget: (isMobile && !dual)
+            ? null
+            : Text(
+                leftIsEc ? 'EC (mS/cm)' : 'pH',
+                style: axisNameStyle(leftIsEc ? _ecColor : _phColor),
+              ),
         sideTitles: SideTitles(
           showTitles: true,
-          reservedSize: 46 * MediaQuery.textScalerOf(context).scale(12) / 12,
-          interval: singleInterval,
-          getTitlesWidget: (value, meta) {
-            final label = Text(
-              value.toStringAsFixed(axisDecimals),
-              style: AppTextStyles.cardMeta.copyWith(fontSize: 11),
-            );
-            if (!isMobile) return label;
-            return SideTitleWidget(
-              axisSide: meta.axisSide,
-              space: 6,
-              fitInside: SideTitleFitInsideData(
-                enabled: true,
-                axisPosition: meta.axisPosition,
-                parentAxisSize: meta.parentAxisSize,
-                distanceFromEdge: 0,
-              ),
-              child: label,
-            );
-          },
+          reservedSize: leftReserved,
+          interval: left.step,
+          getTitlesWidget: (value, meta) =>
+              tickLabel(_tickLabel(value, left.step), meta, onRight: false),
         ),
       ),
-      rightTitles: const AxisTitles(
-        sideTitles: SideTitles(showTitles: false),
-      ),
+      rightTitles: r == null
+          ? const AxisTitles(sideTitles: SideTitles(showTitles: false))
+          : AxisTitles(
+              axisNameSize: axisNameSize,
+              axisNameWidget: Text(
+                isMobile ? 'EC' : 'EC (mS/cm)',
+                style: axisNameStyle(_ecColor),
+              ),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: rightReserved,
+                interval: left.step,
+                getTitlesWidget: (value, meta) {
+                  final real = r.min +
+                      (value - left.min) *
+                          (r.max - r.min) /
+                          (left.max - left.min);
+                  return tickLabel(_tickLabel(real, r.step), meta,
+                      onRight: true);
+                },
+              ),
+            ),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,
@@ -623,7 +802,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     required bool predicted,
     required String parameter,
   }) {
-    String? valueFor(List<ForecastPoint> points) {
+    String? valueFor(List<ForecastPoint> points, int decimals) {
       final matching = points.where(
         (point) => point.isPredicted == predicted,
       );
@@ -634,16 +813,16 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
                   (a.hour - _hours).abs() <= (b.hour - _hours).abs() ? a : b,
             )
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
-      return point.value.toStringAsFixed(6);
+      return point.value.toStringAsFixed(decimals);
     }
 
     final values = <String>[];
     if (parameter != 'EC') {
-      final value = valueFor(ph);
+      final value = valueFor(ph, 2);
       if (value != null) values.add('pH $value');
     }
     if (parameter != 'pH') {
-      final value = valueFor(ec);
+      final value = valueFor(ec, 3);
       if (value != null) values.add('EC $value');
     }
     return values.isEmpty ? '--' : values.join(' / ');
@@ -658,26 +837,39 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         .toList();
   }
 
-  List<LineChartBarData> _seriesBars(
+  List<_PlotBar> _seriesBars(
     List<ForecastPoint> points, {
+    required String param,
     required Color color,
+    double Function(double) toPlot = _identity,
+    double Function(double) toReal = _identity,
+    required bool fillHistorical,
+    required bool fillPredicted,
   }) {
     final historical = points.where((point) => !point.isPredicted).toList();
     final predicted = points.where((point) => point.isPredicted).toList();
-    double y(double value) => value;
-    final historicalSpots =
-        historical.map((point) => FlSpot(point.hour, y(point.value))).toList();
+    final historicalSpots = historical
+        .map((point) => FlSpot(point.hour, toPlot(point.value)))
+        .toList();
     final predictedSpots = <FlSpot>[
       if (historical.isNotEmpty)
-        FlSpot(historical.last.hour, y(historical.last.value)),
-      ...predicted.map((point) => FlSpot(point.hour, y(point.value))),
+        FlSpot(historical.last.hour, toPlot(historical.last.value)),
+      ...predicted.map((point) => FlSpot(point.hour, toPlot(point.value))),
     ];
 
     return [
       if (historicalSpots.isNotEmpty)
-        _bar(historicalSpots, color: color, predicted: false),
+        _PlotBar(
+          _bar(historicalSpots,
+              color: color, predicted: false, fill: fillHistorical),
+          _BarInfo(param, false, toReal),
+        ),
       if (predictedSpots.isNotEmpty)
-        _bar(predictedSpots, color: color, predicted: true),
+        _PlotBar(
+          _bar(predictedSpots,
+              color: color, predicted: true, fill: fillPredicted),
+          _BarInfo(param, true, toReal),
+        ),
     ];
   }
 
@@ -685,26 +877,28 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     List<FlSpot> spots, {
     required Color color,
     required bool predicted,
+    required bool fill,
   }) {
     final lineColor = predicted ? _forecastColor : color;
     return LineChartBarData(
       spots: spots,
       isCurved: true,
       color: lineColor,
-      barWidth: predicted ? 2 : 2.5,
+      barWidth: predicted ? 1.75 : 2.25,
+      isStrokeCapRound: true,
       dashArray: predicted ? [6, 4] : null,
-      dotData: FlDotData(
-        show: predicted,
-        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-          radius: 3,
-          color: _forecastColor,
-          strokeWidth: 1,
-          strokeColor: _forecastColor,
-        ),
-      ),
+      // No resting dots: they only appear on hover.
+      dotData: const FlDotData(show: false),
       belowBarData: BarAreaData(
-        show: true,
-        color: lineColor.withValues(alpha: predicted ? 0.05 : 0.10),
+        show: fill,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            lineColor.withValues(alpha: predicted ? 0.10 : 0.16),
+            lineColor.withValues(alpha: 0.0),
+          ],
+        ),
       ),
     );
   }
@@ -721,6 +915,59 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     final padding = math.max(spread * 0.18, maximum.abs() * 0.03);
     return _ChartRange(math.max(0, minimum - padding), maximum + padding);
   }
+
+  String _timeAtHour(double hour) {
+    final center = widget.generatedAt ?? manilaNow();
+    return formatManilaClockTime(
+      center.add(Duration(minutes: (hour * 60).round())),
+    );
+  }
+
+  /// Round axis bounds + step covering [low]..[high] with at most
+  /// [maxIntervals] gridlines.
+  static _AxisRange _niceAxis(
+    double low,
+    double high, {
+    required int maxIntervals,
+  }) {
+    for (final step in _niceSteps) {
+      var lo = (low / step).floorToDouble() * step;
+      if (lo < 0) lo = 0;
+      var hi = (high / step).ceilToDouble() * step;
+      var n = ((hi - lo) / step).round();
+      if (n < 2) {
+        hi = lo + 2 * step;
+        n = 2;
+      }
+      if (n <= maxIntervals) return _AxisRange(lo, hi, step);
+    }
+    final lo = math.max(low, 0.0);
+    return _AxisRange(lo, high, (high - lo) / maxIntervals);
+  }
+
+  /// Round axis bounds covering [low]..[high] with exactly [intervals]
+  /// gridlines, so a second axis lines up with the first one.
+  static _AxisRange _alignedAxis(double low, double high, int intervals) {
+    for (final step in _niceSteps) {
+      var lo = (low / step).floorToDouble() * step;
+      if (lo < 0) lo = 0;
+      final hi = lo + intervals * step;
+      if (hi >= high - 1e-9) return _AxisRange(lo, hi, step);
+    }
+    final span = math.max(high - low, 0.1);
+    return _AxisRange(low, low + span, span / intervals);
+  }
+
+  static String _tickLabel(double value, double step) {
+    if (step >= 1 && (step - step.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(0);
+    }
+    final tenths = step * 10;
+    if ((tenths - tenths.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(1);
+    }
+    return value.toStringAsFixed(2);
+  }
 }
 
 class _ChartRange {
@@ -728,4 +975,28 @@ class _ChartRange {
   final double maximum;
 
   const _ChartRange(this.minimum, this.maximum);
+}
+
+class _AxisRange {
+  final double min;
+  final double max;
+  final double step;
+  const _AxisRange(this.min, this.max, this.step);
+
+  int get intervals => ((max - min) / step).round();
+}
+
+/// Which parameter a plotted line belongs to, so tooltips can show the real
+/// value even when a series is drawn scaled onto the other axis.
+class _BarInfo {
+  final String param;
+  final bool predicted;
+  final double Function(double) toReal;
+  const _BarInfo(this.param, this.predicted, this.toReal);
+}
+
+class _PlotBar {
+  final LineChartBarData bar;
+  final _BarInfo info;
+  const _PlotBar(this.bar, this.info);
 }

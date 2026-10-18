@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
@@ -36,6 +38,12 @@ class ReportsAnalyticsCard extends StatefulWidget {
 class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
   static Color get phColor => AppColors.accentGreen;
   static Color get ecColor => AppColors.accentTeal;
+
+  // Steps used to pick "nice" axis ticks (4, 6, 8 ... / 1.5, 1.75, 2 ...).
+  static const List<double> _niceSteps = [
+    0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250,
+    500, 1000,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -178,10 +186,12 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 9,
-              height: 9,
-              decoration:
-                  BoxDecoration(color: currentColor, shape: BoxShape.circle),
+              width: 14,
+              height: 3,
+              decoration: BoxDecoration(
+                color: currentColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(width: 6),
             Text('${widget.selectedParameter} measured values',
@@ -198,13 +208,65 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
                   color: AppColors.alertBorder, shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),
-            Text('Out of range (hover for details)',
+            Text('Out of range (shown on hover)',
                 style: AppTextStyles.cardMeta),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 3; i++) ...[
+              Container(width: 4, height: 2, color: AppColors.alertBorder),
+              if (i < 2) const SizedBox(width: 2),
+            ],
+            const SizedBox(width: 6),
+            Text('Ideal range limits', style: AppTextStyles.cardMeta),
           ],
         ),
       ],
     );
   }
+
+  /// Picks a tick step so the axis starts and ends on round numbers
+  /// and never needs more than [maxIntervals] gridlines.
+  static _AxisRange _niceAxis(
+    double dataMin,
+    double dataMax, {
+    required int maxIntervals,
+  }) {
+    final range = dataMax - dataMin;
+    final pad = math.max(range * 0.1, 0.1);
+    final lowTarget = dataMin - pad;
+    final highTarget = dataMax + pad;
+    for (final step in _niceSteps) {
+      var lo = (lowTarget / step).floorToDouble() * step;
+      if (lo < 0) lo = 0;
+      var hi = (highTarget / step).ceilToDouble() * step;
+      var n = ((hi - lo) / step).round();
+      if (n < 2) {
+        hi = lo + 2 * step;
+        n = 2;
+      }
+      if (n <= maxIntervals) return _AxisRange(lo, hi, step);
+    }
+    final low = math.max(lowTarget, 0.0);
+    return _AxisRange(low, highTarget, (highTarget - low) / maxIntervals);
+  }
+
+  static String _tickLabel(double value, double step) {
+    if (step >= 1 && (step - step.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(0);
+    }
+    final tenths = step * 10;
+    if ((tenths - tenths.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(1);
+    }
+    return value.toStringAsFixed(2);
+  }
+
+  /// 5.500000 -> "5.5", 1.25 -> "1.25"
+  static String _compact(double value) =>
+      double.parse(value.toStringAsFixed(2)).toString();
 
   LineChartData _buildTrendChartData(bool isMobile) {
     final spots = <FlSpot>[];
@@ -212,7 +274,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       spots.add(FlSpot(i.toDouble(), widget.points[i].value));
     }
 
-    final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
+    final isPh = widget.selectedParameter == 'pH';
+    final currentColor = isPh ? phColor : ecColor;
     bool isOut(double value) =>
         value < widget.minThreshold || value > widget.maxThreshold;
     var dataMin = widget.minThreshold;
@@ -222,40 +285,37 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       if (point.value < dataMin) dataMin = point.value;
       if (point.value > dataMax) dataMax = point.value;
     }
-    final dataRange = dataMax - dataMin;
-    final padding = (dataRange * 0.1).clamp(0.1, double.infinity).toDouble();
-    final paddedMinY = ((dataMin - padding) / 0.5).floorToDouble() * 0.5;
-    final minY = paddedMinY < 0 ? 0.0 : paddedMinY;
-    final maxY = (((dataMax + padding) / 0.5).ceilToDouble() * 0.5)
-        .clamp(0.5, double.infinity)
-        .toDouble();
+    final axis = _niceAxis(dataMin, dataMax, maxIntervals: isMobile ? 5 : 8);
     final labelIntervals = isMobile ? 5 : 6;
     final xInterval = widget.points.length > 1
         ? ((widget.points.length - 2 + labelIntervals) ~/ labelIntervals)
         : 1;
 
+    final limitLabelStyle = AppTextStyles.cardMeta.copyWith(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      color: AppColors.alertBorder,
+    );
+
     return LineChartData(
       minX: 0,
       maxX:
           widget.points.isNotEmpty ? (widget.points.length - 1).toDouble() : 5,
-      minY: minY,
-      maxY: maxY,
+      minY: axis.min,
+      maxY: axis.max,
       clipData: const FlClipData.all(),
       gridData: FlGridData(
         show: true,
-        drawVerticalLine: true,
+        drawVerticalLine: false,
+        horizontalInterval: axis.step,
         getDrawingHorizontalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withValues(alpha: 0.65),
-          strokeWidth: 1,
-        ),
-        getDrawingVerticalLine: (_) => FlLine(
-          color: AppColors.chartGrid.withValues(alpha: 0.35),
+          color: AppColors.chartGrid.withValues(alpha: 0.55),
           strokeWidth: 1,
         ),
       ),
       borderData: FlBorderData(
         show: true,
-        border: Border.all(color: AppColors.chartGrid),
+        border: Border(bottom: BorderSide(color: AppColors.chartGrid)),
       ),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -263,14 +323,25 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           sideTitles: SideTitles(showTitles: false),
         ),
         leftTitles: AxisTitles(
-          axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+          axisNameSize: 20,
+          axisNameWidget: Text(
+            isPh ? 'pH' : 'EC (mS/cm)',
+            style: AppTextStyles.cardMeta.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: currentColor,
+            ),
+          ),
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: isMobile ? 62 : 72,
-            interval: 0.5,
-            getTitlesWidget: (val, _) => Text(
-              val.toStringAsFixed(6),
-              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+            reservedSize: isMobile ? 38 : 44,
+            interval: axis.step,
+            getTitlesWidget: (val, _) => Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text(
+                _tickLabel(val, axis.step),
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+              ),
             ),
           ),
         ),
@@ -313,16 +384,33 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
             color: AppColors.alertBorder,
             strokeWidth: 1.2,
             dashArray: [5, 5],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              padding: const EdgeInsets.only(right: 4, bottom: 2),
+              style: limitLabelStyle,
+              labelResolver: (_) => 'Max ${_compact(widget.maxThreshold)}',
+            ),
           ),
           HorizontalLine(
             y: widget.minThreshold,
             color: AppColors.alertBorder,
             strokeWidth: 1.2,
             dashArray: [5, 5],
+            label: HorizontalLineLabel(
+              show: true,
+              alignment: Alignment.topRight,
+              padding: const EdgeInsets.only(right: 4, bottom: 2),
+              style: limitLabelStyle,
+              labelResolver: (_) => 'Min ${_compact(widget.minThreshold)}',
+            ),
           ),
         ],
       ),
       lineTouchData: LineTouchData(
+        handleBuiltInTouches: true,
+        // The dot only appears on the hovered point: red when out of range,
+        // the parameter colour when it is within range.
         getTouchedSpotIndicator: (barData, indexes) => indexes
             .map(
               (i) => TouchedSpotIndicatorData(
@@ -335,9 +423,9 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
                   show: true,
                   getDotPainter: (spot, percent, bar, index) =>
                       FlDotCirclePainter(
-                    radius: 6,
+                    radius: 5.5,
                     color: isOut(spot.y) ? AppColors.alertBorder : currentColor,
-                    strokeWidth: 2,
+                    strokeWidth: 2.5,
                     strokeColor: Colors.white,
                   ),
                 ),
@@ -346,15 +434,23 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
             .toList(),
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => AppColors.cardBackground,
-          tooltipRoundedRadius: 8,
+          tooltipRoundedRadius: 10,
+          tooltipPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          tooltipMargin: 10,
+          maxContentWidth: 240,
+          fitInsideHorizontally: true,
+          fitInsideVertically: true,
+          tooltipBorder: BorderSide(color: AppColors.chartGrid),
           getTooltipItems: (spots) => spots.map((spot) {
             final idx = spot.x.toInt();
             final label = idx >= 0 && idx < widget.points.length
                 ? widget.points[idx].label
                 : '';
-            final unit = widget.selectedParameter == 'pH' ? '' : ' mS/cm';
-            final range = '${widget.minThreshold.toStringAsFixed(6)} - '
-                '${widget.maxThreshold.toStringAsFixed(6)}';
+            final unit = isPh ? '' : ' mS/cm';
+            final value = spot.y.toStringAsFixed(isPh ? 2 : 3);
+            final range = '${_compact(widget.minThreshold)} - '
+                '${_compact(widget.maxThreshold)}';
             final String verdict;
             final Color verdictColor;
             if (spot.y > widget.maxThreshold) {
@@ -369,18 +465,25 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
             }
             return LineTooltipItem(
               '$label\n',
-              AppTextStyles.cardMeta,
+              AppTextStyles.cardMeta.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.left,
               children: [
                 TextSpan(
-                  text:
-                      '${widget.selectedParameter} ${spot.y.toStringAsFixed(6)}$unit\n',
-                  style: AppTextStyles.bodyBold.copyWith(color: currentColor),
+                  text: '${widget.selectedParameter} $value$unit\n',
+                  style: AppTextStyles.bodyBold.copyWith(
+                    color: currentColor,
+                    fontSize: 14,
+                  ),
                 ),
                 TextSpan(
                   text: verdict,
                   style: AppTextStyles.cardMeta.copyWith(
                     color: verdictColor,
                     fontWeight: FontWeight.w700,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -396,22 +499,29 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
           preventCurveOverShooting: true,
           color: currentColor,
           barWidth: 2.5,
-          dotData: FlDotData(
-            show: true,
-            checkToShowDot: (spot, _) => isOut(spot.y),
-            getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-              radius: 4.5,
-              color: AppColors.alertBorder,
-              strokeWidth: 2,
-              strokeColor: Colors.white,
-            ),
-          ),
+          isStrokeCapRound: true,
+          // No resting dots: out-of-range points show up on hover only.
+          dotData: const FlDotData(show: false),
           belowBarData: BarAreaData(
             show: true,
-            color: currentColor.withValues(alpha: 0.10),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                currentColor.withValues(alpha: 0.16),
+                currentColor.withValues(alpha: 0.0),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+class _AxisRange {
+  final double min;
+  final double max;
+  final double step;
+  const _AxisRange(this.min, this.max, this.step);
 }

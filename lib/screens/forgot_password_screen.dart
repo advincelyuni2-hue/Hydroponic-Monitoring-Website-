@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -68,7 +69,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   Expanded(
                     flex: 1,
                     child: Center(
-                      child: SingleChildScrollView(
+                      child: AppFooterScrollView(
+                        centerContent: true,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 48,
                           vertical: 32,
@@ -81,7 +83,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               );
             }
 
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.all(isMobile ? 20 : 32),
               child: Center(child: formSection),
             );

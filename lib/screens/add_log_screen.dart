@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../models/notification_models.dart';
 import '../services/app_state.dart';
@@ -26,7 +27,7 @@ class AddLogScreen extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: -1),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: AppFooterScrollView(
           padding: EdgeInsets.all(isMobile ? 16 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

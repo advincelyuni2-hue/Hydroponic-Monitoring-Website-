@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
 
@@ -52,7 +53,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             if (_controller.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (_controller.errorMessage != null) return _buildErrorState();
+            if (_controller.errorMessage != null) {
+              return AppFooterScrollView(
+                centerContent: true,
+                child: _buildErrorState(),
+              );
+            }
 
             return DashboardLayout(
               header:

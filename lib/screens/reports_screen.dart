@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -11,6 +12,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/report_analytics_card.dart';
 import '../widgets/report_prediction_card.dart';
+import '../widgets/prediction_records_card.dart';
 import '../widgets/sensor_health_card.dart';
 import '../widgets/target_distribution_card.dart';
 import 'generate_report_screen.dart';
@@ -86,7 +88,7 @@ class ReportsScreenState extends State<ReportsScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            return SingleChildScrollView(
+            return AppFooterScrollView(
               padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24,
                   isMobile ? 16 : 24, isMobile ? 16 : 24, isMobile ? 96 : 24),
               child: Column(
@@ -137,21 +139,18 @@ class ReportsScreenState extends State<ReportsScreen> {
         sideBySide: true,
         naturalHeightSidebar: true,
         children: [
-          Column(
+          LayoutBuilder(builder: (context, constraints) => Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ..._buildMetricCards(),
               const SizedBox(height: 12),
+              _buildPredictionRecordsCard(),
+              if (constraints.hasBoundedHeight) const Spacer(),
+              const SizedBox(height: 12),
               SensorHealthCard(sensors: _controller.sensorHealthList),
-              const SizedBox(height: 10),
-              Text(
-                '© 2026 Hydroponic Monitoring System',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
-              ),
             ],
-          ),
+          )),
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -180,10 +179,9 @@ class ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   ..._buildMetricCards(),
                   const SizedBox(height: 16),
-                  if (constraints.hasBoundedHeight)
-                    Expanded(child: calibration)
-                  else
-                    calibration,
+                  _buildPredictionRecordsCard(),
+                  const SizedBox(height: 16),
+                  calibration,
                 ],
               );
             },
@@ -202,15 +200,9 @@ class ReportsScreenState extends State<ReportsScreen> {
       children: [
         ..._buildMetricCards(),
         const SizedBox(height: 16),
+        _buildPredictionRecordsCard(),
+        const SizedBox(height: 16),
         SensorHealthCard(sensors: _controller.sensorHealthList),
-        if (_isAdmin) ...[
-          const SizedBox(height: 10),
-          Text(
-            '© 2026 Hydroponic Monitoring System',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
-          ),
-        ],
         const SizedBox(height: 16),
         _buildTrendsCard(),
         const SizedBox(height: 16),
@@ -294,6 +286,15 @@ class ReportsScreenState extends State<ReportsScreen> {
       onTimeframeChanged: _controller.setTimeframe,
     );
   }
+
+  Widget _buildPredictionRecordsCard() => PredictionRecordsCard(
+        evaluation: _controller.modelEvaluation,
+        selectedParameter: _controller.selectedPredictionParameter,
+        selectedHorizon: _controller.selectedPredictionHorizon,
+        isLoading: _controller.isEvaluationLoading,
+        errorMessage: _controller.evaluationError,
+        onViewTable: _navigateToForecastTable,
+      );
 
   Widget _buildPredictionCard() => MobileGraphCard(
         title: 'Forecast Model Evaluation',
@@ -546,9 +547,18 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
             parentUsesSize: true);
       }
       final topHeight = children[1].size.height;
-      final bottomHeight = children[2].size.height > children[3].size.height
+      final naturalBottomHeight = children[2].size.height > children[3].size.height
           ? children[2].size.height
           : children[3].size.height;
+      final sidebarRemainder = children[0].size.height - topHeight - 12;
+      final bottomHeight = naturalBottomHeight > sidebarRemainder
+          ? naturalBottomHeight : sidebarRemainder;
+      final alignedHeight = topHeight + 12 + bottomHeight;
+      // Keep sidebar cards at their natural heights; only the gap above
+      // calibration grows to align its bottom with the two chart cards.
+      children[0].layout(
+          BoxConstraints.tightFor(width: widths[0], height: alignedHeight),
+          parentUsesSize: true);
       for (var i = 2; i < children.length; i++) {
         children[i].layout(
             BoxConstraints.tightFor(width: cardWidth, height: bottomHeight),
@@ -563,12 +573,7 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
       for (var i = 0; i < children.length; i++) {
         (children[i].parentData as StackParentData).offset = offsets[i];
       }
-      final rightBottom = topHeight + 12 + bottomHeight;
-      size = constraints.constrain(Size(
-          constraints.maxWidth,
-          children[0].size.height > rightBottom
-              ? children[0].size.height
-              : rightBottom));
+      size = constraints.constrain(Size(constraints.maxWidth, alignedHeight));
       return;
     }
     final rightWidth = constraints.maxWidth - 340;

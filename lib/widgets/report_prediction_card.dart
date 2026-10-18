@@ -37,6 +37,12 @@ class ReportPredictionCard extends StatelessWidget {
   bool get _showPh => selectedParameter != 'EC';
   bool get _showEc => selectedParameter != 'pH';
 
+  // Steps used to pick "nice" axis ticks (0, 2, 4 ... / 0, 0.25, 0.5 ...).
+  static const List<double> _niceSteps = [
+    0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250,
+    500, 1000,
+  ];
+
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
@@ -115,7 +121,7 @@ class ReportPredictionCard extends StatelessWidget {
             ? AppTextStyles.sectionTitle
             : AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
         ],
-        TextButton.icon(
+        if (!Responsive.isDesktop(context)) TextButton.icon(
           onPressed: onViewTable,
           icon: const Icon(Icons.table_chart_outlined, size: 17),
           label: const Text('View table'),
@@ -282,6 +288,48 @@ class ReportPredictionCard extends StatelessWidget {
     return list.where((s) => s.spots.isNotEmpty).toList();
   }
 
+  static double _maxOf(Iterable<_Series> items) {
+    var maxValue = 0.0;
+    for (final s in items) {
+      for (final spot in s.spots) {
+        maxValue = math.max(maxValue, spot.y);
+      }
+    }
+    return maxValue;
+  }
+
+  /// Picks a tick step so the axis ends on a round number
+  /// (e.g. pH 0..16 every 2, EC 0..2 every 0.25).
+  static _AxisScale _niceScale(double maxValue, {required int maxIntervals}) {
+    final target = math.max(maxValue * 1.08, 0.1);
+    for (final step in _niceSteps) {
+      final n = (target / step).ceil();
+      if (n <= maxIntervals) {
+        final count = math.max(n, 2);
+        return _AxisScale(count * step, step, count);
+      }
+    }
+    return _AxisScale(target, target / maxIntervals, maxIntervals);
+  }
+
+  static double _niceStep(double target) {
+    for (final step in _niceSteps) {
+      if (step >= target) return step;
+    }
+    return target;
+  }
+
+  static String _tickLabel(double value, double step) {
+    if (step >= 1 && (step - step.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(0);
+    }
+    final tenths = step * 10;
+    if ((tenths - tenths.roundToDouble()).abs() < 1e-9) {
+      return value.toStringAsFixed(1);
+    }
+    return value.toStringAsFixed(2);
+  }
+
   Widget _buildChart(bool isMobile) {
     final samples = evaluation.samples;
     final series = _series();
@@ -292,52 +340,135 @@ class ReportPredictionCard extends StatelessWidget {
       );
     }
 
-    var maxValue = 0.0;
-    for (final s in series) {
-      for (final spot in s.spots) {
-        maxValue = math.max(maxValue, spot.y);
-      }
+    final hasPh = series.any((s) => !s.isEc);
+    final hasEc = series.any((s) => s.isEc);
+    final dual = hasPh && hasEc;
+
+    // Left axis follows pH when it is shown, otherwise EC.
+    final leftScale = _niceScale(
+      _maxOf(series.where((s) => hasPh ? !s.isEc : s.isEc)),
+      maxIntervals: isMobile ? 5 : 8,
+    );
+
+    // With both parameters, EC gets its own right-hand axis. EC is drawn
+    // scaled into the pH range; tooltips and labels show the real values.
+    var ecStep = 0.0;
+    var ecAxisMax = 0.0;
+    var ecScale = 1.0;
+    if (dual) {
+      final ecMax = _maxOf(series.where((s) => s.isEc));
+      ecStep = _niceStep(math.max(ecMax * 1.08, 0.1) / leftScale.intervals);
+      ecAxisMax = ecStep * leftScale.intervals;
+      ecScale = leftScale.max / ecAxisMax;
     }
-    final maxY = math.max(1.0, ((maxValue * 1.15) / 0.5).ceilToDouble() * 0.5);
+
+    final plotted = [
+      for (final s in series) dual && s.isEc ? s.scaled(ecScale) : s,
+    ];
+
     final labelInterval =
         math.max(1, (samples.length / (isMobile ? 3 : 4)).ceil());
+
+    final axisNameStyle = AppTextStyles.cardMeta.copyWith(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    );
+
+    LineTooltipItem tooltipItem(LineBarSpot spot, String? header) {
+      final s = plotted[spot.barIndex];
+      final real = spot.y / s.scale;
+      final value = s.isEc
+          ? '${real.toStringAsFixed(3)} mS/cm'
+          : real.toStringAsFixed(2);
+      return LineTooltipItem(
+        header == null ? '' : '$header\n',
+        AppTextStyles.cardMeta.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        textAlign: TextAlign.left,
+        children: [
+          TextSpan(
+            text: '● ',
+            style: TextStyle(color: s.lineColor, fontSize: 12),
+          ),
+          TextSpan(
+            text: '${s.name}  ',
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
+          ),
+          TextSpan(
+            text: value,
+            style: AppTextStyles.bodyBold.copyWith(
+              color: s.color,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      );
+    }
 
     return MobileLineChart(
       LineChartData(
         minX: 0,
         maxX: math.max(samples.length - 1, 1).toDouble(),
         minY: 0,
-        maxY: maxY,
+        maxY: leftScale.max,
         clipData: const FlClipData.all(),
         gridData: FlGridData(
           show: true,
+          drawVerticalLine: false,
+          horizontalInterval: leftScale.interval,
           getDrawingHorizontalLine: (_) => FlLine(
-            color: AppColors.chartGrid.withValues(alpha: 0.65),
-            strokeWidth: 1,
-          ),
-          getDrawingVerticalLine: (_) => FlLine(
-            color: AppColors.chartGrid.withValues(alpha: 0.35),
+            color: AppColors.chartGrid.withValues(alpha: 0.55),
             strokeWidth: 1,
           ),
         ),
         borderData: FlBorderData(
           show: true,
-          border: Border.all(color: AppColors.chartGrid),
+          border: Border(bottom: BorderSide(color: AppColors.chartGrid)),
         ),
         titlesData: FlTitlesData(
           topTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: dual
+              ? AxisTitles(
+                  axisNameSize: 20,
+                  axisNameWidget: Text(
+                    'EC (mS/cm)',
+                    style: axisNameStyle.copyWith(color: _ecColor),
+                  ),
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: isMobile ? 38 : 44,
+                    interval: leftScale.interval,
+                    getTitlesWidget: (value, _) => Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Text(
+                        _tickLabel(value / leftScale.max * ecAxisMax, ecStep),
+                        style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                      ),
+                    ),
+                  ),
+                )
+              : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
-            axisNameWidget: Text('Value', style: AppTextStyles.cardMeta),
+            axisNameSize: 20,
+            axisNameWidget: Text(
+              hasPh ? 'pH' : 'EC (mS/cm)',
+              style: axisNameStyle.copyWith(
+                color: hasPh ? _phColor : _ecColor,
+              ),
+            ),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: isMobile ? 62 : 72,
-              interval: maxY / 4,
-              getTitlesWidget: (value, _) => Text(
-                value.toStringAsFixed(6),
-                style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+              reservedSize: isMobile ? 34 : 40,
+              interval: leftScale.interval,
+              getTitlesWidget: (value, _) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  _tickLabel(value, leftScale.interval),
+                  style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                ),
               ),
             ),
           ),
@@ -358,7 +489,7 @@ class ReportPredictionCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     samples[index].label,
-                    style: AppTextStyles.cardMeta.copyWith(fontSize: 9),
+                    style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
                   ),
                 );
               },
@@ -366,45 +497,69 @@ class ReportPredictionCard extends StatelessWidget {
           ),
         ),
         lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
+          // Dots only appear on the hovered x position, one per line.
+          getTouchedSpotIndicator: (barData, spotIndexes) => [
+            for (final _ in spotIndexes)
+              TouchedSpotIndicatorData(
+                FlLine(
+                  color: AppColors.textPrimary.withValues(alpha: 0.18),
+                  strokeWidth: 1,
+                  dashArray: [3, 3],
+                ),
+                FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, bar, index) =>
+                      FlDotCirclePainter(
+                    radius: 5,
+                    color: bar.color ?? _phColor,
+                    strokeWidth: 2.5,
+                    strokeColor: AppColors.cardBackground,
+                  ),
+                ),
+              ),
+          ],
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) => AppColors.cardBackground,
-            tooltipRoundedRadius: 8,
+            tooltipRoundedRadius: 10,
+            tooltipPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            tooltipMargin: 10,
+            maxContentWidth: 220,
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            tooltipBorder: BorderSide(color: AppColors.chartGrid),
             getTooltipItems: (touched) => [
               for (var i = 0; i < touched.length; i++)
-                LineTooltipItem(
-                  '${i == 0 ? '${samples[touched[i].x.toInt()].label}\n' : ''}'
-                  '${series[touched[i].barIndex].name}: '
-                  '${touched[i].y.toStringAsFixed(6)}'
-                  '${series[touched[i].barIndex].name.startsWith('EC') ? ' mS/cm' : ''}',
-                  AppTextStyles.bodyBold.copyWith(
-                    color: series[touched[i].barIndex].color,
-                    fontSize: 12,
-                  ),
+                tooltipItem(
+                  touched[i],
+                  i == 0 ? samples[touched[i].x.toInt()].label : null,
                 ),
             ],
           ),
         ),
         lineBarsData: [
-          for (final s in series)
+          for (final s in plotted)
             LineChartBarData(
-              spots: s.spots,
+              spots: s.plotSpots,
               isCurved: false,
-              color: s.color,
-              barWidth: 2.5,
+              color: s.lineColor,
+              barWidth: s.predicted ? 1.75 : 2.25,
+              isStrokeCapRound: true,
               dashArray: s.predicted ? [6, 4] : null,
-              dotData: FlDotData(
-                show: true,
-                getDotPainter: (spot, percent, bar, index) =>
-                    FlDotCirclePainter(
-                  radius: 3,
-                  color: s.color,
-                  strokeWidth: 1.5,
-                  strokeColor: AppColors.cardBackground,
-                ),
-              ),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
-                show: !s.predicted,
-                color: s.color.withValues(alpha: 0.08),
+                // Fill only the main measured line; EC gets a fill only
+                // when it is the only parameter shown.
+                show: !s.predicted && (!s.isEc || !hasPh),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    s.color.withValues(alpha: 0.16),
+                    s.color.withValues(alpha: 0.0),
+                  ],
+                ),
               ),
             ),
         ],
@@ -426,7 +581,7 @@ class ReportPredictionCard extends StatelessWidget {
                 Row(
                   children: [
                     for (var i = 0; i < 3; i++) ...[
-                      Container(width: 4, height: 3, color: s.color),
+                      Container(width: 4, height: 3, color: s.lineColor),
                       if (i < 2) const SizedBox(width: 2),
                     ],
                   ],
@@ -436,7 +591,7 @@ class ReportPredictionCard extends StatelessWidget {
                   width: 14,
                   height: 3,
                   decoration: BoxDecoration(
-                    color: s.color,
+                    color: s.lineColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -454,5 +609,30 @@ class _Series {
   final Color color;
   final bool predicted;
   final List<FlSpot> spots;
-  const _Series(this.name, this.color, this.predicted, this.spots);
+
+  /// Multiplier applied when plotting (used to draw EC on the pH scale).
+  final double scale;
+
+  const _Series(this.name, this.color, this.predicted, this.spots,
+      {this.scale = 1});
+
+  bool get isEc => name.startsWith('EC');
+
+  /// Predicted lines use a lighter tint so they read apart from measured.
+  Color get lineColor =>
+      predicted ? Color.lerp(color, Colors.white, 0.4)! : color;
+
+  List<FlSpot> get plotSpots => scale == 1
+      ? spots
+      : [for (final p in spots) FlSpot(p.x, p.y * scale)];
+
+  _Series scaled(double factor) =>
+      _Series(name, color, predicted, spots, scale: factor);
+}
+
+class _AxisScale {
+  final double max;
+  final double interval;
+  final int intervals;
+  const _AxisScale(this.max, this.interval, this.intervals);
 }

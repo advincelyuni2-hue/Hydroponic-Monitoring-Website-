@@ -6,6 +6,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'mobile_page_header.dart';
+import 'app_footer.dart';
 
 /// Uses the owning screen's live state; opening a graph creates no controller.
 class MobileGraphCard extends StatelessWidget {
@@ -71,8 +72,10 @@ class MobileGraphPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final graph = LayoutBuilder(builder: (context, viewport) => _GraphViewport(
-      height: (viewport.maxHeight - 32).clamp(0.0, double.infinity),
-      child: SingleChildScrollView(
+      height: (viewport.maxHeight - 32 -
+          AppFooter.heightFor(context, viewport.maxWidth - 32))
+          .clamp(0.0, double.infinity),
+      child: AppFooterScrollView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: ListenableBuilder(listenable: listenable,
         builder: (context, _) => builder(context)),

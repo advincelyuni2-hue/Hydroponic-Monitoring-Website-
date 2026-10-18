@@ -1,3 +1,4 @@
+import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/email_mask.dart';
@@ -279,7 +280,8 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
     return Scaffold(
       drawer: const AppDrawer(selectedIndex: 6),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: AppFooterScrollView(
+          showFooter: !_loading,
           padding: EdgeInsets.all(Responsive.isMobile(context) ? 16 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
