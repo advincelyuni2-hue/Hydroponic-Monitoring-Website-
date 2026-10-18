@@ -7,14 +7,16 @@ import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'mobile_page_header.dart';
 import 'app_footer.dart';
+import 'card_info_tooltip.dart';
 
 /// Uses the owning screen's live state; opening a graph creates no controller.
 class MobileGraphCard extends StatelessWidget {
   const MobileGraphCard({super.key, required this.title,
     required this.actionLabel, required this.listenable, required this.builder,
-    this.storageBucket});
+    this.storageBucket, this.description});
 
   final String title;
+  final String? description;
   final String actionLabel;
   final Listenable listenable;
   final WidgetBuilder builder;
@@ -43,7 +45,11 @@ class MobileGraphCard extends StatelessWidget {
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
+                  if (description == null)
+                    Text(title, style: AppTextStyles.sectionTitle.copyWith(fontSize: 16))
+                  else
+                    CardInfoTitle(title, description: description!,
+                        style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
                   const SizedBox(height: 6),
                   Text(actionLabel, style: AppTextStyles.cardMeta.copyWith(color: AppColors.accentGreen)),
                 ],

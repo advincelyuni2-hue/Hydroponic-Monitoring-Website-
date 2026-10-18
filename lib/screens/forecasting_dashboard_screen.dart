@@ -120,6 +120,7 @@ class _ForecastingDashboardScreenState
             }
             final chart = MobileGraphCard(
               title: 'Forecasting',
+              description: 'Shows recent readings and model forecasts for pH, EC, or both over the selected horizon.',
               actionLabel: 'View Forecasting Graph',
               listenable: _controller,
               builder: (_) => _buildForecastingGraph(),

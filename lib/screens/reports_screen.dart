@@ -13,6 +13,7 @@ import '../widgets/app_header.dart';
 import '../widgets/report_analytics_card.dart';
 import '../widgets/report_prediction_card.dart';
 import '../widgets/prediction_records_card.dart';
+import '../widgets/card_info_tooltip.dart';
 import '../widgets/sensor_health_card.dart';
 import '../widgets/target_distribution_card.dart';
 import 'generate_report_screen.dart';
@@ -179,9 +180,10 @@ class ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   ..._buildMetricCards(),
                   const SizedBox(height: 16),
-                  _buildPredictionRecordsCard(),
-                  const SizedBox(height: 16),
-                  calibration,
+                  if (constraints.hasBoundedHeight)
+                    Expanded(child: calibration)
+                  else
+                    calibration,
                 ],
               );
             },
@@ -200,8 +202,10 @@ class ReportsScreenState extends State<ReportsScreen> {
       children: [
         ..._buildMetricCards(),
         const SizedBox(height: 16),
-        _buildPredictionRecordsCard(),
-        const SizedBox(height: 16),
+        if (_isAdmin) ...[
+          _buildPredictionRecordsCard(),
+          const SizedBox(height: 16),
+        ],
         SensorHealthCard(sensors: _controller.sensorHealthList),
         const SizedBox(height: 16),
         _buildTrendsCard(),
@@ -267,6 +271,7 @@ class ReportsScreenState extends State<ReportsScreen> {
 
   Widget _buildTrendsCard() => MobileGraphCard(
         title: 'Historical Telemetry Trends',
+        description: 'Shows historical sensor readings and how they change over the selected period.',
         actionLabel: 'View Historical Telemetry Trends',
         listenable: _controller,
         builder: (_) => _buildTrendsGraph(),
@@ -298,6 +303,7 @@ class ReportsScreenState extends State<ReportsScreen> {
 
   Widget _buildPredictionCard() => MobileGraphCard(
         title: 'Forecast Model Evaluation',
+        description: 'Compares actual sensor readings with model predictions to evaluate forecasting performance.',
         actionLabel: 'View Forecast Model Evaluation',
         listenable: _controller,
         builder: (_) => _buildPredictionGraph(),
@@ -447,8 +453,14 @@ class ReportsScreenState extends State<ReportsScreen> {
             expand ? MainAxisAlignment.center : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          CardInfoTitle(
             title,
+            description: switch (title) {
+              'AVG PH' => 'Shows the average pH from the report sensor readings and its current range classification.',
+              'AVG EC' => 'Shows the average electrical conductivity from the report sensor readings and its current range classification.',
+              'AVG TEMP' => 'Shows the average temperature from the report sensor readings and its current range classification.',
+              _ => 'Shows the number of critical alerts recorded during the displayed reporting period.',
+            },
             style: AppTextStyles.cardMeta.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 12,

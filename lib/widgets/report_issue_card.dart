@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -19,7 +20,7 @@ class ReportIssueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Report an issue', style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
+                CardInfoTitle('Report an issue', description: 'Lets you notify an administrator about a reading or an issue encountered on this screen.', style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
                 const SizedBox(height: 6),
                 Text(
                   'Notify an admin about this reading or if you have encountered an error',

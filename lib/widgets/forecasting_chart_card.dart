@@ -2,6 +2,7 @@ import 'mobile_graph_card.dart';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'card_info_tooltip.dart';
 import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
@@ -456,8 +457,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                 ),
               ),
             ),
-            child: Text(
+            child: CardInfoTitle(
               tabLabel,
+              description: !isSelected ? null : key == 'Both'
+                  ? 'Shows recent readings and model forecasts for both pH and EC over the selected horizon.'
+                  : 'Shows recent $key readings and model forecasts over the selected horizon.',
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: isMobile ? 14 : 16,
                 color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,

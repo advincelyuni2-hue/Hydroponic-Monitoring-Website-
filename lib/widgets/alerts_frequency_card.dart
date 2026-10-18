@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
@@ -41,7 +42,7 @@ class AlertFrequencyCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Critical Alert Frequency',
+                    CardInfoTitle('Critical Alert Frequency', description: 'Shows the number of critical alerts for each monitored parameter over the displayed period.',
                         style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
                     const SizedBox(height: 4),
                     Text('Last 30 days', style: AppTextStyles.cardMeta),
@@ -141,7 +142,7 @@ class AlertFrequencyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Critical Alert Frequency',
+          CardInfoTitle('Critical Alert Frequency', description: 'Shows the number of critical alerts for each monitored parameter over the displayed period.',
               style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
           const SizedBox(height: 4),
           Text('Last 30 days', style: AppTextStyles.cardMeta),

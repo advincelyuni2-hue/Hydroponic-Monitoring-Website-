@@ -34,6 +34,11 @@ class NotificationsScreenState extends State<NotificationsScreen> {
   bool _dialogOpen = false;
   bool _mobileOpen = false;
 
+  // NEW: desktop panel is collapsed into the small circle.
+  bool _panelMinimized = false;
+  // NEW: the list scrolls on its own beside the details panel.
+  final ScrollController _listScroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +53,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
     if (!_controller.isLoading &&
         !_visible.any((e) => e.id == highlightedNotificationId)) {
       highlightedNotificationId = null;
+      _panelMinimized = false;
     }
   }
 
@@ -75,6 +81,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void dispose() {
     _controller.removeListener(_syncSelection);
+    _listScroll.dispose();
     if (widget.controller == null) _controller.dispose();
     super.dispose();
   }
@@ -127,16 +134,28 @@ class NotificationsScreenState extends State<NotificationsScreen> {
             : _controller.errorMessage ?? 'Unable to resolve notification.')));
   }
 
-  Widget _details(AppNotificationItem item, {bool mobile = false}) {
+  // CHANGED: `expand` is true only in the desktop split view.
+  Widget _details(AppNotificationItem item,
+      {bool mobile = false, bool expand = false}) {
     final parameterKnown =
         RegExp(r'\bp\s*h\b|\bec\b|temperature|\btemp\b', caseSensitive: false)
             .hasMatch('${item.title} ${item.subtitle}');
     return NotificationDetailsPanel(
         item: item,
+        expand: expand,
         busy: _controller.isBusy(item.id),
         onClose: mobile
             ? null
-            : () => setState(() => highlightedNotificationId = null),
+            : () => setState(() {
+                  highlightedNotificationId = null;
+                  _panelMinimized = false;
+                }),
+        onMinimize:
+            expand ? () => setState(() => _panelMinimized = true) : null,
+        // TODO: connect to your History logs screen, e.g.
+        // onViewHistory: () => Navigator.of(context).push(...),
+        // Leave null to hide the "View in history logs" button.
+        onViewHistory: null,
         onRecord:
             item.isResolved || !parameterKnown ? null : () => _showFixLog(item),
         onResolve: item.isResolved || item.isSensorAlert
@@ -145,7 +164,11 @@ class NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _open(AppNotificationItem item, bool wide) async {
-    setState(() => highlightedNotificationId = item.id);
+    // CHANGED: selecting a notification also reopens a minimized panel.
+    setState(() {
+      highlightedNotificationId = item.id;
+      _panelMinimized = false;
+    });
     if (wide || _mobileOpen) return;
     _mobileOpen = true;
     await Navigator.of(context).push(MaterialPageRoute<void>(
@@ -232,24 +255,24 @@ class NotificationsScreenState extends State<NotificationsScreen> {
               side: BorderSide(color: AppColors.cardBorder),
             ),
             onSelected: (value) {
-  setState(() {
-    _filter = value == 'all'
-        ? null
-        : NotificationType.values.firstWhere(
-            (type) => type.name == value,
-          );
-    _syncSelection();
-  });
-},
+              setState(() {
+                _filter = value == 'all'
+                    ? null
+                    : NotificationType.values.firstWhere(
+                        (type) => type.name == value,
+                      );
+                _syncSelection();
+              });
+            },
             itemBuilder: (context) => [
               for (final option in <(String, String)>[
-  ('All', 'all'),
-  ('Critical', 'critical'),
-  ('Warning', 'warning'),
-  ('Information', 'info'),
-])
-  PopupMenuItem<String>(
-    value: option.$2,
+                ('All', 'all'),
+                ('Critical', 'critical'),
+                ('Warning', 'warning'),
+                ('Information', 'info'),
+              ])
+                PopupMenuItem<String>(
+                  value: option.$2,
                   child: Row(children: [
                     Expanded(
                       child: Text(option.$1, style: AppTextStyles.bodySmall),
@@ -292,6 +315,72 @@ class NotificationsScreenState extends State<NotificationsScreen> {
         }),
       );
 
+  Widget _errorBanner() => _controller.errorMessage == null
+      ? const SizedBox.shrink()
+      : Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(_controller.errorMessage!,
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: AppColors.criticalRed)));
+
+  /// NEW: desktop layout used while a notification is selected.
+  /// Header, tabs and toolbar stay fixed; the list scrolls by itself on the
+  /// left; the details panel fills the remaining height on the right (or is
+  /// collapsed into a small circle at the top right).
+  Widget _splitView(
+      List<AppNotificationItem> items, AppNotificationItem selected, double pad) {
+    return Padding(
+      padding: EdgeInsets.all(pad),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const AppHeader(title: 'Notifications'),
+        const SizedBox(height: 24),
+        Row(children: [
+          _buildTab('Active'),
+          const SizedBox(width: 20),
+          _buildTab('Resolved')
+        ]),
+        Divider(height: 1, color: AppColors.cardBorder),
+        _toolbar(),
+        _errorBanner(),
+        Expanded(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // The list takes the full width when minimized; the circle
+            // floats on top of it instead of reserving its own column.
+            Expanded(
+              flex: 7,
+              child: Stack(children: [
+                Positioned.fill(
+                  child: Scrollbar(
+                    controller: _listScroll,
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: _listScroll,
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _list(items, true),
+                    ),
+                  ),
+                ),
+                if (_panelMinimized)
+                  Positioned(
+                    top: 0,
+                    right: 18,
+                    child: NotificationMinimizedButton(
+                      item: selected,
+                      onPressed: () => setState(() => _panelMinimized = false),
+                    ),
+                  ),
+              ]),
+            ),
+            if (!_panelMinimized) ...[
+              const SizedBox(width: 16),
+              Expanded(flex: 5, child: _details(selected, expand: true)),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: AppColors.background,
@@ -304,66 +393,62 @@ class NotificationsScreenState extends State<NotificationsScreen> {
                   final selected = items
                       .where((item) => item.id == highlightedNotificationId)
                       .firstOrNull;
-                  return AppFooterScrollView(
-                    showFooter: !_controller.isLoading,
-                    key: const PageStorageKey('notification-list-scroll'),
-                    padding: EdgeInsets.all(
-                        MediaQuery.sizeOf(context).width < 600 ? 16 : 24),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const AppHeader(title: 'Notifications'),
-                          const SizedBox(height: 24),
-                          Row(children: [
-                            _buildTab('Active'),
-                            const SizedBox(width: 20),
-                            _buildTab('Resolved')
-                          ]),
-                          Divider(height: 1, color: AppColors.cardBorder),
-                          _toolbar(),
-                          if (_controller.errorMessage != null)
-                            Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(_controller.errorMessage!,
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.criticalRed))),
-                          if (_controller.isLoading)
-                            const Center(child: CircularProgressIndicator())
-                          else if (items.isEmpty)
-                            Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                    'No ${selectedTab.toLowerCase()} notifications found.',
-                                    style: AppTextStyles.bodySmall))
-                          else
-                            LayoutBuilder(builder: (context, constraints) {
-                              final wide = constraints.maxWidth >= 850;
-                              if (!wide && selected != null && !_mobileOpen) {
-                                WidgetsBinding.instance
-                                    .addPostFrameCallback((_) {
-                                  if (mounted &&
-                                      !_mobileOpen &&
-                                      highlightedNotificationId ==
-                                          selected.id) {
-                                    _open(selected, false);
-                                  }
-                                });
-                              }
-                              if (!wide || selected == null) {
+                  final pad = MediaQuery.sizeOf(context).width < 600 ? 16.0 : 24.0;
+                  return LayoutBuilder(builder: (context, box) {
+                    final wideScreen = box.maxWidth - pad * 2 >= 850;
+
+                    // Desktop + a notification selected: fixed-height layout.
+                    if (wideScreen &&
+                        !_controller.isLoading &&
+                        selected != null) {
+                      return _splitView(items, selected, pad);
+                    }
+
+                    // Everything else: the original page-scroll layout.
+                    return AppFooterScrollView(
+                      showFooter: !_controller.isLoading,
+                      key: const PageStorageKey('notification-list-scroll'),
+                      padding: EdgeInsets.all(pad),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const AppHeader(title: 'Notifications'),
+                            const SizedBox(height: 24),
+                            Row(children: [
+                              _buildTab('Active'),
+                              const SizedBox(width: 20),
+                              _buildTab('Resolved')
+                            ]),
+                            Divider(height: 1, color: AppColors.cardBorder),
+                            _toolbar(),
+                            _errorBanner(),
+                            if (_controller.isLoading)
+                              const Center(child: CircularProgressIndicator())
+                            else if (items.isEmpty)
+                              Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                      'No ${selectedTab.toLowerCase()} notifications found.',
+                                      style: AppTextStyles.bodySmall))
+                            else
+                              LayoutBuilder(builder: (context, constraints) {
+                                final wide = constraints.maxWidth >= 850;
+                                if (!wide && selected != null && !_mobileOpen) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    if (mounted &&
+                                        !_mobileOpen &&
+                                        highlightedNotificationId ==
+                                            selected.id) {
+                                      _open(selected, false);
+                                    }
+                                  });
+                                }
                                 return _list(items, wide);
-                              }
-                              return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                        flex: 7, child: _list(items, true)),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                        flex: 5, child: _details(selected)),
-                                  ]);
-                            }),
-                        ]),
-                  );
+                              }),
+                          ]),
+                    );
+                  });
                 })),
       );
 
@@ -373,6 +458,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
       onTap: () => setState(() {
         selectedTab = title;
         highlightedNotificationId = null;
+        _panelMinimized = false;
       }),
       child: IntrinsicWidth(
         child: Column(

@@ -1,5 +1,6 @@
 import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
+import '../widgets/card_info_tooltip.dart';
 import '../controllers/history_logs_controller.dart';
 import '../services/notification_service.dart';
 import '../services/app_state.dart';
@@ -916,8 +917,13 @@ class HistoryLogsScreenState extends State<HistoryLogsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
+            CardInfoTitle(
               title,
+              description: title == 'Intervention logs'
+                  ? 'Sensor logs: Recorded sensor readings and their conditions for the selected period.\n\n'
+                    'Calibration logs: Recorded sensor calibration sessions and their results for the selected period.\n\n'
+                    'Intervention logs: Logged interventions and corrective actions for the selected period.'
+                  : null,
               style: AppTextStyles.sectionTitle.copyWith(
                 fontSize: isMobile ? 15 : 18,
                 color: isActive ? AppColors.textPrimary : AppColors.textSecondary,

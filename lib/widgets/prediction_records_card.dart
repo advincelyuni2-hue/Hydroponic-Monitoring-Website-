@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 
 import '../models/reports_models.dart';
@@ -158,8 +159,7 @@ class PredictionRecordsCard extends StatelessWidget {
     );
   }
 
-  Widget _header(BuildContext context) => Text(
-        'Prediction Records',
+  Widget _header(BuildContext context) => CardInfoTitle('Prediction Records', description: 'Summarizes evaluated, pending, excluded, and missing-actual forecast records, with available model accuracy.',
         style: AppTextStyles.sectionTitle.copyWith(
           fontSize: Responsive.isDesktop(context) ? 16 : 18,
         ),

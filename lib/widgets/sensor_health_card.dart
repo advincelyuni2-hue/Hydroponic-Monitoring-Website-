@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
 import '../theme/app_colors.dart';
@@ -46,7 +47,7 @@ class SensorHealthCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Sensor Calibration',
+                child: CardInfoTitle('Sensor Calibration', description: 'Displays recorded calibration status and the latest calibration information for each sensor.',
                     style: AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
               ),
               const SizedBox(width: 8),

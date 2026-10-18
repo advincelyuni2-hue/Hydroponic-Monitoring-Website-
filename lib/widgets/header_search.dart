@@ -258,23 +258,47 @@ class _HeaderSearchFieldState extends State<HeaderSearchField> {
                 child: Focus(
                   canRequestFocus: false,
                   onKeyEvent: _onKey,
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focus,
-                    style: AppTextStyles.body,
-                    textInputAction: TextInputAction.search,
-                    onTap: _openDropdown,
-                    onTapOutside: (_) {},
-                    onChanged: (_) {
-                      _openDropdown();
-                      _refreshResults();
-                    },
-                    onSubmitted: (_) => _selectHighlighted(),
-                    decoration: InputDecoration(
-                      hintText: 'Search...',
-                      hintStyle: AppTextStyles.cardMeta,
-                      border: InputBorder.none,
-                      isDense: true,
+                  // Overrides the app-wide input theme (filled box + borders)
+                  // for this field only, so just the pill outline remains.
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      inputDecorationTheme: const InputDecorationTheme(
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focus,
+                      style: AppTextStyles.body,
+                      textInputAction: TextInputAction.search,
+                      onTap: _openDropdown,
+                      onTapOutside: (_) {},
+                      onChanged: (_) {
+                        _openDropdown();
+                        _refreshResults();
+                      },
+                      onSubmitted: (_) => _selectHighlighted(),
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle: AppTextStyles.cardMeta,
+                        isDense: true,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        contentPadding: EdgeInsets.zero,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                      ),
                     ),
                   ),
                 ),

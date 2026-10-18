@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../screens/notifications_screen.dart';
 import '../models/forecasting_models.dart';
@@ -66,7 +67,7 @@ class PredictionInsightsCard extends StatelessWidget {
     // any spare height between the blocks instead of leaving it at the bottom.
     final header = LayoutBuilder(builder: (context, constraints) {
       final title =
-          Text('Prediction Insights', style: AppTextStyles.sectionTitle);
+          CardInfoTitle('Prediction Insights', description: 'Explains the selected forecast, its expected conditions, and contributing sensor readings.', style: AppTextStyles.sectionTitle);
       final selector = showParamSelector && onInsightParamChanged != null;
 
       if (constraints.maxWidth < 320 ||

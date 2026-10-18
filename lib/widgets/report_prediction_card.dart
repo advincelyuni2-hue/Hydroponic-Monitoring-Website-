@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -117,7 +118,7 @@ class ReportPredictionCard extends StatelessWidget {
       children: [
         if (!MobileGraphPage.isActive(context)) ...[
         Icon(Icons.show_chart, color: AppColors.accentGreen),
-        Text('Forecast Model Evaluation', style: isMobile
+        CardInfoTitle('Forecast Model Evaluation', description: 'Compares actual sensor readings with model predictions to evaluate forecasting performance.', style: isMobile
             ? AppTextStyles.sectionTitle
             : AppTextStyles.sectionTitle.copyWith(fontSize: 16)),
         ],

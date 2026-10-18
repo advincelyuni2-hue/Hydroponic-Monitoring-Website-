@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'card_info_tooltip.dart';
 
 import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
@@ -49,8 +50,9 @@ class DashboardParameterGauge extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
+                child: CardInfoTitle(
                   _shortLabel(data.label),
+                  description: 'Shows the latest ${_shortLabel(data.label)} reading and its condition relative to the configured range.',
                   style: AppTextStyles.sectionTitle.copyWith(
                     fontSize: dense ? 14 : (compact ? 15 : 17),
                     height: 1.2,

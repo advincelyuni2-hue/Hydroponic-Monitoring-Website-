@@ -125,12 +125,17 @@ class RecordFixCard extends StatefulWidget {
   final Future<bool> Function(FixEntry) onSubmit;
   final String? Function()? submissionError;
 
+  /// Dialog look: a bit more padding and a close (✕) button in the corner.
+  /// The full-page version (AddLogScreen) leaves this off.
+  final bool dialogStyle;
+
   const RecordFixCard({
     super.key,
     this.notification,
     required this.onCancel,
     required this.onSubmit,
     this.submissionError,
+    this.dialogStyle = false,
   });
 
   @override
@@ -157,6 +162,10 @@ class RecordFixCardState extends State<RecordFixCard> {
   late DateTime _performedAtManila;
   bool _submitting = false;
   String? _submissionError;
+
+  // ---------------------------------------------------------------------------
+  // LOGIC (unchanged)
+  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
@@ -274,32 +283,29 @@ class RecordFixCardState extends State<RecordFixCard> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
+    final notification = widget.notification;
 
-    final timestampField = widget.notification != null
-        ? _labeled(
-            'Logged Date & Time (Read-only)',
-            TextFormField(
-              initialValue: formatManilaDateTime(_performedAtManila),
-              enabled: false,
-              style:
-                  AppTextStyles.input.copyWith(color: AppColors.textSecondary),
-              decoration: _decoration(),
-            ),
-          )
+    final timestampField = notification != null
+        ? _loggedRow()
         : _labeled(
             'Action date & time (Manila)',
             Wrap(spacing: 12, runSpacing: 8, children: [
               OutlinedButton.icon(
                 onPressed: _submitting ? null : _pickDate,
+                style: _pickerButtonStyle(),
                 icon: const Icon(Icons.calendar_today_outlined, size: 18),
                 label: Text(
                     '${_performedAtManila.year}-${_performedAtManila.month.toString().padLeft(2, '0')}-${_performedAtManila.day.toString().padLeft(2, '0')}'),
               ),
               OutlinedButton.icon(
                 onPressed: _submitting ? null : _pickTime,
+                style: _pickerButtonStyle(),
                 icon: const Icon(Icons.access_time_outlined, size: 18),
                 label: Text(formatManilaClockTime(_performedAtManila)),
               ),
@@ -341,7 +347,7 @@ class RecordFixCardState extends State<RecordFixCard> {
     );
 
     final amountField = _labeled(
-      'Amount / volume (optional)',
+      'Amount / volume',
       _textField(
         controller: _amountController,
         hint: '250',
@@ -352,7 +358,7 @@ class RecordFixCardState extends State<RecordFixCard> {
     );
 
     final reservoirVolumeField = _labeled(
-      'Reservoir volume (optional)',
+      'Reservoir volume',
       _textField(
         controller: _reservoirVolumeController,
         hint: '100',
@@ -364,102 +370,272 @@ class RecordFixCardState extends State<RecordFixCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
+      padding: EdgeInsets.all(widget.dialogStyle ? 24 : 20),
+      decoration: AppDecorations.card(radius: widget.dialogStyle ? 22 : 16),
       child: Form(
         key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Record a fix',
-                style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
-            const SizedBox(height: 6),
-            Text(
-              'Log an action you took so your history and forecasts stay accurate.',
-              style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
-            ),
-            const SizedBox(height: 14),
-            Divider(color: AppColors.cardBorder, height: 1),
-            const SizedBox(height: 16),
-            timestampField,
-            const SizedBox(height: 16),
-            if (isMobile) ...[
-              parameterField,
+        // Two columns only when the card is wide enough; otherwise stacked.
+        child: LayoutBuilder(builder: (context, constraints) {
+          final twoCol = constraints.maxWidth >= 420;
+          Widget pair(Widget a, Widget b) => twoCol
+              ? _twoColumns(a, b)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [a, const SizedBox(height: 16), b],
+                );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Record a fix',
+                            style: AppTextStyles.sectionTitle
+                                .copyWith(fontSize: 20)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Log an action you took so your history and forecasts stay accurate.',
+                          style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (widget.dialogStyle) ...[
+                    const SizedBox(width: 12),
+                    _closeButton(),
+                  ],
+                ],
+              ),
               const SizedBox(height: 16),
-              currentValueField,
+              if (notification != null) ...[
+                _alertStrip(notification),
+                const SizedBox(height: 12),
+              ],
+              timestampField,
+              const SizedBox(height: 16),
+              Divider(color: AppColors.cardBorder, height: 1),
+              const SizedBox(height: 16),
+              pair(parameterField, currentValueField),
               const SizedBox(height: 16),
               actionField,
+              const SizedBox(height: 18),
+              _sectionLabel('OPTIONAL DETAILS'),
+              const SizedBox(height: 8),
+              pair(amountField, reservoirVolumeField),
               const SizedBox(height: 16),
-              amountField,
-              const SizedBox(height: 16),
-              reservoirVolumeField,
-            ] else ...[
-              _twoColumns(parameterField, currentValueField),
-              const SizedBox(height: 16),
-              _twoColumns(actionField, amountField),
-              const SizedBox(height: 16),
-              reservoirVolumeField,
-            ],
-            const SizedBox(height: 16),
-            _labeled(
-              'Notes / Intervention Details',
-              _textField(
-                controller: _notesController,
-                hint: 'Describe the action performed...',
-                maxLines: 4,
-                required: false,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_submissionError != null) ...[
-              Text(
-                _submissionError!,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.criticalRed),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                CustomButton(
-                  text: 'Cancel',
-                  backgroundColor: AppColors.primaryButton,
-                  textStyle: AppTextStyles.button.copyWith(
-                    fontSize: 13,
-                    color: AppColors.primaryButton,
-                  ),
-                  onPressed: _submitting ? null : widget.onCancel,
-                  outlined: true,
-                  width: 116,
-                  height: 38,
+              _labeled(
+                'Notes / Intervention Details',
+                _textField(
+                  controller: _notesController,
+                  hint: 'Describe the action performed...',
+                  maxLines: 4,
+                  required: false,
                 ),
-                const SizedBox(width: 12),
-                CustomButton(
-                  text: 'Record fix',
-                  backgroundColor: AppColors.primaryButton,
-                  textStyle: AppTextStyles.button.copyWith(
-                    fontSize: 13,
-                    color: Colors.white,
-                  ),
-                  onPressed: _submitting ? null : _submit,
-                  isLoading: _submitting,
-                  width: 136,
-                  height: 38,
-                ),
+              ),
+              const SizedBox(height: 20),
+              if (_submissionError != null) ...[
+                _errorBanner(_submissionError!),
+                const SizedBox(height: 12),
               ],
-            ),
-          ],
-        ),
+              if (actionType == null && !_submitting)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text('Choose an action to continue',
+                        style: AppTextStyles.cardMeta),
+                  ),
+                ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  CustomButton(
+                    text: 'Cancel',
+                    backgroundColor: AppColors.primaryButton,
+                    textStyle: AppTextStyles.button.copyWith(
+                      fontSize: 13,
+                      color: AppColors.primaryButton,
+                    ),
+                    onPressed: _submitting ? null : widget.onCancel,
+                    outlined: true,
+                    width: 116,
+                    height: 40,
+                  ),
+                  CustomButton(
+                    text: 'Record fix',
+                    backgroundColor: AppColors.primaryButton,
+                    textStyle: AppTextStyles.button.copyWith(
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                    // The action type was already a required field; the
+                    // button now just waits for it instead of showing an error.
+                    onPressed:
+                        (_submitting || actionType == null) ? null : _submit,
+                    isLoading: _submitting,
+                    width: 136,
+                    height: 40,
+                  ),
+                ],
+              ),
+            ],
+          );
+        }),
       ),
     );
   }
+
+  // ---- header pieces --------------------------------------------------------
+
+  Widget _closeButton() {
+    return InkWell(
+      onTap: _submitting ? null : widget.onCancel,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppColors.pillBackground,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(Icons.close_rounded, size: 18, color: AppColors.textPrimary),
+      ),
+    );
+  }
+
+  Color _alertColor(NotificationType type) => type == NotificationType.critical
+      ? AppColors.criticalRed
+      : type == NotificationType.warning
+          ? AppColors.warningYellow
+          : AppColors.textSecondary;
+
+  Color _alertTint(NotificationType type) => type == NotificationType.critical
+      ? AppColors.alertBackground
+      : type == NotificationType.warning
+          ? AppColors.statusCardYellow
+          : AppColors.surfaceMuted;
+
+  /// Which alert this fix is for (only shown when opened from a notification).
+  Widget _alertStrip(AppNotificationItem item) {
+    final color = _alertColor(item.type);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _alertTint(item.type),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            item.type == NotificationType.critical
+                ? Icons.error_outline
+                : item.type == NotificationType.warning
+                    ? Icons.warning_amber_rounded
+                    : Icons.info_outline,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: 'For alert: ',
+                  style: AppTextStyles.bodySmall.copyWith(fontSize: 12.5),
+                ),
+                TextSpan(
+                  text: item.title,
+                  style: AppTextStyles.bodyBold.copyWith(fontSize: 12.5),
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Read-only timestamp (notification flow), shown as a small line instead of
+  /// a full-width disabled input.
+  Widget _loggedRow() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Icon(Icons.calendar_today_outlined,
+            size: 15, color: AppColors.textSecondary),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(text: 'Logged ', style: AppTextStyles.bodySmall),
+            TextSpan(
+              text: formatManilaDateTime(_performedAtManila),
+              style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
+            ),
+          ]),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.pillBackground,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'Read-only',
+            style: AppTextStyles.cardMeta
+                .copyWith(fontSize: 10.5, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: AppTextStyles.cardMeta.copyWith(
+          fontSize: 10.5,
+          letterSpacing: 1.1,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+
+  Widget _errorBanner(String message) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.alertBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.alertBorder),
+        ),
+        child: Text(
+          message,
+          style: AppTextStyles.bodySmall.copyWith(color: AppColors.criticalRed),
+        ),
+      );
+
+  ButtonStyle _pickerButtonStyle() => OutlinedButton.styleFrom(
+        foregroundColor: AppColors.accentGreen,
+        side: BorderSide(color: AppColors.inputBorder),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      );
+
+  // ---- layout + field helpers ----------------------------------------------
 
   Widget _twoColumns(Widget left, Widget right) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: left),
-          const SizedBox(width: 24),
+          const SizedBox(width: 16),
           Expanded(child: right),
         ],
       );
@@ -467,8 +643,8 @@ class RecordFixCardState extends State<RecordFixCard> {
   Widget _labeled(String label, Widget field) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTextStyles.label),
-          const SizedBox(height: 8),
+          Text(label, style: AppTextStyles.label.copyWith(fontSize: 13)),
+          const SizedBox(height: 6),
           field,
         ],
       );
@@ -479,7 +655,7 @@ class RecordFixCardState extends State<RecordFixCard> {
 
   InputDecoration _decoration({String? hint, String? suffix}) {
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: color),
         );
 
@@ -538,6 +714,7 @@ class RecordFixCardState extends State<RecordFixCard> {
       key: ValueKey('$hint-$value-${items.length}'),
       initialValue: value,
       isExpanded: true,
+      borderRadius: BorderRadius.circular(14),
       hint: Text(
         hint,
         style: AppTextStyles.input.copyWith(color: AppColors.textSecondary),
@@ -567,18 +744,24 @@ Future<void> showRecordFixDialog(
     builder: (dialogContext) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        child: RecordFixCard(
-          notification: notification,
-          submissionError: submissionError,
-          onCancel: () => Navigator.of(dialogContext).pop(),
-          onSubmit: (entry) async {
-            final saved = await onSubmit(entry);
-            if (saved && dialogContext.mounted) {
-              Navigator.of(dialogContext).pop();
-            }
-            return saved;
-          },
+      // Fixed max width so the dialog sits in the middle instead of stretching
+      // across the whole screen. On a phone it still uses the full width.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          child: RecordFixCard(
+            notification: notification,
+            submissionError: submissionError,
+            dialogStyle: true,
+            onCancel: () => Navigator.of(dialogContext).pop(),
+            onSubmit: (entry) async {
+              final saved = await onSubmit(entry);
+              if (saved && dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
+              return saved;
+            },
+          ),
         ),
       ),
     ),

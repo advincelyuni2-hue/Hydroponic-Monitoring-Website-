@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../models/monitoring_models.dart';
 import '../theme/app_colors.dart';
@@ -30,8 +31,7 @@ class DashboardRealtimeSection extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'Realtime Parameter Status',
+                child: CardInfoTitle('Realtime Parameter Status', description: 'Displays the latest monitored pH, EC, and temperature readings and their current conditions.',
                   style: AppTextStyles.sectionTitle.copyWith(
                     fontSize: compact ? 17 : 19,
                   ),

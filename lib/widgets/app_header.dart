@@ -54,7 +54,24 @@ class AppHeader extends StatelessWidget {
 
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
+      builder: (context) {
+        final media = MediaQuery.of(context);
+        final viewport = media.size;
+        final width = (viewport.width - media.padding.horizontal - 16)
+            .clamp(0.0, 380.0);
+        final availableHeight = (viewport.height - media.padding.vertical -
+                media.viewInsets.bottom - 16).clamp(0.0, 480.0);
+        final top = (offset.dy + size.height + 8).clamp(
+          media.padding.top + 8,
+          (viewport.height - media.padding.bottom - media.viewInsets.bottom -
+                  availableHeight - 8).clamp(media.padding.top + 8, double.infinity),
+        );
+        final left = (offset.dx + size.width - width).clamp(
+          media.padding.left + 8,
+          (viewport.width - media.padding.right - width - 8)
+              .clamp(media.padding.left + 8, double.infinity),
+        );
+        return Stack(
         children: [
           // Dismiss overlay when clicking outside
           GestureDetector(
@@ -63,9 +80,12 @@ class AppHeader extends StatelessWidget {
             child: const SizedBox.expand(),
           ),
           Positioned(
-            top: offset.dy + size.height + 8,
-            right: MediaQuery.of(context).size.width - offset.dx - size.width,
-            child: StreamBuilder<List<AppNotificationItem>>(
+            top: top,
+            left: left,
+            width: width,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: availableHeight),
+              child: StreamBuilder<List<AppNotificationItem>>(
               stream: NotificationService().streamNotificationItems(),
               builder: (context, snapshot) {
                 final notifications = snapshot.data ?? [];
@@ -117,9 +137,11 @@ class AppHeader extends StatelessWidget {
                 );
               },
             ),
+            ),
           ),
         ],
-      ),
+      );
+      },
     );
 
     Overlay.of(context).insert(overlayEntry);

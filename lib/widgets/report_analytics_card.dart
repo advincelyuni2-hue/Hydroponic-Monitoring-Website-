@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -87,7 +88,7 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Icon(Icons.show_chart, color: AppColors.accentGreen),
-        Text('Historical Telemetry Trends', style: AppTextStyles.sectionTitle),
+        CardInfoTitle('Historical Telemetry Trends', description: 'Shows historical sensor readings and how they change over the selected period.', style: AppTextStyles.sectionTitle),
       ],
     );
 

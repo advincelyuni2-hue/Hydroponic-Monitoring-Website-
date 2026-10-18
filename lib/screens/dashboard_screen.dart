@@ -71,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               insight: _buildLatestInsightCard(false),
               overview: MobileGraphCard(
                 title: 'Forecast Overview',
+                description: 'Shows recent readings and available model predictions for pH and EC over the selected horizon.',
                 actionLabel: 'View Forecast Overview Graph',
                 listenable: _controller,
                 storageBucket: _graphStorage,

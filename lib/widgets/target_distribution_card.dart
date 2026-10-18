@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../models/reports_models.dart';
@@ -46,8 +47,7 @@ class TargetDistributionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(
-                  'Frequency Distribution',
+                child: CardInfoTitle('Frequency Distribution', description: 'Shows the proportions of readings in optimal, warning, and critical ranges for the selected parameter.',
                   style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
                 ),
               ),

@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'mobile_graph_card.dart';
 import 'dart:math' as math;
 
@@ -5,6 +6,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../models/monitoring_models.dart';
+import '../models/forecast_insight_summary.dart';
+import '../models/forecasting_models.dart' as forecasting;
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -88,7 +91,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
       );
 
   Widget _buildCard(BuildContext context, bool isMobile) {
-    if (widget.isOffline || widget.forecastIssue != null) {
+    if (widget.isOffline || widget.isCalibrating || widget.forecastIssue != null) {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
@@ -405,7 +408,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
         const Icon(Icons.show_chart, color: AppColors.primaryButton),
         const SizedBox(width: 8),
         Flexible(
-            child: Text('Forecast Overview',
+            child: CardInfoTitle('Forecast Overview', description: 'Shows recent readings and available model predictions for pH and EC over the selected horizon.',
                 style: AppTextStyles.sectionTitle
                     .copyWith(fontSize: isMobile ? 17 : 19))),
       ],
@@ -803,16 +806,14 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     required String parameter,
   }) {
     String? valueFor(List<ForecastPoint> points, int decimals) {
+      if (predicted) {
+        return _modelSummary(points).valueAt(_hours)?.toStringAsFixed(decimals);
+      }
       final matching = points.where(
         (point) => point.isPredicted == predicted,
       );
       if (matching.isEmpty) return null;
-      final point = predicted
-          ? matching.reduce(
-              (a, b) =>
-                  (a.hour - _hours).abs() <= (b.hour - _hours).abs() ? a : b,
-            )
-          : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
+      final point = matching.reduce((a, b) => a.hour >= b.hour ? a : b);
       return point.value.toStringAsFixed(decimals);
     }
 
@@ -828,13 +829,34 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
     return values.isEmpty ? '--' : values.join(' / ');
   }
 
+  // Use the same genuine-model mapping as the dashboard insight card.
+  // This excludes fallback, invalid, and non-forward-looking predictions.
+  ForecastInsightSummary _modelSummary(List<ForecastPoint> points) =>
+      ForecastInsightSummary(
+        forecast: points.map((point) => forecasting.ForecastingChartPoint(
+          hour: point.hour,
+          value: point.value,
+          isPredicted: point.isPredicted,
+          isFallback: point.isFallback,
+        )).toList(),
+        minimum: 0,
+        maximum: 1,
+      );
+
   List<ForecastPoint> _filtered(List<ForecastPoint> points) {
-    return points
-        .where(
-          (point) =>
-              point.isPredicted ? point.hour <= _hours : point.hour >= -_hours,
-        )
-        .toList();
+    return [
+      ...points.where((point) => !point.isPredicted &&
+          point.hour.isFinite && point.value.isFinite &&
+          point.hour >= -_hours && point.hour <= 0),
+      for (final point in _modelSummary(points).points)
+        if (point.hour <= _hours)
+          ForecastPoint(
+            hour: point.hour,
+            value: point.value,
+            isPredicted: true,
+            isFallback: false,
+          ),
+    ]..sort((a, b) => a.hour.compareTo(b.hour));
   }
 
   List<_PlotBar> _seriesBars(
@@ -864,7 +886,7 @@ class _DashboardForecastOverviewState extends State<DashboardForecastOverview> {
               color: color, predicted: false, fill: fillHistorical),
           _BarInfo(param, false, toReal),
         ),
-      if (predictedSpots.isNotEmpty)
+      if (predicted.isNotEmpty)
         _PlotBar(
           _bar(predictedSpots,
               color: color, predicted: true, fill: fillPredicted),

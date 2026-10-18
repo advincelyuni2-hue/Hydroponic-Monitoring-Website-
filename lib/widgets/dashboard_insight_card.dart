@@ -1,3 +1,4 @@
+import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../models/forecast_insight_summary.dart';
 import '../services/app_state.dart';
@@ -132,8 +133,7 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
             size: 22, color: AppColors.warningYellow),
         const SizedBox(width: 8),
         Flexible(
-          child: Text(
-            'Latest Forecast Insight',
+          child: CardInfoTitle('Latest Forecast Insight', description: 'Summarizes the predicted trend, future values, and possible threshold crossings for pH or EC.',
             style:
                 AppTextStyles.sectionTitle.copyWith(fontSize: narrow ? 17 : 19),
           ),

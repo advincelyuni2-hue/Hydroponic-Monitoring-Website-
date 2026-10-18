@@ -71,7 +71,6 @@ class DashboardController extends ChangeNotifier {
     if (_refreshingParameters || isLoading || _disposed) return;
     _refreshingParameters = true;
     final version = ++_telemetryVersion;
-    ++_forecastVersion;
     try {
       final snapshot = await _monitoringService.getTelemetrySnapshot();
       if (_disposed || version != _telemetryVersion) return;
@@ -216,12 +215,14 @@ class DashboardController extends ChangeNotifier {
       if (_disposed || version != _forecastVersion) return;
       forecastIssue = error.message;
       _clearPredictiveData();
+      _forecastBaselineRecordedAt = null;
       if (notify) notifyListeners();
       return;
     } on ForecastEndpointUnavailableException catch (error) {
       if (_disposed || version != _forecastVersion) return;
       forecastIssue = error.message;
       _clearPredictiveData();
+      _forecastBaselineRecordedAt = null;
       if (notify) notifyListeners();
       return;
     }
