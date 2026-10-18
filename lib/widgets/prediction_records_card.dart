@@ -158,45 +158,12 @@ class PredictionRecordsCard extends StatelessWidget {
     );
   }
 
-  Widget _header(BuildContext context) {
-    final compact = Responsive.isDesktop(context);
-    final titleStyle = AppTextStyles.sectionTitle.copyWith(
-        fontSize: compact ? 16 : 18);
-    final pillStyle = AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w700);
-    double textWidth(String text, TextStyle style) {
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: Directionality.of(context),
-        textScaler: MediaQuery.textScalerOf(context),
-      )..layout();
-      final width = painter.width;
-      painter.dispose();
-      return width;
-    }
-
-    final requiredWidth = textWidth('Prediction Records', titleStyle) + 8 + 6 +
-        [4, 8, 12].fold<double>(0, (width, hours) =>
-            width + textWidth('${hours}h', pillStyle) + (compact ? 12 : 22));
-    return LayoutBuilder(builder: (context, constraints) {
-      final title = Text('Prediction Records', style: titleStyle);
-      final pills = _HorizonPills(
-          selectedHorizon: selectedHorizon, compact: compact);
-      if (constraints.maxWidth >= requiredWidth.ceilToDouble()) {
-        return Row(children: [
-          title,
-          const SizedBox(width: 8),
-          const Spacer(),
-          pills,
-        ]);
-      }
-      return Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [title, pills],
+  Widget _header(BuildContext context) => Text(
+        'Prediction Records',
+        style: AppTextStyles.sectionTitle.copyWith(
+          fontSize: Responsive.isDesktop(context) ? 16 : 18,
+        ),
       );
-    });
-  }
 
   Widget _metric(String label, String value, String detail, {Color? color}) =>
       Container(
@@ -218,59 +185,4 @@ class PredictionRecordsCard extends StatelessWidget {
           ],
         ),
       );
-}
-
-/// Local UI selection only; the summary continues to describe the loaded data.
-class _HorizonPills extends StatefulWidget {
-  const _HorizonPills({required this.selectedHorizon, this.compact = false});
-  final int selectedHorizon;
-  final bool compact;
-
-  @override
-  State<_HorizonPills> createState() => _HorizonPillsState();
-}
-
-class _HorizonPillsState extends State<_HorizonPills> {
-  late int _selected = widget.selectedHorizon;
-
-  @override
-  void didUpdateWidget(covariant _HorizonPills oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedHorizon != widget.selectedHorizon) {
-      _selected = widget.selectedHorizon;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(3),
-    decoration: BoxDecoration(
-      color: AppColors.calloutBackground,
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Wrap(
-      children: [
-        for (final hours in const [4, 8, 12])
-          Semantics(
-            selected: _selected == hours,
-            child: TextButton(
-              onPressed: () => setState(() => _selected = hours),
-              style: TextButton.styleFrom(
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: EdgeInsets.symmetric(
-                    horizontal: widget.compact ? 6 : 11, vertical: 7),
-                backgroundColor: _selected == hours
-                    ? AppColors.primaryButton : Colors.transparent,
-                foregroundColor: _selected == hours
-                    ? Colors.white : AppColors.textPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                textStyle: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w700),
-              ),
-              child: Text('${hours}h'),
-            ),
-          ),
-      ],
-    ),
-  );
 }
