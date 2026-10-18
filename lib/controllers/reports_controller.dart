@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
 import '../models/monitoring_models.dart';
 import '../models/reports_models.dart';
 import 'dart:async';
@@ -19,6 +20,9 @@ class ReportsController extends ChangeNotifier {
   final PdfReportService _pdfReportService = PdfReportService();
   final ModelEvaluationService _evaluationService = ModelEvaluationService();
   bool _disposed = false;
+
+  String? _reportHistoryRangeCacheKey;
+  final Map<String, List<HistoryLogEntry>> _reportHistoryCache = {};
 
   @override
   void dispose() {
@@ -41,7 +45,7 @@ class ReportsController extends ChangeNotifier {
 
   String lastUpdatedTimestamp = 'Loading sensor history...';
 
-    String get alertsDateRange {
+  String get alertsDateRange {
     final end = manilaNow();
     final start = end.subtract(const Duration(days: 30));
 
@@ -197,8 +201,29 @@ class ReportsController extends ChangeNotifier {
     notifyListeners();
   }
 
-    void toggleInterventionLogs(bool? val) {
+  void toggleInterventionLogs(bool? val) {
     includeInterventionLogs = val ?? false;
+    notifyListeners();
+  }
+
+  void setAllReportSections(bool value) {
+    if (includeSensorLogs == value &&
+        includeCalibrationLogs == value &&
+        includeInterventionLogs == value &&
+        includePhOptimization == value &&
+        includeEcOptimization == value &&
+        includeAllAnalytics == value &&
+        includeInsightsAndDecisionSupport == value) {
+      return;
+    }
+
+    includeSensorLogs = value;
+    includeCalibrationLogs = value;
+    includeInterventionLogs = value;
+    includePhOptimization = value;
+    includeEcOptimization = value;
+    includeAllAnalytics = value;
+    includeInsightsAndDecisionSupport = value;
     notifyListeners();
   }
 
@@ -250,33 +275,88 @@ class ReportsController extends ChangeNotifier {
     }
   }
 
+  Future<List<HistoryLogEntry>> _getCachedReportHistory({
+    required DateTime start,
+    required DateTime end,
+    required String dataKey,
+    required Future<List<HistoryLogEntry>> Function() fetch,
+  }) async {
+    final rangeKey = '${start.toIso8601String()}|${end.toIso8601String()}';
+
+    // A different selected range must use newly fetched records.
+    if (_reportHistoryRangeCacheKey != rangeKey) {
+      _reportHistoryRangeCacheKey = rangeKey;
+      _reportHistoryCache.clear();
+    }
+
+    final cacheKey = '$rangeKey|$dataKey';
+    final cachedRows = _reportHistoryCache[cacheKey];
+    if (cachedRows != null) return cachedRows;
+
+    final rows = await fetch();
+    _reportHistoryCache[cacheKey] = rows;
+    return rows;
+  }
+
   /// Builds the PDF using the selected date range and report options.
   Future<Uint8List> buildPdfBytes({
     required DateTimeRange dateRange,
     required HistoryAggregation aggregation,
+    required PdfPageFormat pageFormat,
   }) async {
-    final reportSensorData = await _monitoringService.getSensorHistory(
-      start: dateRange.start,
-      end: dateRange.end,
-      aggregation: aggregation,
-    );
+    final includeSensorLogsForBuild = includeSensorLogs;
+    final includeCalibrationLogsForBuild = includeCalibrationLogs;
+    final includeInterventionLogsForBuild = includeInterventionLogs;
+    final includePhOptimizationForBuild = includePhOptimization;
+    final includeEcOptimizationForBuild = includeEcOptimization;
+    final includeAllAnalyticsForBuild = includeAllAnalytics;
+    final includeInsightsForBuild = includeInsightsAndDecisionSupport;
 
+    final needsSensorHistory =
+        includeSensorLogsForBuild || includeAllAnalyticsForBuild;
+
+    final results = await Future.wait<List<HistoryLogEntry>>([
+      needsSensorHistory
+          ? _getCachedReportHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+              dataKey: 'sensor:$aggregation',
+              fetch: () => _monitoringService.getSensorHistory(
+                start: dateRange.start,
+                end: dateRange.end,
+                aggregation: aggregation,
+              ),
+            )
+          : Future.value(<HistoryLogEntry>[]),
+      includeCalibrationLogsForBuild
+          ? _getCachedReportHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+              dataKey: 'calibration',
+              fetch: () => _monitoringService.getCalibrationHistory(
+                start: dateRange.start,
+                end: dateRange.end,
+              ),
+            )
+          : Future.value(<HistoryLogEntry>[]),
+      includeInterventionLogsForBuild
+          ? _getCachedReportHistory(
+              start: dateRange.start,
+              end: dateRange.end,
+              dataKey: 'intervention',
+              fetch: () => _monitoringService.getInterventionHistory(
+                start: dateRange.start,
+                end: dateRange.end,
+              ),
+            )
+          : Future.value(<HistoryLogEntry>[]),
+    ]);
+
+    final reportSensorData = results[0];
     final sensorLogs =
-        includeSensorLogs ? reportSensorData : <HistoryLogEntry>[];
-
-    final calibrationLogs = includeCalibrationLogs
-        ? await _monitoringService.getCalibrationHistory(
-            start: dateRange.start,
-            end: dateRange.end,
-          )
-        : <HistoryLogEntry>[];
-
-    final interventionLogs = includeInterventionLogs
-        ? await _monitoringService.getInterventionHistory(
-            start: dateRange.start,
-            end: dateRange.end,
-          )
-        : <HistoryLogEntry>[];
+        includeSensorLogsForBuild ? reportSensorData : <HistoryLogEntry>[];
+    final calibrationLogs = results[1];
+    final interventionLogs = results[2];
 
     List<AnalyticsPoint> trendFor(int valueIndex, String parameter) {
       return reportSensorData.reversed
@@ -303,6 +383,7 @@ class ReportsController extends ChangeNotifier {
 
     return _pdfReportService.buildReport(
       downloadedBy: downloadedBy,
+      pageFormat: pageFormat,
       summary: summary,
       phTrendPoints: trendFor(2, 'pH'),
       ecTrendPoints: trendFor(3, 'EC'),
@@ -312,13 +393,13 @@ class ReportsController extends ChangeNotifier {
       interventionLogs: interventionLogs,
       phRange: phRange,
       ecRange: ecRange,
-      includeSensorLogs: includeSensorLogs,
-      includeCalibrationLogs: includeCalibrationLogs,
-      includeInterventionLogs: includeInterventionLogs,
-      includePhOptimization: includePhOptimization,
-      includeEcOptimization: includeEcOptimization,
-      includeAllAnalytics: includeAllAnalytics,
-      includeInsightsAndDecisionSupport: includeInsightsAndDecisionSupport,
+      includeSensorLogs: includeSensorLogsForBuild,
+      includeCalibrationLogs: includeCalibrationLogsForBuild,
+      includeInterventionLogs: includeInterventionLogsForBuild,
+      includePhOptimization: includePhOptimizationForBuild,
+      includeEcOptimization: includeEcOptimizationForBuild,
+      includeAllAnalytics: includeAllAnalyticsForBuild,
+      includeInsightsAndDecisionSupport: includeInsightsForBuild,
     );
   }
 
@@ -326,10 +407,12 @@ class ReportsController extends ChangeNotifier {
   Future<void> generatePdfReport({
     required DateTimeRange dateRange,
     required HistoryAggregation aggregation,
+    required PdfPageFormat pageFormat,
   }) async {
     final bytes = await buildPdfBytes(
       dateRange: dateRange,
       aggregation: aggregation,
+      pageFormat: pageFormat,
     );
     await _pdfReportService.downloadPdf(bytes);
   }

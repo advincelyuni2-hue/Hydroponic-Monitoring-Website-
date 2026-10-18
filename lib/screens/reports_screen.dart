@@ -73,8 +73,8 @@ class ReportsScreenState extends State<ReportsScreen> {
                           borderRadius: BorderRadius.circular(24)),
                       icon: const Icon(Icons.file_download_outlined, size: 20),
                       label: Text('Export PDF',
-                          style: AppTextStyles.bodyBold.copyWith(
-                              fontSize: 13, color: Colors.white)),
+                          style: AppTextStyles.bodyBold
+                              .copyWith(fontSize: 13, color: Colors.white)),
                     ),
             )
           : null,
@@ -87,11 +87,8 @@ class ReportsScreenState extends State<ReportsScreen> {
             }
 
             return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  isMobile ? 16 : 24,
-                  isMobile ? 16 : 24,
-                  isMobile ? 16 : 24,
-                  isMobile ? 96 : 24),
+              padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24,
+                  isMobile ? 16 : 24, isMobile ? 16 : 24, isMobile ? 96 : 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -147,6 +144,12 @@ class ReportsScreenState extends State<ReportsScreen> {
               ..._buildMetricCards(),
               const SizedBox(height: 12),
               SensorHealthCard(sensors: _controller.sensorHealthList),
+              const SizedBox(height: 10),
+              Text(
+                '© 2026 Hydroponic Monitoring System',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
+              ),
             ],
           ),
           Column(
@@ -200,6 +203,14 @@ class ReportsScreenState extends State<ReportsScreen> {
         ..._buildMetricCards(),
         const SizedBox(height: 16),
         SensorHealthCard(sensors: _controller.sensorHealthList),
+        if (_isAdmin) ...[
+          const SizedBox(height: 10),
+          Text(
+            '© 2026 Hydroponic Monitoring System',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 16),
         _buildTrendsCard(),
         const SizedBox(height: 16),
@@ -263,11 +274,11 @@ class ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildTrendsCard() => MobileGraphCard(
-    title: 'Historical Telemetry Trends',
-    actionLabel: 'View Historical Telemetry Trends',
-    listenable: _controller,
-    builder: (_) => _buildTrendsGraph(),
-  );
+        title: 'Historical Telemetry Trends',
+        actionLabel: 'View Historical Telemetry Trends',
+        listenable: _controller,
+        builder: (_) => _buildTrendsGraph(),
+      );
 
   Widget _buildTrendsGraph() {
     final isPh = _controller.selectedParameter == 'pH';
@@ -285,11 +296,11 @@ class ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildPredictionCard() => MobileGraphCard(
-    title: 'Forecast Model Evaluation',
-    actionLabel: 'View Forecast Model Evaluation',
-    listenable: _controller,
-    builder: (_) => _buildPredictionGraph(),
-  );
+        title: 'Forecast Model Evaluation',
+        actionLabel: 'View Forecast Model Evaluation',
+        listenable: _controller,
+        builder: (_) => _buildPredictionGraph(),
+      );
 
   Widget _buildPredictionGraph() {
     return ReportPredictionCard(
@@ -553,9 +564,11 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
         (children[i].parentData as StackParentData).offset = offsets[i];
       }
       final rightBottom = topHeight + 12 + bottomHeight;
-      size = constraints.constrain(Size(constraints.maxWidth,
+      size = constraints.constrain(Size(
+          constraints.maxWidth,
           children[0].size.height > rightBottom
-              ? children[0].size.height : rightBottom));
+              ? children[0].size.height
+              : rightBottom));
       return;
     }
     final rightWidth = constraints.maxWidth - 340;
@@ -569,12 +582,14 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
     double rightBottom;
     if (sideBySide) {
       final naturalHeight = children[2].size.height > children[3].size.height
-          ? children[2].size.height : children[3].size.height;
+          ? children[2].size.height
+          : children[3].size.height;
       final leftRemainder = children[0].size.height - bottomTop;
-      final height = naturalHeight > leftRemainder
-          ? naturalHeight : leftRemainder;
+      final height =
+          naturalHeight > leftRemainder ? naturalHeight : leftRemainder;
       for (var i = 2; i < children.length; i++) {
-        children[i].layout(BoxConstraints.tightFor(width: cardWidth, height: height),
+        children[i].layout(
+            BoxConstraints.tightFor(width: cardWidth, height: height),
             parentUsesSize: true);
       }
       rightBottom = bottomTop + height;
@@ -582,7 +597,8 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
           BoxConstraints.tightFor(width: widths[0], height: rightBottom),
           parentUsesSize: true);
     } else {
-      rightBottom = bottomTop + children[2].size.height + 16 + children[3].size.height;
+      rightBottom =
+          bottomTop + children[2].size.height + 16 + children[3].size.height;
     }
     final offsets = [
       Offset.zero,
@@ -595,8 +611,11 @@ class _RenderBottomAlignedReportColumns extends RenderStack {
     for (var i = 0; i < children.length; i++) {
       (children[i].parentData as StackParentData).offset = offsets[i];
     }
-    size = constraints.constrain(Size(constraints.maxWidth,
-        children[0].size.height > rightBottom ? children[0].size.height : rightBottom));
+    size = constraints.constrain(Size(
+        constraints.maxWidth,
+        children[0].size.height > rightBottom
+            ? children[0].size.height
+            : rightBottom));
   }
 
   @override

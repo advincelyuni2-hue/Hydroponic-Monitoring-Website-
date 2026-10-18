@@ -260,6 +260,24 @@ const List<HelpArticle> kDefaultHelpArticles = [
         'If a table is empty, nothing has been recorded for it yet.',
   ),
   HelpArticle(
+    type: 'tutorial',
+    category: 'History logs',
+    title: 'Run a guided pH or Gravity TDS calibration',
+    body: '1. Open History logs and select Start Calibration.\n'
+        '2. Choose Calibrate pH or Calibrate Gravity TDS. Normal five-minute uploads pause until the calibration session ends.\n'
+        '3. For pH, place the rinsed probe in pH 7.00 solution and start observing. Wait for stable readings to be captured, rinse the probe, then repeat with pH 4.00 solution.\n'
+        '4. For Gravity TDS, use the 1413 µS/cm standard. Enter the measured solution temperature between 24 and 26 °C; the DHT22 air temperature cannot be used for this.\n'
+        '5. Start observing and wait for the stable 1413 µS/cm readings to be captured. The 84 µS/cm solution is an optional informational check and does not set the coefficient.\n'
+        '6. Rinse the probe, return it to the reservoir, and finish the calibration. Check Calibration logs for the result. If the ESP32 has not applied the new version yet, keep it online and check the log again.',
+  ),
+  HelpArticle(
+    type: 'faq',
+    category: 'History logs',
+    title: 'Which standards are used for pH and Gravity TDS calibration?',
+    body:
+        'Guided pH calibration uses pH 7.00 followed by pH 4.00. Gravity TDS calibration uses 1413 µS/cm as its required coefficient-setting standard. The 84 µS/cm solution is optional and informational only; it does not adjust the coefficient.',
+  ),
+  HelpArticle(
     type: 'faq',
     category: 'History logs',
     title: 'Why do some values have a warning color?',

@@ -44,27 +44,33 @@ class PdfReportService {
     required bool includeEcOptimization,
     required bool includeAllAnalytics,
     required bool includeInsightsAndDecisionSupport,
+    required PdfPageFormat pageFormat,
     String downloadedBy = 'Current user',
   }) async {
     final document = pw.Document();
     final generatedAt = DateTime.now();
 
-    final leftLogoBytes = (await rootBundle.load('assets/images/logo_left.png'))
-        .buffer
-        .asUint8List();
+    final leftLogoBytes =
+        (await rootBundle.load('assets/images/SanPedroSeal.png'))
+            .buffer
+            .asUint8List();
     final rightLogoBytes =
-        (await rootBundle.load('assets/images/logo_right.png'))
+        (await rootBundle.load('assets/images/BagongPilipinas.png'))
             .buffer
             .asUint8List();
 
     final leftLogo = pw.MemoryImage(leftLogoBytes);
     final rightLogo = pw.MemoryImage(rightLogoBytes);
 
+    final reportMargins = pageFormat.width > pageFormat.height
+        ? const pw.EdgeInsets.fromLTRB(32, 112, 32, 32)
+        : const pw.EdgeInsets.fromLTRB(54, 118, 54, 54);
+
     document.addPage(
       pw.MultiPage(
-        pageTheme: const pw.PageTheme(
-          pageFormat: PdfPageFormat.letter,
-          margin: pw.EdgeInsets.fromLTRB(54, 118, 54, 54),
+        pageTheme: pw.PageTheme(
+          pageFormat: pageFormat,
+          margin: reportMargins,
         ),
         header: (context) =>
             _buildReportHeader(downloadedBy, leftLogo, rightLogo),
@@ -267,31 +273,55 @@ class PdfReportService {
     pw.MemoryImage rightLogo,
   ) {
     return pw.SizedBox(
-      height: 100,
+      height: 104,
       child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           _reportLogo(leftLogo),
+          pw.SizedBox(width: 10),
           pw.Expanded(
             child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.start,
+              mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
                 pw.Text(
-                  'San Pedro Office of the\n'
-                  'Agricultural and Biosystems Engineering\n'
-                  'Analytics Report',
+                  'CITY OF SAN PEDRO',
                   textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 13, lineSpacing: 2),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'OFFICE OF THE CITY AGRICULTURAL\n'
+                  'AND BIOSYSTEMS ENGINEERING',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _primaryGreen,
+                    lineSpacing: 2,
+                  ),
                 ),
                 pw.SizedBox(height: 5),
                 pw.Text(
+                  'Analytics Report',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
                   'Downloaded by: $downloadedBy',
                   textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 11),
+                  style: const pw.TextStyle(fontSize: 10),
                 ),
               ],
             ),
           ),
+          pw.SizedBox(width: 10),
           _reportLogo(rightLogo),
         ],
       ),
@@ -321,8 +351,8 @@ class PdfReportService {
   }
 
   pw.Widget _reportLogo(pw.MemoryImage image) => pw.SizedBox(
-        width: 56,
-        height: 56,
+        width: 72,
+        height: 72,
         child: pw.Image(image, fit: pw.BoxFit.contain),
       );
 
@@ -367,14 +397,15 @@ class PdfReportService {
     required String description,
     required List<pw.Widget> children,
   }) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [
-        _sectionTitle(title),
-        _sectionNote(description),
-        ...children,
-        pw.SizedBox(height: 16),
-      ],
+    return pw.Inseparable(
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          _sectionTitle(title),
+          _sectionNote(description),
+          ...children,
+        ],
+      ),
     );
   }
 
@@ -408,11 +439,10 @@ class PdfReportService {
       ];
     }
     return [
-      pw.NewPage(),
+      pw.NewPage(freeSpace: 130),
       _sectionTitle(title),
       _sectionNote(description),
       _table(headers, rows, columnWidths: columnWidths),
-      pw.SizedBox(height: 16),
     ];
   }
 

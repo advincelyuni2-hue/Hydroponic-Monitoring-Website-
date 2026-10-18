@@ -10,6 +10,7 @@ import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
 import '../widgets/custom_calendar_popup.dart';
 import '../services/monitoring_service.dart';
+import 'dart:async';
 
 class GenerateReportScreen extends StatefulWidget {
   final ReportsController controller;
@@ -24,9 +25,67 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
   DateTime selectedDate = DateTime.now();
   CalendarMode selectedMode = CalendarMode.daily;
 
+  bool isLandscape = false;
+
+  PdfPageFormat get _selectedPdfFormat =>
+      isLandscape ? PdfPageFormat.letter.landscape : PdfPageFormat.letter;
+
   /// Whether the section list has more content below the visible area.
   /// Drives the soft fade at the bottom edge of the list.
   bool _showBottomFade = false;
+
+  Timer? _previewRefreshTimer;
+  int _previewRefreshVersion = 0;
+  late String _displayedPreviewKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayedPreviewKey = _previewKey;
+    _c.addListener(_schedulePreviewRefresh);
+  }
+
+  @override
+  void didUpdateWidget(covariant GenerateReportScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_schedulePreviewRefresh);
+      _previewRefreshTimer?.cancel();
+      _previewRefreshVersion++;
+      _displayedPreviewKey = _previewKey;
+      _c.addListener(_schedulePreviewRefresh);
+    }
+  }
+
+  void _schedulePreviewRefresh() {
+    final requestedKey = _previewKey;
+    final version = ++_previewRefreshVersion;
+
+    _previewRefreshTimer?.cancel();
+
+    if (requestedKey == _displayedPreviewKey) return;
+
+    _previewRefreshTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted || version != _previewRefreshVersion) return;
+
+      if (requestedKey != _previewKey) {
+        _schedulePreviewRefresh();
+        return;
+      }
+
+      setState(() {
+        _displayedPreviewKey = requestedKey;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _previewRefreshTimer?.cancel();
+    _c.removeListener(_schedulePreviewRefresh);
+    super.dispose();
+  }
 
   static const Map<CalendarMode, String> _modeLabels = {
     CalendarMode.daily: 'Daily',
@@ -132,6 +191,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         _c.includeEcOptimization,
         _c.includeAllAnalytics,
         _c.includeInsightsAndDecisionSupport,
+        isLandscape,
         selectedDate.toIso8601String(),
       ].join('-');
 
@@ -139,30 +199,12 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     return _c.buildPdfBytes(
       dateRange: _selectedReportRange,
       aggregation: _reportAggregation,
+      pageFormat: _selectedPdfFormat,
     );
   }
 
   void _toggleSelectAll() {
-    final newValue = !isAllSelected;
-    setState(() {
-      if (_c.includeSensorLogs != newValue) _c.toggleSensorLogs(newValue);
-      if (_c.includeCalibrationLogs != newValue) {
-        _c.toggleCalibrationLogs(newValue);
-      }
-      if (_c.includeInterventionLogs != newValue) {
-        _c.toggleInterventionLogs(newValue);
-      }
-      if (_c.includePhOptimization != newValue) {
-        _c.togglePhOptimization(newValue);
-      }
-      if (_c.includeEcOptimization != newValue) {
-        _c.toggleEcOptimization(newValue);
-      }
-      if (_c.includeAllAnalytics != newValue) _c.toggleAllAnalytics(newValue);
-      if (_c.includeInsightsAndDecisionSupport != newValue) {
-        _c.toggleInsightsAndDecisionSupport(newValue);
-      }
-    });
+    _c.setAllReportSections(!isAllSelected);
   }
 
   void _openCalendarPopup() {
@@ -175,6 +217,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           setState(() {
             selectedDate = date;
           });
+          _schedulePreviewRefresh();
         },
       ),
     );
@@ -251,6 +294,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       await _c.generatePdfReport(
         dateRange: _selectedReportRange,
         aggregation: _reportAggregation,
+        pageFormat: _selectedPdfFormat,
       );
       if (!mounted) return;
       _snack('PDF report generated successfully!');
@@ -315,7 +359,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     );
   }
 
-  Widget _buildActionLayout({required bool isMobile, required List<Widget> children}) {
+  Widget _buildActionLayout(
+      {required bool isMobile, required List<Widget> children}) {
     if (!isMobile) return Row(children: children);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,7 +381,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         children: children,
       );
     }
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: children);
+    return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, children: children);
   }
 
   Widget _buildPdfPreviewArea() {
@@ -375,7 +421,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: PdfPreview(
-                key: ValueKey(_previewKey),
+                key: ValueKey(_displayedPreviewKey),
                 build: buildPreview,
                 useActions: false,
                 allowPrinting: false,
@@ -384,6 +430,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 canChangeOrientation: false,
                 canDebug: false,
                 maxPageWidth: 560,
+                dpi: 50,
                 scrollViewDecoration:
                     BoxDecoration(color: AppColors.calloutBackground),
                 pdfPreviewPageDecoration: const BoxDecoration(
@@ -465,15 +512,22 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
               ],
             )
           else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Date pill shrinks (with ellipsis) before the toggle does.
-              Flexible(child: _buildDateChip(isMobile: isMobile)),
-              const SizedBox(width: 8),
-              _buildSegmentedModeFilter(isMobile: isMobile),
-            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Date pill shrinks (with ellipsis) before the toggle does.
+                Flexible(child: _buildDateChip(isMobile: isMobile)),
+                const SizedBox(width: 8),
+                _buildSegmentedModeFilter(isMobile: isMobile),
+              ],
+            ),
+          SizedBox(height: isMobile ? 12 : 18),
+          Text(
+            'Print Orientation',
+            style: AppTextStyles.bodyBold.copyWith(fontSize: 13),
           ),
+          const SizedBox(height: 10),
+          _buildPrintOrientationSelector(isMobile: isMobile),
           SizedBox(height: isMobile ? 12 : 18),
           Divider(color: AppColors.cardBorder, height: 1),
           const SizedBox(height: 14),
@@ -630,9 +684,11 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     );
   }
 
-  Widget _buildSectionsHeader({required bool isMobile, required List<Widget> children}) {
+  Widget _buildSectionsHeader(
+      {required bool isMobile, required List<Widget> children}) {
     if (!isMobile) {
-      return Row(crossAxisAlignment: CrossAxisAlignment.center, children: children);
+      return Row(
+          crossAxisAlignment: CrossAxisAlignment.center, children: children);
     }
     return Wrap(
       spacing: 12,
@@ -671,7 +727,12 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       label: label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => selectedMode = mode),
+        onTap: () {
+          if (selectedMode == mode) return;
+
+          setState(() => selectedMode = mode);
+          _schedulePreviewRefresh();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
@@ -688,7 +749,85 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
             style: TextStyle(
               fontSize: isMobile ? 12 : 12.5,
               fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : (isMobile ? Colors.black87 : AppColors.textPrimary),
+              color: isSelected
+                  ? Colors.white
+                  : (isMobile ? Colors.black87 : AppColors.textPrimary),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrintOrientationSelector({required bool isMobile}) {
+    return SizedBox(
+      width: isMobile ? double.infinity : 240,
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 3 : 4),
+        decoration: BoxDecoration(
+          color:
+              isMobile ? const Color(0xFFE2E2E2) : AppColors.calloutBackground,
+          borderRadius: BorderRadius.circular(isMobile ? 12 : 999),
+          border: isMobile ? null : Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildOrientationSegment(
+                label: 'Portrait',
+                selected: !isLandscape,
+                isMobile: isMobile,
+              ),
+            ),
+            Expanded(
+              child: _buildOrientationSegment(
+                label: 'Landscape',
+                selected: isLandscape,
+                isMobile: isMobile,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrientationSegment({
+    required String label,
+    required bool selected,
+    required bool isMobile,
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          final nextIsLandscape = label == 'Landscape';
+          if (isLandscape == nextIsLandscape) return;
+
+          setState(() => isLandscape = nextIsLandscape);
+          _schedulePreviewRefresh();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          height: isMobile ? 40 : 36,
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primaryButton : Colors.transparent,
+            borderRadius: BorderRadius.circular(isMobile ? 10 : 999),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isMobile ? 12 : 12.5,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? Colors.white
+                  : (isMobile ? Colors.black87 : AppColors.textPrimary),
             ),
           ),
         ),
@@ -726,7 +865,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                 child: Text(
                   isMobile ? _formatSelectedPeriodLabel() : _formatChipLabel(),
                   maxLines: isMobile ? null : 1,
-                  overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
+                  overflow:
+                      isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
                   style: AppTextStyles.cardMeta.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -791,7 +931,8 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
       final onCount = group.items.where((i) => i.value).length;
       widgets.add(
         Padding(
-          padding: EdgeInsets.fromLTRB(12, widgets.isEmpty ? 4 : (isMobile ? 8 : 14), 12, 4),
+          padding: EdgeInsets.fromLTRB(
+              12, widgets.isEmpty ? 4 : (isMobile ? 8 : 14), 12, 4),
           child: _buildCategoryHeader(
             isMobile: isMobile,
             children: [
@@ -819,9 +960,12 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
     return widgets;
   }
 
-  Widget _buildCategoryHeader({required bool isMobile, required List<Widget> children}) {
+  Widget _buildCategoryHeader(
+      {required bool isMobile, required List<Widget> children}) {
     if (!isMobile) {
-      return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: children);
+      return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: children);
     }
     return Row(
       children: [

@@ -4,6 +4,11 @@ import 'services/app_state.dart';
 import 'screens/auth_gate.dart';
 import 'services/supabase_client.dart';
 import 'theme/theme_mode_controller.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
+import 'widgets/idle_session_guard.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +26,29 @@ class MyApp extends StatelessWidget {
       valueListenable: appThemeMode,
       builder: (context, themeMode, _) {
         return MaterialApp(
+          navigatorKey: appNavigatorKey,
           title: 'Monitoring App',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeMode,
+          builder: (context, child) {
+            return IdleSessionGuard(
+              onTimeout: () async {
+                try {
+                  await AuthService().logout();
+                } finally {
+                  appNavigatorKey.currentState?.pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const LoginScreen(),
+                    ),
+                    (route) => false,
+                  );
+                }
+              },
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           home: const AuthGate(),
         );
       },
