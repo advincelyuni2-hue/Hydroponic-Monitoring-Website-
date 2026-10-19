@@ -38,12 +38,31 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
   Timer? _previewRefreshTimer;
   int _previewRefreshVersion = 0;
   late String _displayedPreviewKey;
+  bool _isRouteTransitionComplete = false;
 
   @override
   void initState() {
     super.initState();
     _displayedPreviewKey = _previewKey;
     _c.addListener(_schedulePreviewRefresh);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final route = ModalRoute.of(context);
+      if (route != null &&
+          route.animation != null &&
+          !route.animation!.isCompleted) {
+        void onAnimationStatus(AnimationStatus status) {
+          if (status == AnimationStatus.completed) {
+            route.animation!.removeStatusListener(onAnimationStatus);
+            if (mounted) setState(() => _isRouteTransitionComplete = true);
+          }
+        }
+
+        route.animation!.addStatusListener(onAnimationStatus);
+      } else {
+        if (mounted) setState(() => _isRouteTransitionComplete = true);
+      }
+    });
   }
 
   @override
@@ -67,7 +86,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
 
     if (requestedKey == _displayedPreviewKey) return;
 
-    _previewRefreshTimer = Timer(const Duration(milliseconds: 700), () {
+    _previewRefreshTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted || version != _previewRefreshVersion) return;
 
       if (requestedKey != _previewKey) {
@@ -419,47 +438,82 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: PdfPreview(
-                key: ValueKey(_displayedPreviewKey),
-                build: buildPreview,
-                useActions: false,
-                allowPrinting: false,
-                allowSharing: false,
-                canChangePageFormat: false,
-                canChangeOrientation: false,
-                canDebug: false,
-                maxPageWidth: 560,
-                dpi: 50,
-                scrollViewDecoration:
-                    BoxDecoration(color: AppColors.calloutBackground),
-                pdfPreviewPageDecoration: const BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                loadingWidget: const CircularProgressIndicator(),
-                onError: (context, error) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Unable to build the preview.\n$error',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodySmall,
+            child: !_isRouteTransitionComplete
+                ? _buildPreviewPlaceholder()
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: PdfPreview(
+                      key: ValueKey(_displayedPreviewKey),
+                      build: buildPreview,
+                      useActions: false,
+                      allowPrinting: false,
+                      allowSharing: false,
+                      canChangePageFormat: false,
+                      canChangeOrientation: false,
+                      canDebug: false,
+                      maxPageWidth: 560,
+                      dpi: 50,
+                      scrollViewDecoration:
+                          BoxDecoration(color: AppColors.calloutBackground),
+                      pdfPreviewPageDecoration: const BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      loadingWidget: _buildPreviewSpinner('Generating preview...'),
+                      onError: (context, error) => Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Unable to build the preview.\n$error',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodySmall,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPreviewSpinner([String message = 'Loading preview...']) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: AppColors.accentGreen,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.calloutBackground,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: _buildPreviewSpinner('Preparing preview...'),
     );
   }
 

@@ -27,6 +27,42 @@ class PdfReportService {
     Future<void> Function(Uint8List bytes, String filename)? output,
   }) : outputPdf = output ?? platform_pdf_output.outputPdf;
 
+  static Uint8List? _cachedLeftLogoBytes;
+  static Uint8List? _cachedRightLogoBytes;
+
+  static Future<void> preloadLogos() async {
+    try {
+      _cachedLeftLogoBytes ??=
+          (await rootBundle.load('assets/images/SanPedroSeal.png'))
+              .buffer
+              .asUint8List();
+      _cachedRightLogoBytes ??=
+          (await rootBundle.load('assets/images/BagongPilipinas.png'))
+              .buffer
+              .asUint8List();
+    } catch (e) {
+      debugPrint('Failed to preload PDF logos: $e');
+    }
+  }
+
+  static Future<Uint8List> _getLeftLogoBytes() async {
+    if (_cachedLeftLogoBytes != null) return _cachedLeftLogoBytes!;
+    final bytes = (await rootBundle.load('assets/images/SanPedroSeal.png'))
+        .buffer
+        .asUint8List();
+    _cachedLeftLogoBytes = bytes;
+    return bytes;
+  }
+
+  static Future<Uint8List> _getRightLogoBytes() async {
+    if (_cachedRightLogoBytes != null) return _cachedRightLogoBytes!;
+    final bytes = (await rootBundle.load('assets/images/BagongPilipinas.png'))
+        .buffer
+        .asUint8List();
+    _cachedRightLogoBytes = bytes;
+    return bytes;
+  }
+
   Future<Uint8List> buildReport({
     required ReportSummaryData summary,
     required List<AnalyticsPoint> phTrendPoints,
@@ -50,14 +86,8 @@ class PdfReportService {
     final document = pw.Document();
     final generatedAt = DateTime.now();
 
-    final leftLogoBytes =
-        (await rootBundle.load('assets/images/SanPedroSeal.png'))
-            .buffer
-            .asUint8List();
-    final rightLogoBytes =
-        (await rootBundle.load('assets/images/BagongPilipinas.png'))
-            .buffer
-            .asUint8List();
+    final leftLogoBytes = await _getLeftLogoBytes();
+    final rightLogoBytes = await _getRightLogoBytes();
 
     final leftLogo = pw.MemoryImage(leftLogoBytes);
     final rightLogo = pw.MemoryImage(rightLogoBytes);

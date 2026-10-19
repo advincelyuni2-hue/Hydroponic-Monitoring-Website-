@@ -23,6 +23,8 @@ class ReportsController extends ChangeNotifier {
 
   String? _reportHistoryRangeCacheKey;
   final Map<String, List<HistoryLogEntry>> _reportHistoryCache = {};
+  String? _lastPdfBytesCacheKey;
+  Uint8List? _lastPdfBytes;
 
   @override
   void dispose() {
@@ -134,6 +136,7 @@ class ReportsController extends ChangeNotifier {
   bool recommendationDismissed = false;
 
   ReportsController() {
+    PdfReportService.preloadLogos();
     loadData();
   }
 
@@ -381,7 +384,31 @@ class ReportsController extends ChangeNotifier {
         ? profileName
         : (supabaseClient?.auth.currentUser?.email ?? 'Current user');
 
-    return _pdfReportService.buildReport(
+    final pdfCacheKey = [
+      dateRange.start.toIso8601String(),
+      dateRange.end.toIso8601String(),
+      aggregation.name,
+      pageFormat.width,
+      pageFormat.height,
+      includeSensorLogsForBuild,
+      includeCalibrationLogsForBuild,
+      includeInterventionLogsForBuild,
+      includePhOptimizationForBuild,
+      includeEcOptimizationForBuild,
+      includeAllAnalyticsForBuild,
+      includeInsightsForBuild,
+      phRange.start,
+      phRange.end,
+      ecRange.start,
+      ecRange.end,
+      downloadedBy,
+    ].join('|');
+
+    if (_lastPdfBytesCacheKey == pdfCacheKey && _lastPdfBytes != null) {
+      return _lastPdfBytes!;
+    }
+
+    final bytes = await _pdfReportService.buildReport(
       downloadedBy: downloadedBy,
       pageFormat: pageFormat,
       summary: summary,
@@ -401,6 +428,10 @@ class ReportsController extends ChangeNotifier {
       includeAllAnalytics: includeAllAnalyticsForBuild,
       includeInsightsAndDecisionSupport: includeInsightsForBuild,
     );
+
+    _lastPdfBytesCacheKey = pdfCacheKey;
+    _lastPdfBytes = bytes;
+    return bytes;
   }
 
   /// Builds the PDF and downloads it.
