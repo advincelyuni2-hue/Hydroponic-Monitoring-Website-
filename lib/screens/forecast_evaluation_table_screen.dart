@@ -9,7 +9,7 @@ import '../widgets/app_drawer.dart';
 import '../widgets/app_header.dart';
 import '../widgets/forecast_evaluation_table.dart';
 
-class ForecastEvaluationTableScreen extends StatelessWidget {
+class ForecastEvaluationTableScreen extends StatefulWidget {
   final ReportsController controller;
 
   const ForecastEvaluationTableScreen({
@@ -18,7 +18,27 @@ class ForecastEvaluationTableScreen extends StatelessWidget {
   });
 
   @override
+  State<ForecastEvaluationTableScreen> createState() =>
+      _ForecastEvaluationTableScreenState();
+}
+
+class _ForecastEvaluationTableScreenState
+    extends State<ForecastEvaluationTableScreen> {
+  DateTimeRange? _dateFilter;
+
+  void _selectHistoryDate(DateTime date, bool wholeMonth) {
+    final start = wholeMonth
+        ? DateTime(date.year, date.month)
+        : DateTime(date.year, date.month, date.day);
+    final end = wholeMonth
+        ? DateTime(date.year, date.month + 1)
+        : start.add(const Duration(days: 1));
+    setState(() => _dateFilter = DateTimeRange(start: start, end: end));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
     final isMobile = Responsive.isMobile(context);
     final compactHeader = !Responsive.isDesktop(context) ||
         MediaQuery.textScalerOf(context).scale(13) > 18;
@@ -48,8 +68,8 @@ class ForecastEvaluationTableScreen extends StatelessWidget {
               ),
               icon: const Icon(Icons.arrow_back, size: 20),
               label: Text('Back to reports',
-                  style: AppTextStyles.bodyBold.copyWith(
-                      fontSize: 13, color: Colors.white)),
+                  style: AppTextStyles.bodyBold
+                      .copyWith(fontSize: 13, color: Colors.white)),
             )
           : null,
       body: SafeArea(
@@ -69,6 +89,7 @@ class ForecastEvaluationTableScreen extends StatelessWidget {
                 AppHeader(
                   title: 'Prediction records',
                   profile: controller.profile,
+                  onHistoryDateSelected: _selectHistoryDate,
                   compactLayout: compactHeader,
                   titleAction: compactHeader ? null : backButton,
                 ),
@@ -85,6 +106,7 @@ class ForecastEvaluationTableScreen extends StatelessWidget {
                   errorMessage: controller.evaluationError,
                   onParameterChanged: controller.setPredictionParameter,
                   onHorizonChanged: controller.setPredictionHorizon,
+                  dateFilter: _dateFilter,
                 ),
               ],
             ),

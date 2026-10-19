@@ -121,6 +121,7 @@ class EvaluationSample {
 
 class ForecastEvaluationRecord {
   final String parameter;
+  final DateTime? targetAt;
   final String targetLabel;
   final double predictedValue;
   final double? actualValue;
@@ -131,6 +132,7 @@ class ForecastEvaluationRecord {
 
   const ForecastEvaluationRecord({
     required this.parameter,
+    this.targetAt,
     required this.targetLabel,
     required this.predictedValue,
     required this.actualValue,

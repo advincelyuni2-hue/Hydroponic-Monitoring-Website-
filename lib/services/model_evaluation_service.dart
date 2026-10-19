@@ -64,6 +64,7 @@ class ModelEvaluationService {
       if (predicted != null && targetRaw != null) {
         records.add(ForecastEvaluationRecord(
           parameter: raw['parameter']?.toString() ?? '',
+          targetAt: toManilaTime(parseSupabaseTimestamp(targetRaw)),
           targetLabel: formatManilaDateTime(
             toManilaTime(parseSupabaseTimestamp(targetRaw)),
           ),
