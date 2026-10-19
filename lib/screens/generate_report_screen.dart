@@ -452,7 +452,6 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
                       canChangeOrientation: false,
                       canDebug: false,
                       maxPageWidth: 560,
-                      dpi: 50,
                       scrollViewDecoration:
                           BoxDecoration(color: AppColors.calloutBackground),
                       pdfPreviewPageDecoration: const BoxDecoration(
