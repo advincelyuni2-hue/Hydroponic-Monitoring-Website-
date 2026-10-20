@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,7 +45,7 @@ class _AuthGateState extends State<AuthGate> {
     return _home ??
         const Scaffold(
           body: SafeArea(
-            child: Center(child: CircularProgressIndicator()),
+            child: HydroLoadingScreen(),
           ),
         );
   }

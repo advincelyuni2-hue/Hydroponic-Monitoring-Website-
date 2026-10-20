@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 /// The single source of truth for the application's copyright and styling.
 class AppFooter extends StatelessWidget {
-  const AppFooter({super.key});
+  const AppFooter({super.key, this.text = copyrightText});
+
+  /// Public pages may override the copy; all existing callers keep the default.
+  final String text;
 
   static const year = 2026;
   static const copyrightText =
@@ -37,7 +40,7 @@ class AppFooter extends StatelessWidget {
         child: Padding(
           padding: _padding,
           child: Text(
-            copyrightText,
+            text,
             textAlign: TextAlign.center,
             style: _style(context),
           ),

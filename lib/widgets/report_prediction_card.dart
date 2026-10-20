@@ -54,6 +54,9 @@ class ReportPredictionCard extends StatelessWidget {
       decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
       child: MobileGraphComposition(
         chartIndex: 2,
+        subtitle: 'Predicted vs measured values',
+        sheetTitle: 'Evaluation details',
+        sheetContent: _mobileDetails(context),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(context, isMobile),
@@ -66,33 +69,27 @@ class ReportPredictionCard extends StatelessWidget {
               height: MobileGraphPage.isActive(context) ? constraints.maxHeight : chartHeight,
               child: MobileGraphTimeline(
                 pointCount: isLoading || evaluation.samples.isEmpty ? 0 : evaluation.samples.length,
-                child: _buildBody(isMobile),
+                child: _buildBody(isMobile, MobileGraphPage.isActive(context)),
               ),
             );
           }),
           const SizedBox(height: 12),
           _buildLegend(),
+          if (MobileGraphPage.isActive(context)) TextButton.icon(
+            onPressed: onViewTable,
+            icon: const Icon(Icons.table_chart_outlined, size: 17),
+            label: const Text('View table'),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBody(bool isMobile) {
+  Widget _buildBody(bool isMobile, bool dedicated) {
     if (isLoading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 12),
-            Text(
-              'Comparing model predictions with sensor readings...',
-              style: AppTextStyles.cardMeta,
-            ),
-          ],
-        ),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
+
     if (evaluation.samples.isEmpty) {
       return Center(
         child: Padding(
@@ -105,7 +102,7 @@ class ReportPredictionCard extends StatelessWidget {
         ),
       );
     }
-    return _buildChart(isMobile);
+    return _buildChart(isMobile, dedicated);
   }
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
@@ -160,6 +157,27 @@ class ReportPredictionCard extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [parameterControls, horizonControls],
     );
+
+    if (MobileGraphPage.isActive(context)) {
+      final dropdown = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFDDDECF))),
+        child: DropdownButtonHideUnderline(child: DropdownButton<String>(
+          value: selectedParameter, isDense: true,
+          style: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w700),
+          items: ['Both', 'pH', 'EC'].map((value) => DropdownMenuItem(
+            value: value, child: Text(value))).toList(),
+          onChanged: (value) { if (value != null) onParameterChanged(value); },
+        )));
+      return LayoutBuilder(builder: (context, space) {
+        if (space.maxWidth < 270 || MediaQuery.textScalerOf(context).scale(12) > 17) {
+          return Wrap(spacing: 12, runSpacing: 8, children: [dropdown, horizonControls]);
+        }
+        return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [dropdown, horizonControls]);
+      });
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -331,7 +349,7 @@ class ReportPredictionCard extends StatelessWidget {
     return value.toStringAsFixed(2);
   }
 
-  Widget _buildChart(bool isMobile) {
+  Widget _buildChart(bool isMobile, bool dedicated) {
     final samples = evaluation.samples;
     final series = _series();
     if (series.isEmpty) {
@@ -368,7 +386,7 @@ class ReportPredictionCard extends StatelessWidget {
     ];
 
     final labelInterval =
-        math.max(1, (samples.length / (isMobile ? 3 : 4)).ceil());
+        dedicated ? 2 : math.max(1, (samples.length / (isMobile ? 3 : 4)).ceil());
 
     final axisNameStyle = AppTextStyles.cardMeta.copyWith(
       fontSize: 11,
@@ -409,6 +427,7 @@ class ReportPredictionCard extends StatelessWidget {
     }
 
     return MobileLineChart(
+      preserveAxes: dedicated,
       LineChartData(
         minX: 0,
         maxX: math.max(samples.length - 1, 1).toDouble(),
@@ -433,27 +452,28 @@ class ReportPredictionCard extends StatelessWidget {
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: dual
               ? AxisTitles(
-                  axisNameSize: 20,
+                  axisNameSize: dedicated ? 12 : 20,
                   axisNameWidget: Text(
                     'EC (mS/cm)',
                     style: axisNameStyle.copyWith(color: _ecColor),
                   ),
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: isMobile ? 38 : 44,
+                    reservedSize: dedicated ? 28 : (isMobile ? 38 : 44),
                     interval: leftScale.interval,
                     getTitlesWidget: (value, _) => Padding(
                       padding: const EdgeInsets.only(left: 6),
                       child: Text(
                         _tickLabel(value / leftScale.max * ecAxisMax, ecStep),
-                        style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                        style: AppTextStyles.cardMeta.copyWith(fontSize: 10,
+                          color: dedicated ? _ecColor : null),
                       ),
                     ),
                   ),
                 )
               : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
-            axisNameSize: 20,
+            axisNameSize: dedicated ? 12 : 20,
             axisNameWidget: Text(
               hasPh ? 'pH' : 'EC (mS/cm)',
               style: axisNameStyle.copyWith(
@@ -462,13 +482,14 @@ class ReportPredictionCard extends StatelessWidget {
             ),
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: isMobile ? 34 : 40,
+              reservedSize: dedicated ? 26 : (isMobile ? 34 : 40),
               interval: leftScale.interval,
               getTitlesWidget: (value, _) => Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   _tickLabel(value, leftScale.interval),
-                  style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                  style: AppTextStyles.cardMeta.copyWith(fontSize: 10,
+                    color: dedicated ? (hasPh ? _phColor : _ecColor) : null),
                 ),
               ),
             ),
@@ -483,8 +504,13 @@ class ReportPredictionCard extends StatelessWidget {
                 if (index < 0 ||
                     index >= samples.length ||
                     (value - index).abs() > 0.001 ||
-                    index % labelInterval != 0) {
+                    (index % labelInterval != 0 && (!dedicated || index != samples.length - 1))) {
                   return const SizedBox.shrink();
+                }
+                if (dedicated) {
+                  return SizedBox(width: 88, child: Text(samples[index].label,
+                    textAlign: TextAlign.center, maxLines: 3,
+                    style: AppTextStyles.cardMeta.copyWith(fontSize: 10)));
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -566,6 +592,79 @@ class ReportPredictionCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<Widget> _mobileDetails(BuildContext context) {
+    final accuracy = evaluation.accuracyFor(selectedParameter);
+    final meta = AppTextStyles.cardMeta.copyWith(fontSize: 11);
+    Widget card(Widget child) => Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: child);
+    Widget record(String label, int count) => Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(children: [Expanded(child: Text(label, style: meta)),
+        Text(isLoading ? '?' : '$count', style: meta.copyWith(fontWeight: FontWeight.w700))]));
+    final accuracyCard = card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Accuracy', style: meta.copyWith(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Text(isLoading ? 'Loading?' : accuracy == null ? 'Not available' : '${accuracy.toStringAsFixed(1)}%',
+        style: AppTextStyles.sectionTitle.copyWith(fontSize: 24, color: _phColor)),
+      const SizedBox(height: 4),
+      Text('$selectedParameter ? ${selectedHorizon}h', style: meta),
+    ]));
+    final recordsCard = card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Records', style: meta.copyWith(fontWeight: FontWeight.w700)),
+      record('Evaluated', evaluation.evaluatedCount),
+      record('Pending', evaluation.pendingCount),
+      record('Excluded', evaluation.intervenedCount + evaluation.calibrationExcludedCount),
+      if (evaluation.missingActualCount > 0) record('Missing actual', evaluation.missingActualCount),
+    ]));
+    Widget legendItem(_Series series) => Row(children: [
+      SizedBox(width: 20, child: Row(children: [
+        if (series.predicted)
+          for (var i = 0; i < 3; i++) ...[
+            Container(width: 4, height: 2, color: series.lineColor),
+            const SizedBox(width: 2),
+          ]
+        else Container(width: 18, height: 2, color: series.lineColor),
+      ])),
+      const SizedBox(width: 6),
+      Expanded(child: Text(series.name, style: meta)),
+    ]);
+    final series = _series();
+    return [
+      card(Column(children: [
+        for (final ec in [false, true])
+          if (series.any((s) => s.isEc == ec))
+            Padding(padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                for (final predicted in [false, true])
+                  Expanded(child: Column(children: [
+                    for (final s in series.where((s) => s.isEc == ec && s.predicted == predicted))
+                      legendItem(s),
+                  ])),
+              ])),
+      ])),
+      const SizedBox(height: 8),
+      LayoutBuilder(builder: (context, space) {
+        if (space.maxWidth < 260 || MediaQuery.textScalerOf(context).scale(12) > 17) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [accuracyCard, const SizedBox(height: 8), recordsCard]);
+        }
+        return IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [Expanded(child: accuracyCard), const SizedBox(width: 8), Expanded(child: recordsCard)]));
+      }),
+      const SizedBox(height: 8),
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(
+        onPressed: onViewTable,
+        style: OutlinedButton.styleFrom(backgroundColor: Colors.white,
+          foregroundColor: _phColor, side: BorderSide(color: _phColor),
+          minimumSize: const Size(0, 40), shape: const StadiumBorder()),
+        icon: const Icon(Icons.table_chart_outlined, size: 16),
+        label: const Text('View table'),
+      )),
+    ];
   }
 
   Widget _buildLegend() {

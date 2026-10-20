@@ -1,3 +1,5 @@
+import '../widgets/hydro_loading_screen.dart';
+import '../widgets/sensor_offline_state.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +19,7 @@ import '../widgets/dashboard_realtime_section.dart';
 import '../widgets/dashboard_layout.dart';
 import 'forecasting_dashboard_screen.dart';
 import '../widgets/dashboard_insight_card.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -45,13 +48,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: const AppDrawer(selectedIndex: 0),
+      drawer: ListenableBuilder(listenable: _controller,
+        builder: (context, _) => AppDrawer(selectedIndex: 0,
+          isOffline: _controller.isLoading ? null : _controller.isSensorOffline,
+          isCalibrating: _controller.isCalibrating,
+          lastReceived: _controller.latestSensorRecordedAt)),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
             if (_controller.isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const HydroLoadingScreen();
             }
             if (_controller.errorMessage != null) {
               return AppFooterScrollView(
@@ -62,7 +69,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             return DashboardLayout(
               header:
-                  AppHeader(title: 'Dashboard', profile: _controller.profile),
+                  _controller.isSensorOffline && !_controller.isCalibrating
+                    ? Column(children: [
+                        AppHeader(title: 'Dashboard', profile: _controller.profile),
+                        const SizedBox(height: 12),
+                        SensorOfflineBanner(lastReceived: _controller.latestSensorRecordedAt),
+                      ])
+                    : AppHeader(title: 'Dashboard', profile: _controller.profile),
               realtime: DashboardRealtimeSection(
                 statuses: _controller.parameterStatuses,
                 isOffline: _controller.isSensorOffline,
@@ -72,7 +85,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               overview: MobileGraphCard(
                 title: 'Forecast Overview',
                 description: 'Shows recent readings and available model predictions for pH and EC over the selected horizon.',
-                actionLabel: 'View Forecast Overview Graph',
+                actionLabel: 'View Forecast Chart',
+                onMobileTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const ForecastingDashboardScreen(graphOnly: true))),
                 listenable: _controller,
                 storageBucket: _graphStorage,
                 builder: (_) => _buildForecastOverview(),

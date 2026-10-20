@@ -16,6 +16,7 @@ class ForecastingController extends ChangeNotifier {
   final UserService userService = UserService();
 
   bool isLoading = true;
+  bool isChartLoading = false;
   String? errorMessage;
   UserProfile? profile;
 
@@ -73,6 +74,7 @@ class ForecastingController extends ChangeNotifier {
     final version = ++_loadVersion;
     final hours = selectedHours;
     isLoading = true;
+    isChartLoading = false;
     errorMessage = null;
     forecastIssue = null;
     notifyListeners();
@@ -259,10 +261,43 @@ class ForecastingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectHours(int hours) {
+  Future<void> selectHours(int hours) async {
     if (selectedHours == hours) return;
     selectedHours = hours;
-    loadData();
+    final version = ++_loadVersion;
+    isChartLoading = true;
+    forecastIssue = null;
+    notifyListeners();
+    try {
+      final results = await Future.wait([
+        for (final parameter in ['ph', 'ec'])
+          forecastingService.getSharedForecastChartData(
+            parameter,
+            selectedHours: hours,
+            baselineRecordedAt: latestSensorRecordedAt,
+            currentPh: currentPh,
+            currentEc: currentEc,
+            currentTemp: currentTemp,
+          ),
+      ]);
+      if (_disposed || version != _loadVersion) return;
+      phPoints = results[0];
+      ecPoints = results[1];
+    } on ForecastBaselineUnavailableException catch (error) {
+      if (_disposed || version != _loadVersion) return;
+      forecastIssue = error.message;
+    } on ForecastEndpointUnavailableException catch (error) {
+      if (_disposed || version != _loadVersion) return;
+      forecastIssue = error.message;
+    } catch (_) {
+      if (_disposed || version != _loadVersion) return;
+      forecastIssue = 'Could not load this forecast. Try another horizon.';
+    } finally {
+      if (!_disposed && version == _loadVersion) {
+        isChartLoading = false;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> applyFix(PredictionInsightDetail detail) async {

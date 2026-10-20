@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -275,6 +276,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Scaffold(body: SafeArea(child: HydroLoadingScreen()));
     final isAdmin = appProfile.value?.isAdmin == true;
 
     return Scaffold(

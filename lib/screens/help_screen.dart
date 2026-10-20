@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../services/app_state.dart';
@@ -26,7 +27,9 @@ class _HelpScreenState extends State<HelpScreen> {
   bool _busy = false;
   String? _loadError;
   String _category = _all;
-  String _searchQuery = '';
+
+  /// Mobile only: which list is showing ('tutorial' or 'faq').
+  String _tab = 'tutorial';
 
   bool get _isAdmin => appProfile.value?.isAdmin == true;
 
@@ -181,36 +184,45 @@ class _HelpScreenState extends State<HelpScreen> {
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
+    if (_loading) return const Scaffold(body: SafeArea(child: HydroLoadingScreen()));
     final categories = _categoriesInUse();
     if (_category != _all && !categories.contains(_category)) {
       _category = _all;
     }
 
-    final query = _searchQuery.trim().toLowerCase();
-
-    final visible = _articles.where((article) {
-      final matchesCategory =
-          _category == _all || article.category == _category;
-
-      final matchesSearch = query.isEmpty ||
-          article.title.toLowerCase().contains(query) ||
-          article.body.toLowerCase().contains(query) ||
-          article.category.toLowerCase().contains(query);
-
-      return matchesCategory && matchesSearch;
-    }).toList();
+    final visible = _articles
+        .where((article) => _category == _all || article.category == _category)
+        .toList();
 
     final tutorials =
         visible.where((article) => article.type == 'tutorial').toList();
     final faqs = visible.where((article) => article.type == 'faq').toList();
 
+    const tutorialsEmpty = 'No tutorials in this category yet.';
+    const faqsEmpty = 'No FAQs in this category yet.';
+
+    // On mobile "Add article" floats at the bottom so it stays reachable.
+    final showAddFab = isMobile && _isAdmin;
+    final edge = isMobile ? 16.0 : 24.0;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const AppDrawer(selectedIndex: 5),
+      floatingActionButton: showAddFab
+          ? FloatingActionButton.extended(
+              onPressed: _busy ? null : _add,
+              backgroundColor: AppColors.primaryButton,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Add article'),
+            )
+          : null,
       body: SafeArea(
         child: AppFooterScrollView(
           showFooter: !_loading,
-          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          // Extra room at the bottom so the floating button never covers
+          // the last article.
+          padding: EdgeInsets.fromLTRB(edge, edge, edge, showAddFab ? 96 : edge),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -221,75 +233,56 @@ class _HelpScreenState extends State<HelpScreen> {
                 style: AppTextStyles.body,
               ),
               const SizedBox(height: 16),
-              TextField(
-                onChanged: (value) => setState(() => _searchQuery = value),
-                decoration: InputDecoration(
-                  hintText: 'Search tutorials and FAQs',
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
               if (_isAdmin && _loadError != null) _buildLoadError(),
               if (_busy || _loading) ...[
                 const LinearProgressIndicator(),
                 const SizedBox(height: 12),
               ],
-              _buildCategoryChips(categories),
+              if (isMobile && _showSaveDefaults) ...[
+                _buildSaveDefaultsButton(),
+                const SizedBox(height: 12),
+              ],
+              _buildCategoryChips(categories, isMobile),
               const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(isMobile ? 16 : 20),
-                decoration: AppDecorations.card(),
-                child: isMobile
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSection(
-                            'Tutorials',
-                            tutorials,
-                            query.isEmpty
-                                ? 'No tutorials in this category yet.'
-                                : 'No tutorials match your search.',
-                          ),
-                          const SizedBox(height: 24),
-                          _buildSection(
-                            'FAQs',
-                            faqs,
-                            query.isEmpty
-                                ? 'No FAQs in this category yet.'
-                                : 'No FAQs match your search.',
-                          ),
-                        ],
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _buildSection(
-                              'Tutorials',
-                              tutorials,
-                              query.isEmpty
-                                  ? 'No tutorials in this category yet.'
-                                  : 'No tutorials match your search.',
-                            ),
-                          ),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: _buildSection(
-                              'FAQs',
-                              faqs,
-                              query.isEmpty
-                                  ? 'No FAQs in this category yet.'
-                                  : 'No FAQs match your search.',
-                            ),
-                          ),
-                        ],
+              if (isMobile) ...[
+                _buildTabSwitch(),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: AppDecorations.card(),
+                  child: _buildList(
+                    _tab == 'tutorial' ? tutorials : faqs,
+                    _tab == 'tutorial' ? tutorialsEmpty : faqsEmpty,
+                  ),
+                ),
+              ] else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: AppDecorations.card(),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildSection(
+                          'Tutorials',
+                          tutorials,
+                          tutorialsEmpty,
+                        ),
                       ),
-              ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: _buildSection(
+                          'FAQs',
+                          faqs,
+                          faqsEmpty,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -297,28 +290,31 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
-  List<Widget> _buildAdminActions() {
-    return [
-      FilledButton.icon(
-        onPressed: _busy ? null : _add,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primaryButton,
-          foregroundColor: Colors.white,
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Add article'),
+  bool get _showSaveDefaults =>
+      _isAdmin && _usingDefaults && _loadError == null && !_loading;
+
+  Widget _buildAddButton() {
+    return FilledButton.icon(
+      onPressed: _busy ? null : _add,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primaryButton,
+        foregroundColor: Colors.white,
       ),
-      if (_usingDefaults && _loadError == null && !_loading)
-        OutlinedButton.icon(
-          onPressed: _busy ? null : () => _runBusy(() => _saveDefaults()),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: AppColors.accentGreen),
-            foregroundColor: AppColors.accentGreen,
-          ),
-          icon: const Icon(Icons.save_alt_rounded, size: 18),
-          label: const Text('Save built-in guides'),
-        ),
-    ];
+      icon: const Icon(Icons.add),
+      label: const Text('Add article'),
+    );
+  }
+
+  Widget _buildSaveDefaultsButton() {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : () => _runBusy(() => _saveDefaults()),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: AppColors.accentGreen),
+        foregroundColor: AppColors.accentGreen,
+      ),
+      icon: const Icon(Icons.save_alt_rounded, size: 18),
+      label: const Text('Save built-in guides'),
+    );
   }
 
   Widget _buildLoadError() {
@@ -345,26 +341,107 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
-  Widget _buildCategoryChips(List<String> categories) {
+  Widget _categoryChip(String name) {
+    return ChoiceChip(
+      label: Text(name),
+      selected: _category == name,
+      showCheckmark: false,
+      selectedColor: AppColors.primaryButton,
+      backgroundColor: AppColors.pillBackground,
+      side: BorderSide.none,
+      labelStyle: AppTextStyles.cardMeta.copyWith(
+        fontWeight: FontWeight.w600,
+        color: _category == name ? Colors.white : AppColors.pillText,
+      ),
+      onSelected: (_) => setState(() => _category = name),
+    );
+  }
+
+  Widget _buildCategoryChips(List<String> categories, bool isMobile) {
+    final names = [_all, ...categories];
+
+    if (isMobile) {
+      // One scrolling row instead of a wrapped block of chips.
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var i = 0; i < names.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              _categoryChip(names[i]),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        if (_isAdmin) ..._buildAdminActions(),
-        for (final name in [_all, ...categories])
-          ChoiceChip(
-            label: Text(name),
-            selected: _category == name,
-            showCheckmark: false,
-            selectedColor: AppColors.primaryButton,
-            backgroundColor: AppColors.pillBackground,
-            side: BorderSide.none,
-            labelStyle: AppTextStyles.cardMeta.copyWith(
-              fontWeight: FontWeight.w600,
-              color: _category == name ? Colors.white : AppColors.pillText,
+        if (_isAdmin) _buildAddButton(),
+        if (_showSaveDefaults) _buildSaveDefaultsButton(),
+        for (final name in names) _categoryChip(name),
+      ],
+    );
+  }
+
+  /// Mobile only: switches between the Tutorials and FAQs lists.
+  Widget _buildTabSwitch() {
+    Widget tab(String value, String label) {
+      final selected = _tab == value;
+      return Expanded(
+        child: Material(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(22),
+            onTap: () => setState(() => _tab = value),
+            child: Container(
+              height: 44,
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: AppTextStyles.bodyBold.copyWith(
+                  color: selected ? AppColors.accentGreen : AppColors.pillText,
+                ),
+              ),
             ),
-            onSelected: (_) => setState(() => _category = name),
           ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.pillBackground,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Row(
+        children: [
+          tab('tutorial', 'Tutorials'),
+          const SizedBox(width: 4),
+          tab('faq', 'FAQs'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList(List<HelpArticle> items, String emptyText) {
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(emptyText, style: AppTextStyles.cardMeta),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: AppColors.cardBorder),
+          _buildArticle(items[i]),
+        ],
       ],
     );
   }
@@ -376,16 +453,7 @@ class _HelpScreenState extends State<HelpScreen> {
       children: [
         Text(title, style: AppTextStyles.sectionTitle),
         const SizedBox(height: 8),
-        if (items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(emptyText, style: AppTextStyles.cardMeta),
-          )
-        else
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) Divider(height: 1, color: AppColors.cardBorder),
-            _buildArticle(items[i]),
-          ],
+        _buildList(items, emptyText),
       ],
     );
   }

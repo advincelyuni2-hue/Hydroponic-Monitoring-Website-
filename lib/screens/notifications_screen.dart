@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import '../widgets/mobile_page_header.dart';
@@ -389,6 +390,7 @@ class NotificationsScreenState extends State<NotificationsScreen> {
             child: ListenableBuilder(
                 listenable: Listenable.merge([_controller, appThemeMode]),
                 builder: (context, _) {
+                  if (_controller.isLoading) return const HydroLoadingScreen();
                   final items = _visible;
                   final selected = items
                       .where((item) => item.id == highlightedNotificationId)

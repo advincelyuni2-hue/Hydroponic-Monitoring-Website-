@@ -1,3 +1,4 @@
+import 'sensor_offline_state.dart';
 import 'mobile_graph_card.dart';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
@@ -19,6 +20,7 @@ class ForecastingChartCard extends StatefulWidget {
   final List<ForecastPoint>? ecPoints;
   final DateTime? generatedAt;
   final bool isOffline;
+  final bool isLoading;
   final bool isCalibrating;
   final String? forecastIssue;
   final DateTime? latestSensorRecordedAt;
@@ -33,6 +35,7 @@ class ForecastingChartCard extends StatefulWidget {
     this.ecPoints,
     this.generatedAt,
     this.isOffline = false,
+    this.isLoading = false,
     this.isCalibrating = false,
     this.forecastIssue,
     this.latestSensorRecordedAt,
@@ -49,8 +52,24 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
 
   // Steps used to pick "nice" axis ticks (5, 6, 7 ... / 1.5, 2, 2.5 ...).
   static const List<double> _niceSteps = [
-    0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250,
-    500, 1000,
+    0.05,
+    0.1,
+    0.2,
+    0.25,
+    0.5,
+    1,
+    2,
+    2.5,
+    5,
+    10,
+    20,
+    25,
+    50,
+    100,
+    200,
+    250,
+    500,
+    1000,
   ];
 
   static double _identity(double value) => value;
@@ -60,53 +79,63 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     final isDesktop = Responsive.isDesktop(context);
     final isMobile = Responsive.isMobile(context);
 
-    if (widget.isOffline || widget.forecastIssue != null) {
+    if (widget.isLoading || widget.isOffline || widget.forecastIssue != null) {
       final lastReceived = widget.latestSensorRecordedAt == null
           ? 'No sensor data received'
           : 'Last received ${formatManilaDateTime(toManilaTime(widget.latestSensorRecordedAt!))}';
 
       return Container(
         width: double.infinity,
-        height: MobileGraphPage.isActive(context) ? null : (isDesktop ? 689 : 420),
-        padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+        height:
+            MobileGraphPage.isActive(context) ? null : (isDesktop ? 689 : 420),
+        padding: MobileGraphPage.isActive(context)
+            ? EdgeInsets.zero
+            : EdgeInsets.all(isMobile ? 16 : 20),
+        decoration:
+            MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
         child: MobileGraphComposition(
           chartIndex: 1,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(isMobile),
+            widget.isOffline && !widget.isCalibrating
+                ? OfflineHeader(child: _buildHeader(isMobile))
+                : _buildHeader(isMobile),
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      widget.isCalibrating ? Icons.tune : Icons.cloud_off,
-                      size: 46,
-                      color: AppColors.textSecondary,
+              child: widget.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : widget.isOffline && !widget.isCalibrating
+                  ? const SensorOfflineBody.forecast()
+                  : Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.isCalibrating ? Icons.tune : Icons.cloud_off,
+                            size: 46,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.isCalibrating
+                                ? 'Calibration in progress'
+                                : 'Sensor offline',
+                            style: AppTextStyles.sectionTitle,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.isCalibrating
+                                ? 'Forecasting and reservoir history are paused while the probe is in calibration solution.'
+                                : 'Forecasting requires a recent five-minute sensor reading.',
+                            style: AppTextStyles.cardMeta,
+                            textAlign: TextAlign.center,
+                          ),
+                          if (widget.isOffline) ...[
+                            const SizedBox(height: 4),
+                            Text(lastReceived, style: AppTextStyles.cardMeta),
+                          ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.isCalibrating
-                          ? 'Calibration in progress'
-                          : 'Sensor offline',
-                      style: AppTextStyles.sectionTitle,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.isCalibrating
-                          ? 'Forecasting and reservoir history are paused while the probe is in calibration solution.'
-                          : 'Forecasting requires a recent five-minute sensor reading.',
-                      style: AppTextStyles.cardMeta,
-                      textAlign: TextAlign.center,
-                    ),
-                    if (widget.isOffline) ...[
-                      const SizedBox(height: 4),
-                      Text(lastReceived, style: AppTextStyles.cardMeta),
-                    ],
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -125,14 +154,18 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
 
     final ecPointsResolved = (widget.activeTab == 'Both' && ecFiltered.isEmpty)
         ? allFiltered.where((p) => p.value <= 3.0).toList()
-        : (showEc ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered) : <ForecastPoint>[]);
+        : (showEc
+            ? (ecFiltered.isNotEmpty ? ecFiltered : allFiltered)
+            : <ForecastPoint>[]);
 
     final hasFallbackHistory = [...phFiltered, ...ecPointsResolved].any(
       (point) => !point.isPredicted && point.isFallback,
     );
 
-    final phRange = _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
-    final ecRange = _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
+    final phRange =
+        _computeRange(phFiltered, defaultMin: 5.0, defaultMax: 10.0);
+    final ecRange =
+        _computeRange(ecPointsResolved, defaultMin: 0.0, defaultMax: 3.0);
 
     late ChartRange chartRange;
     if (widget.activeTab == 'EC') {
@@ -162,15 +195,55 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     return Container(
       width: double.infinity,
       height: isDesktop ? 689 : null,
-      padding: MobileGraphPage.isActive(context) ? EdgeInsets.zero : EdgeInsets.all(isMobile ? 16 : 20),
-      decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+      padding: MobileGraphPage.isActive(context)
+          ? EdgeInsets.zero
+          : EdgeInsets.all(isMobile ? 16 : 20),
+      decoration:
+          MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
       child: MobileGraphComposition(
-        chartIndex: 2,
+        chartIndex: 4,
+        subtitle: 'Historical readings and ML forecast',
+        sheetTitle: 'Forecast details',
+        sheetContent: [
+          Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: _buildLegendAndDate(true, hasFallbackHistory)),
+          const SizedBox(height: 8),
+          LayoutBuilder(builder: (context, space) {
+            final cards = [
+              _mobileReadingCard('Current', currentLabel),
+              _mobileReadingCard('Forecast', forecastLabel, forecast: true),
+            ];
+            if (space.maxWidth < 260 ||
+                MediaQuery.textScalerOf(context).scale(12) > 17) {
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    cards.first,
+                    const SizedBox(height: 8),
+                    cards.last
+                  ]);
+            }
+            return IntrinsicHeight(
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  Expanded(child: cards.first),
+                  const SizedBox(width: 8),
+                  Expanded(child: cards.last)
+                ]));
+          }),
+        ],
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: isDesktop ? MainAxisSize.max : MainAxisSize.min,
         children: [
           _buildHeader(isMobile),
-           SizedBox(height: isMobile ? 12 : 16),
+          const SizedBox(height: 8),
+          _readingBadges(phFiltered, ecPointsResolved, showPh, showEc),
+          const SizedBox(height: 12),
           Expanded(
             flex: isDesktop ? 1 : 0,
             child: ClipRRect(
@@ -178,28 +251,31 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               child: Stack(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 28), // Space for callout badge & hover tooltips
+                    padding: EdgeInsets.zero,
                     child: SizedBox(
                       height: MobileGraphPage.isActive(context)
                           ? null
-                          : widget.activeTab == 'Both' ? 750 : (isDesktop ? 500 : 320),
+                          : widget.activeTab == 'Both'
+                              ? 750
+                              : (isDesktop ? 500 : 320),
                       width: double.infinity,
                       child: MobileGraphTimeline(
-                        pointCount: math.max(phFiltered.length, ecPointsResolved.length),
+                        pointCount: math.max(
+                            phFiltered.length, ecPointsResolved.length),
                         child: MobileLineChart(
-                        buildChartData(
-                          chartRange,
-                          isMobile,
-                          phFiltered,
-                          ecPointsResolved,
-                          showPh,
-                          showEc,
+                          preserveAxes: MobileGraphPage.isActive(context),
+                          buildChartData(
+                            chartRange,
+                            isMobile,
+                            phFiltered,
+                            ecPointsResolved,
+                            showPh,
+                            showEc,
+                          ),
                         ),
-                      ),
                       ),
                     ),
                   ),
-                  buildCalloutBadge(isMobile, currentLabel, forecastLabel),
                 ],
               ),
             ),
@@ -210,6 +286,119 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       ),
     );
   }
+
+  Widget _readingBadges(List<ForecastPoint> ph, List<ForecastPoint> ec,
+      bool showPh, bool showEc) {
+    Widget badge(String parameter, Color color, bool isPh) {
+      final current = getReadingLabel(ph, ec, isPh, !isPh, predicted: false)
+          .replaceFirst('$parameter ', '');
+      final forecast = getReadingLabel(ph, ec, isPh, !isPh, predicted: true)
+          .replaceFirst('$parameter ', '');
+      return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                    color: color, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 8),
+            Text('$parameter  ',
+                style: AppTextStyles.cardMeta
+                    .copyWith(fontWeight: FontWeight.w600)),
+            Text(current, style: AppTextStyles.bodyBold.copyWith(fontSize: 13)),
+            Text('  ?  ', style: AppTextStyles.cardMeta),
+            Text(forecast,
+                style: AppTextStyles.bodyBold.copyWith(fontSize: 13)),
+          ]));
+    }
+
+    return Wrap(spacing: 12, runSpacing: 8, children: [
+      if (showPh && ph.isNotEmpty) badge('pH', phHistoricalColor, true),
+      if (showEc && ec.isNotEmpty) badge('EC', ecHistoricalColor, false),
+    ]);
+  }
+
+  Widget _mobileReadingCard(String title, String reading,
+      {bool forecast = false}) {
+    final values = <String, String>{};
+    for (final item in reading.split(' / ')) {
+      final parts = item.split(' ');
+      if (parts.length == 2) values[parts.first] = parts.last;
+    }
+    final style = AppTextStyles.cardMeta.copyWith(fontSize: 12);
+    return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: forecast ? const Color(0xFFFFF4E5) : Colors.white,
+            border: Border.all(
+                color: forecast
+                    ? const Color(0xFFFFCC95)
+                    : const Color(0xFFD7DCC1)),
+            borderRadius: BorderRadius.circular(18)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(title.toUpperCase(),
+                    style: style.copyWith(
+                        color: forecast
+                            ? const Color(0xFFAD4D00)
+                            : AppColors.primaryButton,
+                        fontWeight: FontWeight.w700)),
+                if (forecast)
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: predictedColor.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text('+${widget.selectedHours}h',
+                          style: style.copyWith(fontSize: 10))),
+              ]),
+          const SizedBox(height: 12),
+          for (final parameter in ['pH', 'EC'])
+            if (widget.activeTab == 'Both' || widget.activeTab == parameter)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (parameter == 'EC' && widget.activeTab == 'Both') ...[
+                        Divider(
+                            color: forecast
+                                ? const Color(0xFFFFD9AF)
+                                : const Color(0xFFE2E6D4)),
+                        const SizedBox(height: 4),
+                      ],
+                      Row(children: [
+                        Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: parameter == 'pH'
+                                    ? phHistoricalColor
+                                    : ecHistoricalColor)),
+                        const SizedBox(width: 6),
+                        Text(parameter, style: style),
+                        if (parameter == 'EC')
+                          Flexible(
+                              child: Text('  mS/cm',
+                                  style: style.copyWith(fontSize: 10))),
+                      ]),
+                      Text(values[parameter] ?? '?',
+                          style: AppTextStyles.bodyBold.copyWith(fontSize: 26)),
+                    ]),
+              ),
+        ]));
+  }
+
 
   Widget buildCalloutBadge(
     bool isMobile,
@@ -282,8 +471,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           maxIntervals: maxIntervals);
     }
     final r = right;
-    final scale =
-        r == null ? 1.0 : (left.max - left.min) / (r.max - r.min);
+    final scale = r == null ? 1.0 : (left.max - left.min) / (r.max - r.min);
     double ecToPlot(double v) => r == null ? v : left.min + (v - r.min) * scale;
     double ecToReal(double y) => r == null ? y : r.min + (y - left.min) / scale;
 
@@ -310,7 +498,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     final infos = [for (final p in plots) p.info];
 
     return LineChartData(
-      clipData: const FlClipData.none(), // Allow hover tooltips to render without clipping
+      clipData: const FlClipData
+          .none(), // Allow hover tooltips to render without clipping
       minX: -widget.selectedHours.toDouble(),
       maxX: widget.selectedHours.toDouble(),
       minY: left.min,
@@ -326,7 +515,14 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       ),
       borderData: FlBorderData(
         show: true,
-        border: Border(bottom: BorderSide(color: AppColors.chartGrid)),
+        border: Border(
+            bottom: BorderSide(color: AppColors.chartGrid),
+            left: BorderSide(
+                color: hasEc && !hasPh ? ecHistoricalColor : phHistoricalColor,
+                width: 2.5),
+            right: dual
+                ? BorderSide(color: ecHistoricalColor, width: 2.5)
+                : BorderSide.none),
       ),
       titlesData: _buildTitlesData(
         left: left,
@@ -392,7 +588,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               final isPh = info.param == 'pH';
               final value = info.toReal(spot.y).toStringAsFixed(isPh ? 2 : 3);
               final unit = isPh ? '' : ' mS/cm';
-              final name = info.predicted ? '${info.param} forecast' : info.param;
+              final name =
+                  info.predicted ? '${info.param} forecast' : info.param;
               final dotColor = info.predicted
                   ? predictedColor
                   : (isPh ? phHistoricalColor : ecHistoricalColor);
@@ -437,42 +634,32 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   }
 
   Widget _buildHeader(bool isMobile) {
-    final tabItems = ['pH Forecast', 'EC Forecast', 'Both'].map((tabLabel) {
-        final key = tabLabel.contains('pH')
-            ? 'pH'
-            : tabLabel.contains('EC')
-                ? 'EC'
-                : 'Both';
-        final isSelected = widget.activeTab == key;
-        return GestureDetector(
-          onTap: () => widget.onTabChanged(key),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: isSelected ? AppColors.primaryButton : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-            ),
-            child: CardInfoTitle(
-              tabLabel,
-              description: !isSelected ? null : key == 'Both'
-                  ? 'Shows recent readings and model forecasts for both pH and EC over the selected horizon.'
-                  : 'Shows recent $key readings and model forecasts over the selected horizon.',
-              style: AppTextStyles.sectionTitle.copyWith(
-                fontSize: isMobile ? 14 : 16,
-                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        );
-      }).toList();
-    final tabs = isMobile
-        ? Wrap(spacing: 0, runSpacing: 4, children: tabItems)
-        : Row(mainAxisSize: MainAxisSize.min, children: tabItems);
+    final tabs = Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+            color: AppColors.calloutBackground,
+            borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          for (final parameter in ['Both', 'pH', 'EC'])
+            InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => widget.onTabChanged(parameter),
+                child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                    decoration: BoxDecoration(
+                        color: widget.activeTab == parameter
+                            ? AppColors.primaryButton
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(parameter,
+                        style: AppTextStyles.cardMeta.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: widget.activeTab == parameter
+                                ? Colors.white
+                                : AppColors.textPrimary)))),
+        ]));
 
     final hourControls = Container(
       padding: const EdgeInsets.all(3),
@@ -491,7 +678,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryButton : Colors.transparent,
+                color:
+                    isSelected ? AppColors.primaryButton : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -507,24 +695,33 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       ),
     );
 
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          tabs,
-          const SizedBox(height: 12),
-          hourControls,
-        ],
-      );
+    if (MobileGraphPage.isActive(context)) {
+      return MobileGraphControls(
+          value: widget.activeTab,
+          values: const ['pH', 'EC', 'Both'],
+          onChanged: widget.onTabChanged,
+          trailing: hourControls);
     }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        tabs,
-        hourControls,
-      ],
-    );
+    final title = CardInfoTitle('Forecasting Chart',
+        description:
+            'Shows recent readings and model forecasts for pH and EC over the selected horizon.',
+        style:
+            AppTextStyles.sectionTitle.copyWith(fontSize: isMobile ? 17 : 19));
+    return LayoutBuilder(builder: (context, space) {
+      final controls =
+          Wrap(spacing: 10, runSpacing: 8, children: [tabs, hourControls]);
+      if (space.maxWidth <
+          660 * (MediaQuery.textScalerOf(context).scale(14) / 14)) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [title, const SizedBox(height: 8), controls]);
+      }
+      return Row(children: [
+        title,
+        const SizedBox(width: 16),
+        Expanded(child: controls)
+      ]);
+    });
   }
 
   FlTitlesData _buildTitlesData({
@@ -534,7 +731,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     required bool isMobile,
   }) {
     final centerTime = widget.generatedAt ?? manilaNow();
-    final horizontalInterval = isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
+    final horizontalInterval =
+        isMobile ? widget.selectedHours.toDouble() : widget.selectedHours / 2;
 
     TextStyle axisNameStyle(Color color) => AppTextStyles.cardMeta.copyWith(
           fontSize: 11,
@@ -550,7 +748,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         axisNameSize: 20,
         axisNameWidget: Text(
           leftIsEc ? 'EC (mS/cm)' : 'pH',
-          style: axisNameStyle(leftIsEc ? ecHistoricalColor : phHistoricalColor),
+          style:
+              axisNameStyle(leftIsEc ? ecHistoricalColor : phHistoricalColor),
         ),
         sideTitles: SideTitles(
           showTitles: true,
@@ -560,7 +759,10 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             padding: const EdgeInsets.only(right: 6),
             child: Text(
               _tickLabel(val, left.step),
-              style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+              style: AppTextStyles.cardMeta.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: leftIsEc ? ecHistoricalColor : phHistoricalColor),
             ),
           ),
         ),
@@ -579,12 +781,17 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                 interval: left.step,
                 getTitlesWidget: (val, meta) {
                   final real = r.min +
-                      (val - left.min) * (r.max - r.min) / (left.max - left.min);
+                      (val - left.min) *
+                          (r.max - r.min) /
+                          (left.max - left.min);
                   return Padding(
                     padding: const EdgeInsets.only(left: 6),
                     child: Text(
                       _tickLabel(real, r.step),
-                      style: AppTextStyles.cardMeta.copyWith(fontSize: 10),
+                      style: AppTextStyles.cardMeta.copyWith(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: ecHistoricalColor),
                     ),
                   );
                 },
@@ -597,11 +804,18 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           interval: horizontalInterval,
           getTitlesWidget: (val, meta) {
             final time = centerTime.add(Duration(minutes: (val * 60).round()));
+            if (MobileGraphPage.isActive(context) && val.abs() < 0.001) {
+              return Text('Current time\n${formatManilaClockTime(time)}',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.cardMeta
+                      .copyWith(fontSize: 10, fontWeight: FontWeight.w600));
+            }
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 formatManilaClockTime(time),
-                style: AppTextStyles.cardMeta.copyWith(fontSize: isMobile ? 10 : null),
+                style: AppTextStyles.cardMeta
+                    .copyWith(fontSize: isMobile ? 10 : null),
               ),
             );
           },
@@ -617,19 +831,23 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       children: [
         if (widget.activeTab != 'EC')
           _legendItem(
-            hasFallbackHistory ? 'pH Estimated baseline' : 'pH Historical',
+            hasFallbackHistory ? 'pH estimated' : 'pH measured',
             phHistoricalColor,
             isDashed: false,
           ),
         if (widget.activeTab != 'pH')
           _legendItem(
-            hasFallbackHistory ? 'EC Estimated baseline' : 'EC Historical',
+            hasFallbackHistory ? 'EC estimated' : 'EC measured',
             ecHistoricalColor,
             isDashed: false,
           ),
-        _legendItem('Predicted (ML)', predictedColor, isDashed: true),
+        if (widget.activeTab != 'EC')
+          _legendItem('pH forecast', phHistoricalColor, isDashed: true),
+        if (widget.activeTab != 'pH')
+          _legendItem('EC forecast', ecHistoricalColor, isDashed: true),
       ],
     );
+
 
     final generated = widget.generatedAt == null
         ? null
@@ -638,7 +856,9 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             style: AppTextStyles.cardMeta,
           );
 
+
     if (generated == null) return legend;
+
 
     if (isMobile) {
       return Column(
@@ -651,6 +871,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       );
     }
 
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -660,7 +881,8 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
     );
   }
 
-  Widget _legendItem(String label, Color color, {required bool isDashed}) {
+
+   Widget _legendItem(String label, Color color, {required bool isDashed}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -687,6 +909,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       ],
     );
   }
+
 
   List<ForecastPoint> _filterPoints(List<ForecastPoint> pts) {
     return pts.where((p) {
@@ -734,7 +957,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
             spots: historicalSpots,
             isCurved: true,
             color: color,
-            barWidth: 2.25,
+            barWidth: 2.5,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
@@ -749,15 +972,15 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
           LineChartBarData(
             spots: predictedSpots,
             isCurved: true,
-            color: predictedColor,
-            barWidth: 1.75,
+            color: color,
+            barWidth: 2.25,
             isStrokeCapRound: true,
             dashArray: [6, 4],
             // No resting dots: they only appear on hover.
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: fillPredicted,
-              gradient: _fade(predictedColor, 0.10),
+              gradient: _fade(color, 0.08),
             ),
           ),
           _BarInfo(param, true, toReal),
@@ -776,11 +999,10 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
       final matching = pts.where((p) => p.isPredicted == predicted).toList();
       if (matching.isEmpty) return null;
       final point = predicted
-          ? matching.reduce((a, b) =>
-              (a.hour - widget.selectedHours).abs() <=
-                      (b.hour - widget.selectedHours).abs()
-                  ? a
-                  : b)
+          ? matching.reduce((a, b) => (a.hour - widget.selectedHours).abs() <=
+                  (b.hour - widget.selectedHours).abs()
+              ? a
+              : b)
           : matching.reduce((a, b) => a.hour >= b.hour ? a : b);
       return point.value.toStringAsFixed(decimals);
     }
