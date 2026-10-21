@@ -9,6 +9,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import '../widgets/app_header.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/custom_calendar_popup.dart';
 import '../services/monitoring_service.dart';
 import 'dart:async';
@@ -336,6 +337,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: const AppDrawer(selectedIndex: 3),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: _c,
@@ -556,13 +558,12 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           ),
           const SizedBox(height: 10),
           if (isMobile)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildDateChip(isMobile: true),
-                _buildSegmentedModeFilter(isMobile: true),
+                Expanded(flex: 5, child: _buildDateChip(isMobile: true)),
+                const SizedBox(width: 8),
+                Expanded(flex: 6, child: _buildSegmentedModeFilter(isMobile: true)),
               ],
             )
           else
@@ -766,7 +767,10 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (final entry in _modeLabels.entries)
-            _buildModeSegment(entry.key, entry.value, isMobile: isMobile),
+            if (isMobile)
+              Expanded(child: _buildModeSegment(entry.key, entry.value, isMobile: true))
+            else
+              _buildModeSegment(entry.key, entry.value),
         ],
       ),
     );
@@ -792,7 +796,7 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           curve: Curves.easeOut,
           height: isMobile ? null : 36,
           constraints: isMobile ? const BoxConstraints(minHeight: 40) : null,
-          padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 10),
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 10),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primaryButton : Colors.transparent,
@@ -800,8 +804,9 @@ class GenerateReportScreenState extends State<GenerateReportScreen> {
           ),
           child: Text(
             label,
+            textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: isMobile ? 12 : 12.5,
+              fontSize: isMobile ? 11 : 12.5,
               fontWeight: FontWeight.w600,
               color: isSelected
                   ? Colors.white

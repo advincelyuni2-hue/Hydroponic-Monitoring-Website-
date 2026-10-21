@@ -332,6 +332,7 @@ void showMobileSearchSheet(
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: AppColors.cardBackground,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -412,10 +413,12 @@ class _MobileSearchSheetState extends State<_MobileSearchSheet> {
         top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Text(
             'Search',
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
@@ -452,6 +455,7 @@ class _MobileSearchSheetState extends State<_MobileSearchSheet> {
             maxHeight: screenHeight * 0.4,
           ),
         ],
+        ),
       ),
     );
   }

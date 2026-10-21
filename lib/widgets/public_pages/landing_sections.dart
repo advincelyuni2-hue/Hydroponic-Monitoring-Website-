@@ -85,68 +85,67 @@ class LandingHero extends StatelessWidget {
                           ))
                       .toList()),
             ]),
-            // REPLACE IMAGE HERE: Local dashboard and alert screenshots.
-            // REPLACE IMAGE HERE: Local dashboard and alert screenshots (2x2 grid).
-second: SizedBox(
-  height: MediaQuery.sizeOf(context).width < 800 ? 320 : 440,
-  child: const Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Expanded(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: PublicImagePlaceholder(
-                label: PublicPageContent.alertScreenshotLabel,
-                assetPath: PublicPageContent.alertScreenshotAsset,
-                aspectRatio: 1.4,
-                icon: null,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: PublicImagePlaceholder(
-                label: PublicPageContent.dashboardScreenshotLabel,
-                assetPath: PublicPageContent.dashboardScreenshotAsset,
-                aspectRatio: 1.4,
-                icon: null,
-              ),
-            ),
-          ],
-        ),
-      ),
-      SizedBox(height: 16),
-      Expanded(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-                        Expanded(
-              child: PublicImagePlaceholder(
-                label: PublicPageContent.extraScreenshotLabel1,
-                assetPath: PublicPageContent.extraScreenshotAsset1,
-                aspectRatio: 1.4,
-                icon: null,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: PublicImagePlaceholder(
-                label: PublicPageContent.extraScreenshotLabel2,
-                assetPath: PublicPageContent.extraScreenshotAsset2,
-                aspectRatio: 1.4,
-                icon: null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  ),
-),
+            second: const _HeroLaptop(),
           ),
         ),
       );
+}
+
+class _HeroLaptop extends StatelessWidget {
+  const _HeroLaptop();
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      const asset = PublicPageContent.dashboardScreenshotAsset;
+      const placeholder = PublicImagePlaceholder(
+        label: PublicPageContent.dashboardScreenshotLabel,
+        aspectRatio: 16 / 10,
+        icon: null,
+      );
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: width * 0.05),
+          padding: EdgeInsets.all(width * 0.018),
+          decoration: BoxDecoration(
+            color: const Color(0xFF17230F),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(width * 0.04)),
+            boxShadow: const [BoxShadow(color: Colors.black26,
+              blurRadius: 24, offset: Offset(0, 12))],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(width * 0.015),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: ColoredBox(
+                color: PublicPageStyles.background,
+                child: asset == null ? placeholder : Image.asset(asset,
+                  fit: BoxFit.contain,
+                  semanticLabel: PublicPageContent.dashboardScreenshotLabel,
+                  errorBuilder: (_, __, ___) => placeholder),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          height: width * 0.03,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              colors: [Color(0xFFE4E9D4), Color(0xFF929F7D)]),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(width * 0.035)),
+            boxShadow: const [BoxShadow(color: Colors.black26,
+              blurRadius: 18, offset: Offset(0, 10))],
+          ),
+          alignment: Alignment.topCenter,
+          child: Container(width: width * 0.16, height: width * 0.01,
+            decoration: const BoxDecoration(color: Color(0xFF899775),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)))),
+        ),
+      ]);
+    },
+  );
 }
 
 class LandingWhy extends StatelessWidget {

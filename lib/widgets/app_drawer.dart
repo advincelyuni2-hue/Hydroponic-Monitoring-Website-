@@ -1,4 +1,7 @@
 import 'app_confirm_dialog.dart';
+import 'dart:async';
+import '../models/monitoring_models.dart';
+import '../services/monitoring_service.dart';
 import '../theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'side_nav.dart';
@@ -100,13 +103,78 @@ class AppDrawer extends StatelessWidget {
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.horizontal(right: Radius.circular(24))),
         clipBehavior: Clip.antiAlias,
-        child: SideNav(
+        child: _DrawerSensorStatus(
+          enabled: isOffline == null,
+          builder: (snapshot) => SideNav(
             selectedIndex: selectedIndex,
             onSelect: (index) => navigateTo(context, index),
             onClose: () => Navigator.pop(context),
             onLogout: () => _logout(context),
-            isOffline: isOffline,
-            isCalibrating: isCalibrating,
-            lastReceived: lastReceived),
+            isOffline: isOffline ?? snapshot?.isOffline,
+            isCalibrating: isOffline == null
+                ? snapshot?.isCalibrating ?? false
+                : isCalibrating,
+            lastReceived: isOffline == null
+                ? snapshot?.latestRecordedAt
+                : lastReceived)),
       );
+}
+
+/// Supplies live status on pages without a telemetry controller.
+class _DrawerSensorStatus extends StatefulWidget {
+  const _DrawerSensorStatus({required this.enabled, required this.builder});
+
+  final bool enabled;
+  final Widget Function(TelemetrySnapshot?) builder;
+
+  @override
+  State<_DrawerSensorStatus> createState() => _DrawerSensorStatusState();
+}
+
+class _DrawerSensorStatusState extends State<_DrawerSensorStatus> {
+  final _service = MonitoringService();
+  TelemetrySnapshot? _snapshot;
+  Timer? _timer;
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRefresh();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DrawerSensorStatus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled) _startRefresh();
+  }
+
+  void _startRefresh() {
+    _timer?.cancel();
+    if (!widget.enabled) return;
+    _refresh();
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing || !widget.enabled) return;
+    _refreshing = true;
+    try {
+      final snapshot = await _service.getTelemetrySnapshot();
+      if (mounted && widget.enabled) setState(() => _snapshot = snapshot);
+    } catch (_) {
+      // Preserve the last known status during temporary connection failures.
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_snapshot);
 }

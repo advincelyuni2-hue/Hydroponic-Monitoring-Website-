@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/public_page_content.dart';
 import '../theme/public_page_styles.dart';
+import '../utils/responsive.dart';
 import '../widgets/public_pages/landing_sections.dart';
 import '../widgets/public_pages/public_brand.dart';
 
@@ -14,6 +15,7 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
+  bool _mobileMenuExpanded = false;
   final _scrollController = ScrollController();
   final _sectionKeys = <String, GlobalKey>{
     for (final item in PublicPageContent.landingNavigation)
@@ -72,6 +74,9 @@ class _LandingScreenState extends State<LandingScreen> {
       );
 
   Widget _navigation() => LayoutBuilder(builder: (context, space) {
+        if (space.maxWidth < Responsive.mobileMaxWidth) {
+          return _mobileNavigation();
+        }
         final fullNavigation = space.maxWidth >= 1160 &&
             MediaQuery.textScalerOf(context).scale(16) <= 20;
         return Container(
@@ -118,4 +123,98 @@ class _LandingScreenState extends State<LandingScreen> {
           )),
         );
       });
+
+  Widget _mobileNavigation() => Container(
+        constraints: BoxConstraints(
+          maxHeight: (MediaQuery.sizeOf(context).height -
+                  MediaQuery.paddingOf(context).vertical) *
+              0.85,
+        ),
+        decoration: BoxDecoration(
+          color: PublicPageStyles.background,
+          borderRadius: _mobileMenuExpanded
+              ? const BorderRadius.vertical(bottom: Radius.circular(24))
+              : null,
+          boxShadow: _mobileMenuExpanded
+              ? const [BoxShadow(color: Color(0x18000000), blurRadius: 12,
+                  offset: Offset(0, 4))]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(children: [
+                const Expanded(child: PublicBrand(size: 28, nameSize: 16)),
+                const SizedBox(width: 12),
+                IconButton(
+                  tooltip: _mobileMenuExpanded
+                      ? 'Close navigation'
+                      : PublicPageContent.navigationMenu,
+                  style: IconButton.styleFrom(
+                    backgroundColor: PublicPageStyles.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => setState(
+                      () => _mobileMenuExpanded = !_mobileMenuExpanded),
+                  icon: Icon(_mobileMenuExpanded ? Icons.close : Icons.menu),
+                ),
+              ]),
+            ),
+            if (_mobileMenuExpanded)
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        child: Text('EXPLORE', style: PublicPageStyles.label.copyWith(
+                          color: PublicPageStyles.green, fontSize: 10,
+                          letterSpacing: 1.5)),
+                      ),
+                      for (final item in PublicPageContent.landingNavigation)
+                        DecoratedBox(
+                          decoration: const BoxDecoration(border: Border(
+                            bottom: BorderSide(color: Color(0xFFECECEC)))),
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: PublicPageStyles.ink,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                              alignment: Alignment.centerLeft,
+                              shape: const RoundedRectangleBorder(),
+                            ),
+                            onPressed: () {
+                              setState(() => _mobileMenuExpanded = false);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) _scrollTo(item.id);
+                              });
+                            },
+                            child: Row(children: [
+                              Expanded(child: Text(item.label)),
+                              const Icon(Icons.chevron_right, size: 18,
+                                color: Color(0xFF8A9383)),
+                            ]),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: PublicPageStyles.green,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(44),
+                          shape: const StadiumBorder(),
+                        ),
+                        onPressed: widget.onLogin,
+                        child: const Text(PublicPageContent.loginButton),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 }

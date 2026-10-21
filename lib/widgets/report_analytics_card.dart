@@ -9,6 +9,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'mobile_graph_card.dart';
+import 'mobile_graph_legend.dart';
 
 class ReportsAnalyticsCard extends StatefulWidget {
   final String selectedParameter;
@@ -211,6 +212,27 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
   Widget _buildLegend() {
     final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
+    if (MobileGraphPage.isActive(context)) {
+      Widget row(Widget mark, String label, {String? note}) => Row(children: [
+        mark,
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: AppTextStyles.cardMeta)),
+        if (note != null) ...[
+          const SizedBox(width: 8),
+          Flexible(child: Text(note, textAlign: TextAlign.right,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 11,
+              color: AppColors.textSecondary))),
+        ],
+      ]);
+      return MobileGraphLegendRows(children: [
+        row(MobileLegendMark(color: currentColor),
+          '${widget.selectedParameter} measured values'),
+        row(const MobileLegendMark(color: AppColors.alertBorder, dot: true),
+          'Out of range', note: 'shown on hover'),
+        row(const MobileLegendMark(color: AppColors.alertBorder, dashed: true),
+          'Ideal range limits'),
+      ]);
+    }
 
     return Wrap(
       spacing: 18,

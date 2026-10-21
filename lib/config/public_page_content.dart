@@ -10,7 +10,7 @@ class PublicPageContent {
   static const brandName = 'HydroPulse';
   static const brandLogoLabel = 'HydroPulse logo placeholder';
   // REPLACE IMAGE HERE: HydroPulse brand logo
-  static const String? brandLogoAsset = 'images/thesislogo.png';
+  static const String? brandLogoAsset = 'assets/images/thesislogo.png';
 
   // EDIT TEXT HERE: Login heading
   static const loginHeading = 'Welcome back';
@@ -31,7 +31,7 @@ class PublicPageContent {
       '';
 
   // REPLACE IMAGE HERE: Hydroponic plants photo
-  static const String? loginPlantsAsset = 'images/loginphoto.png';
+  static const String? loginPlantsAsset = 'assets/images/loginphoto.png';
   static const loginPlantsLabel = '[Photo: our hydroponic plants]';
 
   static const emailLabel = 'Email';
@@ -73,10 +73,10 @@ class PublicPageContent {
   ];
   // REPLACE IMAGE HERE: Dashboard and alert screenshots.
   // REPLACE IMAGE HERE: Dashboard and alert screenshots.
-  static const String? dashboardScreenshotAsset = "images/dashboard.png";
-  static const String? alertScreenshotAsset = "images/notif.png";
-  static const String? extraScreenshotAsset1 = "images/historylogs.png";
-  static const String? extraScreenshotAsset2 = "images/forecasting.png";
+  static const String? dashboardScreenshotAsset = "assets/images/dashboard.png";
+  static const String? alertScreenshotAsset = "assets/images/notif.png";
+  static const String? extraScreenshotAsset1 = "assets/images/historylogs.png";
+  static const String? extraScreenshotAsset2 = "assets/images/forecasting.png";
   static const dashboardScreenshotLabel = 'Dashboard screenshot';
   static const alertScreenshotLabel = 'Alert details screenshot';
   static const extraScreenshotLabel1 = 'Forecasting graph screenshot';
@@ -86,7 +86,7 @@ class PublicPageContent {
   static const whyDescription =
       'At the San Pedro City Agriculture Office, hydroponic conditions are monitored through periodic manual measurements of pH and EC. This approach can delay the detection of nutrient imbalances and relies heavily on personnel availability. HydroPulse addresses these challenges through continuous monitoring, predictive analytics, and rule-based recommendations to support timely and informed decisions.';
   // REPLACE IMAGE HERE: Farm / greenhouse photo.
-  static const String? farmAsset = "images/greenhouse.png";
+  static const String? farmAsset = "assets/images/greenhouse.png";
   static const farmLabel = 'Farm / greenhouse photo';
   static const howEyebrow = 'HOW IT WORKS';
   static const howHeading = 'From sensor reading to a clear next step';
@@ -120,12 +120,12 @@ class PublicPageContent {
   static const experimentDescription =
       "HydroPulse was developed for hydroponic lettuce cultivation at the San Pedro City Agriculture Office, utilizing Kratky and Nutrient Film Technique (NFT) systems. The study involves a 30-day monitoring and evaluation period comparing manually managed and system-assisted experimental setups to assess the system's predictive capabilities and operational effectiveness.";
   // REPLACE IMAGE HERE: Experiment photographs, in reference order.
-  static const String? experimentMainAsset = "images/loginphoto.png";
+  static const String? experimentMainAsset = "assets/images/loginphoto.png";
   static const experimentMainLabel = '[Photo: full hydroponic setup]';
   static const List<({String label, String? assetPath})> experimentPhotos = [
-    (label: '[Photo: plants, week 1]', assetPath: "images/pstart.png"),
-    (label: '[Photo: reservoir and sensors]', assetPath: "images/pcali.png"),
-    (label: '[Photo: plant growth, later weeks]', assetPath: "images/pday7.png"),
+    (label: '[Photo: plants, week 1]', assetPath: "assets/images/pstart.png"),
+    (label: '[Photo: reservoir and sensors]', assetPath: "assets/images/pcali.png"),
+    (label: '[Photo: plant growth, later weeks]', assetPath: "assets/images/pday7.png"),
     (label: '[Photo: harvest]', assetPath: null),
   ];
   // EDIT HERE: Partner office information.
@@ -137,7 +137,7 @@ class PublicPageContent {
   static const partnerName = 'San Pedro Agriculture Office';
   static const partnerContact = '[Address] · [Phone] · [Email]';
   static const partnerLogoLabel = 'LOGO';
-  static const String? partnerLogoAsset = "images/sanpedrologo.jpg";
+  static const String? partnerLogoAsset = "assets/images/sanpedrologo.jpg";
   static const researchEyebrow = 'THE RESEARCH';
   static const researchHeading = 'About the study';
   static const studyDetails = [

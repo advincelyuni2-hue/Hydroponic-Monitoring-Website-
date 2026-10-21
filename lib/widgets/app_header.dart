@@ -27,6 +27,7 @@ const Color _kBellTint = Color(0xFFE3EDD0);
 
 class AppHeader extends StatelessWidget {
   final String title;
+  final String? mobileTitle;
   final UserProfile? profile;
   final VoidCallback? onBellTap;
   final VoidCallback? onProfileTap;
@@ -42,6 +43,7 @@ class AppHeader extends StatelessWidget {
   const AppHeader({
     super.key,
     required this.title,
+    this.mobileTitle,
     this.profile,
     this.onBellTap,
     this.onProfileTap,
@@ -182,8 +184,8 @@ class AppHeader extends StatelessWidget {
         : (Responsive.isDesktop(context) ? 600 : 480);
 
     final Widget titleText = Text(
-      title,
-      maxLines: 1,
+      isMobile ? mobileTitle ?? title : title,
+      maxLines: isMobile && mobileTitle != null ? 2 : 1,
       // On mobile the title is scaled to fit (below) rather than cut off.
       overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
       softWrap: false,

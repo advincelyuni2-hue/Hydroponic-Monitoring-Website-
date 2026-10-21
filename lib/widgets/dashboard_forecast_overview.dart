@@ -1,6 +1,7 @@
 import 'sensor_offline_state.dart';
 import 'card_info_tooltip.dart';
 import 'mobile_graph_card.dart';
+import 'mobile_graph_legend.dart';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -250,6 +251,7 @@ static Color get _ecColor => AppColors.accentTeal;
                 padding: EdgeInsets.only(right: isMobile ? 8 : 0),
                 child: LayoutBuilder(
                   builder: (context, chartSpace) => MobileLineChart(
+                    continuousTimeLabels: true,
                     LineChartData(
                       clipData: const FlClipData.all(),
                       minX: -_hours.toDouble(),
@@ -791,7 +793,8 @@ static Color get _ecColor => AppColors.accentTeal;
           reservedSize: 34 * textScale,
           interval: horizontalInterval,
           getTitlesWidget: (value, meta) {
-            if (isMobile && tickCount == 1 && value.abs() > 0.001) {
+            if (isMobile && !MobileGraphPage.isActive(context) &&
+                tickCount == 1 && value.abs() > 0.001) {
               return const SizedBox.shrink();
             }
             final time = centerTime.add(
@@ -820,6 +823,10 @@ static Color get _ecColor => AppColors.accentTeal;
   }
 
   Widget _buildLegend(bool hasFallbackHistory) {
+    if (MobileGraphPage.isActive(context)) {
+      return MobileForecastLegend(parameter: _parameter, phColor: _phColor,
+        ecColor: _ecColor, estimated: hasFallbackHistory);
+    }
     return IndexedStack(
       index: const ['Both', 'pH', 'EC'].indexOf(_parameter),
       alignment: Alignment.topLeft,

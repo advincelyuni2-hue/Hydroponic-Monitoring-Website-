@@ -9,6 +9,7 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'mobile_graph_card.dart';
+import 'mobile_graph_legend.dart';
 
 class ReportPredictionCard extends StatelessWidget {
   final ModelEvaluation evaluation;
@@ -162,7 +163,7 @@ class ReportPredictionCard extends StatelessWidget {
       final dropdown = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFDDDECF))),
+          border: Border.all(color: AppColors.inputBorder)),
         child: DropdownButtonHideUnderline(child: DropdownButton<String>(
           value: selectedParameter, isDense: true,
           style: AppTextStyles.cardMeta.copyWith(fontWeight: FontWeight.w700),
@@ -172,10 +173,10 @@ class ReportPredictionCard extends StatelessWidget {
         )));
       return LayoutBuilder(builder: (context, space) {
         if (space.maxWidth < 270 || MediaQuery.textScalerOf(context).scale(12) > 17) {
-          return Wrap(spacing: 12, runSpacing: 8, children: [dropdown, horizonControls]);
+          return Wrap(spacing: 12, runSpacing: 8, children: [dropdown, MobileGraphPillBorder(child: horizonControls)]);
         }
         return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [dropdown, horizonControls]);
+          children: [dropdown, MobileGraphPillBorder(child: horizonControls)]);
       });
     }
 
@@ -599,7 +600,9 @@ class ReportPredictionCard extends StatelessWidget {
     final meta = AppTextStyles.cardMeta.copyWith(fontSize: 11);
     Widget card(Widget child) => Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Colors.white,
+        border: Border.all(color: AppColors.inputBorder),
+        borderRadius: BorderRadius.circular(12)),
       child: child);
     Widget record(String label, int count) => Padding(
       padding: const EdgeInsets.only(top: 3),
@@ -620,32 +623,13 @@ class ReportPredictionCard extends StatelessWidget {
       record('Excluded', evaluation.intervenedCount + evaluation.calibrationExcludedCount),
       if (evaluation.missingActualCount > 0) record('Missing actual', evaluation.missingActualCount),
     ]));
-    Widget legendItem(_Series series) => Row(children: [
-      SizedBox(width: 20, child: Row(children: [
-        if (series.predicted)
-          for (var i = 0; i < 3; i++) ...[
-            Container(width: 4, height: 2, color: series.lineColor),
-            const SizedBox(width: 2),
-          ]
-        else Container(width: 18, height: 2, color: series.lineColor),
-      ])),
-      const SizedBox(width: 6),
-      Expanded(child: Text(series.name, style: meta)),
-    ]);
-    final series = _series();
     return [
-      card(Column(children: [
-        for (final ec in [false, true])
-          if (series.any((s) => s.isEc == ec))
-            Padding(padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(children: [
-                for (final predicted in [false, true])
-                  Expanded(child: Column(children: [
-                    for (final s in series.where((s) => s.isEc == ec && s.predicted == predicted))
-                      legendItem(s),
-                  ])),
-              ])),
-      ])),
+      Container(
+        decoration: BoxDecoration(color: Colors.white,
+          border: Border.all(color: AppColors.inputBorder),
+          borderRadius: BorderRadius.circular(20)),
+        child: MobileForecastLegend(parameter: selectedParameter,
+          phColor: _phColor, ecColor: _ecColor)),
       const SizedBox(height: 8),
       LayoutBuilder(builder: (context, space) {
         if (space.maxWidth < 260 || MediaQuery.textScalerOf(context).scale(12) > 17) {

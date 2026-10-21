@@ -15,7 +15,7 @@ class HydroLoadingScreen extends StatefulWidget {
     super.key,
     this.title = 'Loading your screen',
     this.subtitle = 'This only takes a moment',
-    this.logoAsset = PublicPageContent.brandLogoAsset ?? 'images/thesislogo.png',
+    this.logoAsset = PublicPageContent.brandLogoAsset ?? 'assets/images/thesislogo.png',
   });
 
   final String title;

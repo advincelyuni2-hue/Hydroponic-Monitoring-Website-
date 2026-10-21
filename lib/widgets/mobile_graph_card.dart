@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
@@ -133,8 +134,26 @@ class _GraphViewport extends InheritedWidget {
       height != oldWidget.height;
 }
 
+/// What the docked readout card shows for the touched reading. It is built
+/// from the chart's own tooltip items, so every graph keeps its existing
+/// wording, units and colours without any change in the graph cards.
+class _GraphReadout {
+  const _GraphReadout(this.header, this.rows);
+  final String? header;
+  final List<TextSpan> rows;
+}
+
+/// Lets a chart tell the composition which reading is touched.
+class _ReadoutScope extends InheritedWidget {
+  const _ReadoutScope({required this.notifier, required super.child});
+  final ValueNotifier<_GraphReadout?> notifier;
+  @override
+  bool updateShouldNotify(_ReadoutScope oldWidget) =>
+      notifier != oldWidget.notifier;
+}
+
 /// Keeps the plot geometry independent of the overlaid details sheet.
-class MobileGraphComposition extends StatelessWidget {
+class MobileGraphComposition extends StatefulWidget {
   const MobileGraphComposition(
       {super.key,
       required this.children,
@@ -155,105 +174,201 @@ class MobileGraphComposition extends StatelessWidget {
   final MainAxisSize mainAxisSize;
 
   @override
+  State<MobileGraphComposition> createState() =>
+      _MobileGraphCompositionState();
+}
+
+class _MobileGraphCompositionState extends State<MobileGraphComposition> {
+  final _readout = ValueNotifier<_GraphReadout?>(null);
+
+  @override
+  void dispose() {
+    _readout.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final children = widget.children;
+    final chartIndex = widget.chartIndex;
+    final subtitle = widget.subtitle;
     final viewport =
         context.dependOnInheritedWidgetOfExactType<_GraphViewport>();
     if (!MobileGraphPage.isActive(context) || viewport == null) {
       return Column(
-          crossAxisAlignment: crossAxisAlignment,
-          mainAxisSize: mainAxisSize,
+          crossAxisAlignment: widget.crossAxisAlignment,
+          mainAxisSize: widget.mainAxisSize,
           children: children);
     }
     var plot = children[chartIndex];
     if (plot is Flexible) plot = plot.child;
     if (plot is SizedBox && plot.child != null) plot = plot.child!;
-    return SizedBox(
-        height: viewport.height,
-        child: Column(children: [
-          Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: Row(children: [
-                Material(
-                    color: AppColors.iconCircle,
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                        tooltip: 'Back',
-                        onPressed: () => Navigator.maybePop(context),
-                        icon: const Icon(Icons.arrow_back_rounded,
-                            color: Colors.white, size: 20))),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(
-                          context
-                              .findAncestorWidgetOfExactType<MobileGraphPage>()!
-                              .title,
-                          style: AppTextStyles.sectionTitle
-                              .copyWith(fontSize: 17)),
-                      if (subtitle != null)
-                        Text(subtitle!,
-                            style:
-                                AppTextStyles.cardMeta.copyWith(fontSize: 11)),
-                    ])),
-              ])),
-          Expanded(child: LayoutBuilder(builder: (context, constraints) {
-            const peek = 0.0;
-            return Stack(fit: StackFit.expand, children: [
-              // Only reserve the collapsed header; expansion never resizes the plot.
-              Positioned.fill(
-                  bottom: peek,
-                  child: LayoutBuilder(
-                      builder: (context, plotSpace) => SingleChildScrollView(
-                            primary: false,
-                            physics: const ClampingScrollPhysics(),
-                            child: SizedBox(
-                                height:
-                                    math.max(520.0, plotSpace.maxHeight * 1.25),
-                                child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4),
-                                    child: plot)),
-                          ))),
-              MobileGraphBottomSheet(
-                  title: sheetTitle,
-                  controls: children.first,
-                  children: sheetContent ??
-                      [
-                        Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12)),
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: children.sublist(chartIndex + 1))),
-                        if (summaries.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          LayoutBuilder(builder: (context, space) {
-                            if (space.maxWidth < 260 ||
-                                MediaQuery.textScalerOf(context).scale(12) >
-                                    17) {
-                              return Column(children: summaries);
-                            }
-                            return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (var i = 0;
-                                      i < summaries.length;
-                                      i++) ...[
-                                    if (i > 0) const SizedBox(width: 8),
-                                    Expanded(child: summaries[i]),
-                                  ],
-                                ]);
-                          }),
-                        ],
-                      ]),
-            ]);
-          })),
-        ]));
+    return _ReadoutScope(
+        notifier: _readout,
+        child: SizedBox(
+            height: viewport.height,
+            child: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Row(children: [
+                    Material(
+                        color: AppColors.iconCircle,
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                            tooltip: 'Back',
+                            onPressed: () => Navigator.maybePop(context),
+                            icon: const Icon(Icons.arrow_back_rounded,
+                                color: Colors.white, size: 20))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(
+                              context
+                                  .findAncestorWidgetOfExactType<
+                                      MobileGraphPage>()!
+                                  .title,
+                              style: AppTextStyles.sectionTitle
+                                  .copyWith(fontSize: 17)),
+                          if (subtitle != null)
+                            Text(subtitle,
+                                style: AppTextStyles.cardMeta
+                                    .copyWith(fontSize: 11)),
+                        ])),
+                  ])),
+              Expanded(child: LayoutBuilder(builder: (context, constraints) {
+                const peek = 0.0;
+                return Stack(fit: StackFit.expand, children: [
+                  // Only reserve the collapsed header; expansion never resizes the plot.
+                  Positioned.fill(
+                      bottom: peek,
+                      child: LayoutBuilder(
+                          builder: (context, plotSpace) =>
+                              SingleChildScrollView(
+                                primary: false,
+                                physics: const ClampingScrollPhysics(),
+                                child: SizedBox(
+                                    height: math.max(
+                                        520.0, plotSpace.maxHeight * 1.25),
+                                    child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        child: plot)),
+                              ))),
+                  MobileGraphBottomSheet(
+                      title: widget.sheetTitle,
+                      controls: children.first,
+                      children: widget.sheetContent ??
+                          [
+                            Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(
+                                        color: AppColors.inputBorder),
+                                    borderRadius: BorderRadius.circular(20)),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children:
+                                        children.sublist(chartIndex + 1))),
+                            if (widget.summaries.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              LayoutBuilder(builder: (context, space) {
+                                if (space.maxWidth < 260 ||
+                                    MediaQuery.textScalerOf(context)
+                                            .scale(12) >
+                                        17) {
+                                  return Column(children: widget.summaries);
+                                }
+                                return Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      for (var i = 0;
+                                          i < widget.summaries.length;
+                                          i++) ...[
+                                        if (i > 0) const SizedBox(width: 8),
+                                        Expanded(child: widget.summaries[i]),
+                                      ],
+                                    ]);
+                              }),
+                            ],
+                          ]),
+                  // Readout for the touched reading. It floats over the top of
+                  // the plot (nothing is resized) and ignores pointers, so the
+                  // chart underneath stays fully touchable.
+                  Positioned(
+                      top: 6,
+                      left: 8,
+                      right: 8,
+                      child: IgnorePointer(
+                          child: ValueListenableBuilder<_GraphReadout?>(
+                              valueListenable: _readout,
+                              builder: (context, readout, _) => AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 140),
+                                  child: readout == null
+                                      ? const SizedBox.shrink(
+                                          key: ValueKey('readout-none'))
+                                      : _ReadoutCard(
+                                          key: const ValueKey('readout'),
+                                          readout: readout))))),
+                ]);
+              })),
+            ])));
+  }
+}
+
+/// Card docked at the top of the graph with the touched reading's values.
+/// Four or more values split into two columns (e.g. pH | EC).
+class _ReadoutCard extends StatelessWidget {
+  const _ReadoutCard({super.key, required this.readout});
+  final _GraphReadout readout;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = readout.rows;
+    final split = rows.length >= 3 ? (rows.length + 1) ~/ 2 : rows.length;
+    Widget column(List<TextSpan> items) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final span in items)
+            Padding(
+                padding: const EdgeInsets.only(top: 5),
+                child: Text.rich(span)),
+        ]);
+    final right = rows.sublist(split);
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: AppColors.inputBorder),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4))
+            ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (readout.header != null)
+                Text(readout.header!,
+                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 15)),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: column(rows.sublist(0, split))),
+                if (right.isNotEmpty) ...[
+                  const SizedBox(width: 14),
+                  Expanded(child: column(right)),
+                ],
+              ]),
+            ]));
   }
 }
 
@@ -301,8 +416,8 @@ class _MobileGraphBottomSheetState extends State<MobileGraphBottomSheet> {
                 child: FloatingActionButton.small(
                   heroTag: null,
                   tooltip: 'Expand details',
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryButton,
+                  backgroundColor: AppColors.primaryButton,
+                  foregroundColor: AppColors.primaryButtonText,
                   onPressed: () => _setExpanded(true),
                   child: const Icon(Icons.keyboard_arrow_up),
                 )),
@@ -467,7 +582,7 @@ class MobileGraphControls extends StatelessWidget {
         decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFDDDECF))),
+            border: Border.all(color: AppColors.inputBorder)),
         child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -492,13 +607,26 @@ class MobileGraphControls extends StatelessWidget {
     return LayoutBuilder(builder: (context, space) {
       if (space.maxWidth < 270 ||
           MediaQuery.textScalerOf(context).scale(12) > 17) {
-        return Wrap(spacing: 12, runSpacing: 8, children: [dropdown, trailing]);
+        return Wrap(spacing: 12, runSpacing: 8, children: [dropdown, MobileGraphPillBorder(child: trailing)]);
       }
       return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [dropdown, trailing]);
+          children: [dropdown, MobileGraphPillBorder(child: trailing)]);
     });
   }
+}
+
+class MobileGraphPillBorder extends StatelessWidget {
+  const MobileGraphPillBorder({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+      foregroundDecoration: BoxDecoration(
+          border: Border.all(color: AppColors.inputBorder),
+          borderRadius: BorderRadius.circular(10)),
+      child: child);
 }
 
 class MobileGraphSummary extends StatelessWidget {
@@ -518,7 +646,9 @@ class MobileGraphSummary extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14)),
+          color: Colors.white,
+          border: Border.all(color: AppColors.inputBorder),
+          borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: AppTextStyles.cardMeta),
         const SizedBox(height: 4),
@@ -558,10 +688,28 @@ class _TimelinePoints extends InheritedWidget {
       count != oldWidget.count;
 }
 
+/// The chart's own floating tooltip is replaced by the docked readout card on
+/// the dedicated mobile graph page. This keeps fl_chart's built-in touch
+/// handling (indicator line and dots) but draws nothing for the tooltip.
+final LineTouchTooltipData _hiddenTooltip = LineTouchTooltipData(
+  getTooltipColor: (_) => Colors.transparent,
+  tooltipPadding: EdgeInsets.zero,
+  tooltipMargin: 0,
+  tooltipBorder: BorderSide.none,
+  fitInsideHorizontally: true,
+  fitInsideVertically: true,
+  getTooltipItems: (spots) => [
+    for (final _ in spots)
+      const LineTooltipItem('', TextStyle(fontSize: 0, height: 0)),
+  ],
+);
+
 /// Two library-rendered regions share identical Y bounds, ticks and vertical
 /// title reservations. Only the plot and its bottom titles scroll.
 class MobileLineChart extends StatefulWidget {
-  const MobileLineChart(this.data, {super.key, this.preserveAxes = false});
+  const MobileLineChart(this.data, {super.key, this.preserveAxes = false,
+    this.continuousTimeLabels = false});
+  final bool continuousTimeLabels;
   final bool preserveAxes;
   final LineChartData data;
 
@@ -575,7 +723,61 @@ class _MobileLineChartState extends State<MobileLineChart> {
   DragStartDetails? _panStart;
   bool _verticalDrag = false;
   Offset _panDistance = Offset.zero;
+  double? _lastReadoutX;
   LineChartData get data => widget.data;
+
+  ValueNotifier<_GraphReadout?>? get _readout =>
+      context.getInheritedWidgetOfExactType<_ReadoutScope>()?.notifier;
+
+  /// Builds the docked readout from the chart's own tooltip content.
+  _GraphReadout? _readoutFrom(List<LineBarSpot> spots) {
+    final items = data.lineTouchData.touchTooltipData.getTooltipItems(spots);
+    String? header;
+    final rows = <TextSpan>[];
+    for (final item in items) {
+      if (item == null) continue;
+      final text = item.text.trim();
+      if (header == null && text.isNotEmpty) header = text;
+      final children = item.children;
+      if (children == null || children.isEmpty) continue;
+      rows.add(TextSpan(style: item.textStyle, children: children));
+    }
+    if (header == null && rows.isEmpty) return null;
+    return _GraphReadout(header, rows);
+  }
+
+  void _updateReadout(FlTouchEvent event, LineTouchResponse? response) {
+    final notifier = _readout;
+    if (notifier == null) return;
+    // Tap keeps the reading until the next tap; press-and-hold scrubs it and
+    // it goes away on release. Starting to scroll the timeline also clears it.
+    if (event is FlTapDownEvent ||
+        event is FlTapUpEvent ||
+        event is FlLongPressStart ||
+        event is FlLongPressMoveUpdate ||
+        event is FlPointerHoverEvent) {
+      final spots = response?.lineBarSpots;
+      if (spots == null || spots.isEmpty) {
+        if (event is FlTapDownEvent || event is FlTapUpEvent) {
+          notifier.value = null;
+          _lastReadoutX = null;
+        }
+        return;
+      }
+      final next = _readoutFrom(spots);
+      if (next == null) return;
+      if (_lastReadoutX != spots.first.x) {
+        _lastReadoutX = spots.first.x;
+        HapticFeedback.selectionClick();
+      }
+      notifier.value = next;
+    } else if (event is FlLongPressEnd ||
+        event is FlPanStartEvent ||
+        event is FlPointerExitEvent) {
+      notifier.value = null;
+      _lastReadoutX = null;
+    }
+  }
 
   void _onTouch(FlTouchEvent event, LineTouchResponse? response) {
     // The chart library claims pans. Lock each gesture to its first movement's
@@ -586,7 +788,7 @@ class _MobileLineChartState extends State<MobileLineChart> {
       _panStart = event.details;
       _panDistance = Offset.zero;
     } else if (event is FlPanUpdateEvent) {
-      final movement = event.details.delta;
+      var movement = event.details.delta;
       if (_chartDrag == null && _panStart != null) {
         _panDistance += movement;
         // Ignore initial finger jitter before committing to a scroll axis.
@@ -597,9 +799,13 @@ class _MobileLineChartState extends State<MobileLineChart> {
             : (_scroll.hasClients ? _scroll.position : null);
         _chartDrag = position?.drag(_panStart!, () => _chartDrag = null);
         _panStart = null;
+        // Forward the initial movement too, so the plot follows the finger
+        // without losing the distance used to choose a scrolling axis.
+        movement = _panDistance;
       }
       final delta = _verticalDrag ? movement.dy : movement.dx;
       _chartDrag?.update(DragUpdateDetails(
+          sourceTimeStamp: event.details.sourceTimeStamp,
           delta: _verticalDrag ? Offset(0, delta) : Offset(delta, 0),
           primaryDelta: delta,
           globalPosition: event.details.globalPosition,
@@ -620,7 +826,28 @@ class _MobileLineChartState extends State<MobileLineChart> {
       _chartDrag = null;
       _panStart = null;
     }
+    _updateReadout(event, response);
     data.lineTouchData.touchCallback?.call(event, response);
+  }
+
+  @override
+  void didUpdateWidget(covariant MobileLineChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A different selection (Both/pH/EC, 4h/8h/12h, 7d/30d/90d) invalidates the
+    // reading that is on screen.
+    final a = oldWidget.data;
+    final b = widget.data;
+    if (a.lineBarsData.length != b.lineBarsData.length ||
+        a.minX != b.minX ||
+        a.maxX != b.maxX ||
+        a.minY != b.minY ||
+        a.maxY != b.maxY) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _readout?.value = null;
+        _lastReadoutX = null;
+      });
+    }
   }
 
   @override
@@ -633,6 +860,8 @@ class _MobileLineChartState extends State<MobileLineChart> {
   @override
   Widget build(BuildContext context) {
     if (!MobileGraphPage.isActive(context)) return LineChart(data);
+    final docked =
+        context.getInheritedWidgetOfExactType<_ReadoutScope>() != null;
     final count =
         context.dependOnInheritedWidgetOfExactType<_TimelinePoints>()?.count ??
             0;
@@ -681,6 +910,29 @@ class _MobileLineChartState extends State<MobileLineChart> {
       final rightWidth = right.sideTitles.showTitles
           ? right.sideTitles.reservedSize + right.axisNameSize
           : 0.0;
+      final viewportWidth = (constraints.maxWidth - axisWidth - rightWidth)
+          .clamp(1.0, double.infinity);
+      final xPositions = data.lineBarsData
+          .expand((bar) => bar.spots)
+          .where((spot) => spot.x.isFinite)
+          .map((spot) => spot.x)
+          .toSet()
+          .toList()
+        ..sort();
+      final gaps = <double>[
+        for (var i = 1; i < xPositions.length; i++)
+          if (xPositions[i] > xPositions[i - 1])
+            xPositions[i] - xPositions[i - 1],
+      ]..sort();
+      // An almost-duplicate timestamp must not create a millions-of-pixels
+      // canvas. Use the normal cadence for sizing, retaining all plotted spots.
+      final typicalGap = gaps.isEmpty ? 0.0 : gaps[gaps.length ~/ 2];
+      final spacedWidth = typicalGap > 0
+          ? (data.maxX - data.minX) / typicalGap * 36.0
+          : count * 48.0;
+      final plotWidth = xPositions.length < 2
+          ? viewportWidth
+          : math.max(viewportWidth * 1.25, math.max(count * 48.0, spacedWidth));
       final oldBottom = data.titlesData.bottomTitles;
       Widget labelStyle(Widget widget) {
         if (widget is Text && widget.data != null) {
@@ -699,6 +951,10 @@ class _MobileLineChartState extends State<MobileLineChart> {
 
       final top = oldBottom.copyWith(
           sideTitles: oldBottom.sideTitles.copyWith(
+        interval: widget.continuousTimeLabels
+            ? _timeLabelInterval(data.maxX - data.minX, plotWidth,
+                MediaQuery.textScalerOf(context).scale(100))
+            : oldBottom.sideTitles.interval,
         reservedSize:
             math.max(56.0, MediaQuery.textScalerOf(context).scale(12) * 4),
         getTitlesWidget: (value, meta) {
@@ -727,22 +983,34 @@ class _MobileLineChartState extends State<MobileLineChart> {
       final shared = data.copyWith(
         titlesData: titles,
         backgroundColor: Colors.white,
-        lineTouchData: data.lineTouchData.copyWith(
-            touchTooltipData: LineTouchTooltipData(
-          tooltipRoundedRadius: tooltip.tooltipRoundedRadius,
-          tooltipPadding: tooltip.tooltipPadding,
-          tooltipMargin: tooltip.tooltipMargin,
-          tooltipHorizontalAlignment: tooltip.tooltipHorizontalAlignment,
-          tooltipHorizontalOffset: tooltip.tooltipHorizontalOffset,
-          maxContentWidth: tooltip.maxContentWidth,
-          getTooltipItems: tooltip.getTooltipItems,
-          getTooltipColor: tooltip.getTooltipColor,
-          fitInsideHorizontally: true,
-          fitInsideVertically: true,
-          showOnTopOfTheChartBoxArea: tooltip.showOnTopOfTheChartBoxArea,
-          rotateAngle: tooltip.rotateAngle,
-          tooltipBorder: tooltip.tooltipBorder,
-        )),
+        lineTouchData: docked
+            // Values appear in the docked readout card. A tap snaps to the
+            // nearest reading by horizontal distance (so it doesn't matter
+            // how high or low on the chart the finger lands), and holding
+            // for a moment lets you drag the readout along the timeline
+            // while a quick drag still scrolls it.
+            ? data.lineTouchData.copyWith(
+                touchTooltipData: _hiddenTooltip,
+                touchSpotThreshold: 28,
+                distanceCalculator: (touch, spot) => (touch.dx - spot.dx).abs(),
+                longPressDuration: const Duration(milliseconds: 250),
+              )
+            : data.lineTouchData.copyWith(
+                touchTooltipData: LineTouchTooltipData(
+                tooltipRoundedRadius: tooltip.tooltipRoundedRadius,
+                tooltipPadding: tooltip.tooltipPadding,
+                tooltipMargin: tooltip.tooltipMargin,
+                tooltipHorizontalAlignment: tooltip.tooltipHorizontalAlignment,
+                tooltipHorizontalOffset: tooltip.tooltipHorizontalOffset,
+                maxContentWidth: tooltip.maxContentWidth,
+                getTooltipItems: tooltip.getTooltipItems,
+                getTooltipColor: tooltip.getTooltipColor,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                showOnTopOfTheChartBoxArea: tooltip.showOnTopOfTheChartBoxArea,
+                rotateAngle: tooltip.rotateAngle,
+                tooltipBorder: tooltip.tooltipBorder,
+              )),
       );
       // Fixed axes need labels and matching reservations, not extra copies of
       // every line, gradient, annotation and touch recognizer in the chart.
@@ -768,29 +1036,6 @@ class _MobileLineChartState extends State<MobileLineChart> {
             rightTitles:
                 const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ));
-      final viewportWidth = (constraints.maxWidth - axisWidth - rightWidth)
-          .clamp(1.0, double.infinity);
-      final xPositions = data.lineBarsData
-          .expand((bar) => bar.spots)
-          .where((spot) => spot.x.isFinite)
-          .map((spot) => spot.x)
-          .toSet()
-          .toList()
-        ..sort();
-      final gaps = <double>[
-        for (var i = 1; i < xPositions.length; i++)
-          if (xPositions[i] > xPositions[i - 1])
-            xPositions[i] - xPositions[i - 1],
-      ]..sort();
-      // An almost-duplicate timestamp must not create a millions-of-pixels
-      // canvas. Use the normal cadence for sizing, retaining all plotted spots.
-      final typicalGap = gaps.isEmpty ? 0.0 : gaps[gaps.length ~/ 2];
-      final spacedWidth = typicalGap > 0
-          ? (data.maxX - data.minX) / typicalGap * 36.0
-          : count * 48.0;
-      final plotWidth = xPositions.length < 2
-          ? viewportWidth
-          : math.max(viewportWidth * 1.25, math.max(count * 48.0, spacedWidth));
       return RepaintBoundary(
           child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -831,4 +1076,11 @@ class _MobileLineChartState extends State<MobileLineChart> {
       ));
     });
   }
+}
+
+double _timeLabelInterval(double hours, double width, double labelWidth) {
+  final minimum = hours * labelWidth / width;
+  const steps = [1 / 12, 1 / 6, 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 12.0, 24.0];
+  return steps.firstWhere((step) => step >= minimum,
+      orElse: () => minimum.ceilToDouble());
 }

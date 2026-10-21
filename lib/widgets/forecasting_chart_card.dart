@@ -1,5 +1,6 @@
 import 'sensor_offline_state.dart';
 import 'mobile_graph_card.dart';
+import 'mobile_graph_legend.dart';
 import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -209,7 +210,9 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
               width: double.infinity,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  color: Colors.white,
+                  border: Border.all(color: AppColors.inputBorder),
+                  borderRadius: BorderRadius.circular(20)),
               child: _buildLegendAndDate(true, hasFallbackHistory)),
           const SizedBox(height: 8),
           LayoutBuilder(builder: (context, space) {
@@ -263,6 +266,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
                         pointCount: math.max(
                             phFiltered.length, ecPointsResolved.length),
                         child: MobileLineChart(
+                          continuousTimeLabels: true,
                           preserveAxes: MobileGraphPage.isActive(context),
                           buildChartData(
                             chartRange,
@@ -334,10 +338,7 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
             color: forecast ? const Color(0xFFFFF4E5) : Colors.white,
-            border: Border.all(
-                color: forecast
-                    ? const Color(0xFFFFCC95)
-                    : const Color(0xFFD7DCC1)),
+            border: Border.all(color: AppColors.inputBorder),
             borderRadius: BorderRadius.circular(18)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Wrap(
@@ -825,7 +826,11 @@ class ForecastingChartCardState extends State<ForecastingChartCard> {
   }
 
   Widget _buildLegendAndDate(bool isMobile, bool hasFallbackHistory) {
-    final legend = Wrap(
+    final legend = MobileGraphPage.isActive(context)
+        ? MobileForecastLegend(parameter: widget.activeTab,
+            phColor: phHistoricalColor, ecColor: ecHistoricalColor,
+            estimated: hasFallbackHistory)
+        : Wrap(
       spacing: 18,
       runSpacing: 8,
       children: [

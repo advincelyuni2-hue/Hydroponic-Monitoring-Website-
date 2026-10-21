@@ -162,7 +162,11 @@ class _ForecastingDashboardScreenState
               padding: EdgeInsets.all(isMobile ? 16 : 24),
               child: Column(
                 children: [
-                  AppHeader(title: 'Forecasting dashboard', profile: _controller.profile),
+                  AppHeader(
+                    title: 'Forecasting dashboard',
+                    mobileTitle: 'Forecasting',
+                    profile: _controller.profile,
+                  ),
                   if (_controller.isSensorOffline && !_controller.isCalibrating) ...[
                     const SizedBox(height: 12),
                     SensorOfflineBanner(lastReceived: _controller.latestSensorRecordedAt),

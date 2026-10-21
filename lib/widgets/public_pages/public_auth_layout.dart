@@ -29,18 +29,21 @@ class PublicAuthLayout extends StatelessWidget {
               if (constraints.maxWidth < Responsive.mobileMaxWidth) {
                 final nav = navigation is Align ? (navigation as Align).child : navigation;
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(22, 28, 22, 16),
+                  padding: const EdgeInsets.fromLTRB(12, 22, 12, 16),
                   child: Center(child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 400),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Center(child: PublicBrand(size: 32, nameSize: 20, mobileAuth: true)),
-                      if (nav != null) ...[
-                        const SizedBox(height: 10),
-                        Center(child: nav),
-                      ],
+                      Row(children: [
+                        const Expanded(
+                          child: PublicBrand(size: 36, nameSize: 20, mobileAuth: true)),
+                        if (nav != null) ...[
+                          const SizedBox(width: 12),
+                          nav,
+                        ],
+                      ]),
                       const SizedBox(height: 26),
                       MobileAuthPresentation(
-                        minimumFormHeight: (constraints.maxHeight - (nav == null ? 102 : 160))
+                        minimumFormHeight: (constraints.maxHeight - (nav == null ? 100 : 112))
                             .clamp(0.0, double.infinity),
                         child: formBuilder(context, true, true)),
                     ]),

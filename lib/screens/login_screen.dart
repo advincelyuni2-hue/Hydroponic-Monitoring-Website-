@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/responsive.dart';
 import '../services/supabase_client.dart';
 import '../services/user_service.dart';
 import '../services/auth_service.dart';
@@ -89,7 +90,12 @@ class _LoginScreenState extends State<LoginScreen> {
           foregroundColor: PublicPageStyles.green,
           side: const BorderSide(color: PublicPageStyles.green),
           shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 16 : 24,
+            vertical: Responsive.isMobile(context) ? 8 : 12),
+          textStyle: Responsive.isMobile(context)
+              ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
+              : null,
         ),
         child: const Text(PublicPageContent.aboutLink),
       ),

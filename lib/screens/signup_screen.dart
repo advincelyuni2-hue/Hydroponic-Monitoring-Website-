@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/responsive.dart';
 import '../config/public_page_content.dart';
 import '../controllers/signup_controller.dart';
 import '../theme/public_page_styles.dart';
@@ -94,7 +95,12 @@ Widget _buildNavigation() => Align(
           foregroundColor: PublicPageStyles.green,
           side: const BorderSide(color: PublicPageStyles.green),
           shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 16 : 24,
+            vertical: Responsive.isMobile(context) ? 8 : 12),
+          textStyle: Responsive.isMobile(context)
+              ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
+              : null,
         ),
         child: const Text(PublicPageContent.aboutLink),
       ),

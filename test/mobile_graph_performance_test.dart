@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:monitoring_app/widgets/mobile_graph_card.dart';
 
@@ -30,6 +31,7 @@ void main() {
             child: MobileGraphTimeline(
                 pointCount: spots.length,
                 child: MobileLineChart(
+                    continuousTimeLabels: true,
                     LineChartData(
                       minX: 0,
                       maxX: 20,
@@ -84,6 +86,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('scrollable time axis has intermediate ticks', (tester) async {
+    await mount(tester);
+    final chart = tester.widgetList<LineChart>(find.byType(LineChart))
+        .firstWhere((chart) => chart.data.lineBarsData.isNotEmpty).data;
+    final interval = chart.titlesData.topTitles.sideTitles.interval!;
+    expect(interval, greaterThan(0));
+    expect((chart.maxX - chart.minX) / interval, greaterThan(3));
+    expect(chart.titlesData.bottomTitles.sideTitles.showTitles, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('plot pans scroll both axes and taps still identify data points',
       (tester) async {
     await mount(tester);
@@ -100,7 +113,22 @@ void main() {
     await tester.dragFrom(const Offset(210, 280), const Offset(0, -100));
     await tester.pumpAndSettle();
     expect(vertical.position.pixels, greaterThan(0));
-    await tester.tapAt(const Offset(210, 280));
+    // Tap a visible point after scrolling.
+    final plotFinder = find.byWidgetPredicate(
+        (widget) => widget is LineChart && widget.data.lineBarsData.isNotEmpty);
+    final chart = tester.widget<LineChart>(plotFinder).data;
+    final rect = tester.getRect(find.descendant(of: plotFinder,
+      matching: find.byWidgetPredicate((widget) =>
+        widget.runtimeType.toString() == 'LineChartLeaf')));
+    Offset position(FlSpot spot) => Offset(
+      rect.left + (spot.x - chart.minX) / (chart.maxX - chart.minX) * rect.width,
+      rect.top + (chart.maxY - spot.y) /
+          (chart.maxY - chart.minY) * rect.height,
+    );
+    final visiblePoint = chart.lineBarsData.first.spots.map(position).firstWhere(
+      (point) => point.dx > 80 && point.dx < 330 &&
+          point.dy > 120 && point.dy < 700);
+    await tester.tapAt(visiblePoint);
     await tester.pumpAndSettle();
     expect(tappedPoint, isTrue);
     expect(tester.takeException(), isNull);
