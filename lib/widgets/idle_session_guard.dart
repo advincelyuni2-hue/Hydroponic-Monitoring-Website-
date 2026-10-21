@@ -1,3 +1,4 @@
+import 'app_confirm_dialog.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -39,8 +40,7 @@ class _IdleSessionGuardState extends State<IdleSessionGuard> {
 
     _isAuthenticated = supabaseClient?.auth.currentSession != null;
 
-    _authSubscription =
-        supabaseClient?.auth.onAuthStateChange.listen((_) {
+    _authSubscription = supabaseClient?.auth.onAuthStateChange.listen((_) {
       _syncAuthenticationState();
     });
 
@@ -80,8 +80,7 @@ class _IdleSessionGuardState extends State<IdleSessionGuard> {
     if (!_isAuthenticated) return;
 
     final warningDelay =
-        IdleSessionGuard.idleTimeout -
-        IdleSessionGuard.warningLeadTime;
+        IdleSessionGuard.idleTimeout - IdleSessionGuard.warningLeadTime;
 
     _warningTimer = Timer(warningDelay, _showIdleWarning);
   }
@@ -89,8 +88,7 @@ class _IdleSessionGuardState extends State<IdleSessionGuard> {
   void _showIdleWarning() {
     if (!mounted || !_isAuthenticated) return;
 
-    _warningDeadline =
-        DateTime.now().add(IdleSessionGuard.warningLeadTime);
+    _warningDeadline = DateTime.now().add(IdleSessionGuard.warningLeadTime);
 
     setState(() {
       _showWarning = true;
@@ -192,18 +190,13 @@ class _IdleSessionGuardState extends State<IdleSessionGuard> {
                 child: Material(
                   color: Colors.black54,
                   child: Center(
-                    child: AlertDialog(
-                      title: const Text('Still there?'),
-                      content: Text(
-                        'You will be signed out due to inactivity in '
-                        '$_secondsRemaining seconds.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: _staySignedIn,
-                          child: const Text('Stay signed in'),
-                        ),
-                      ],
+                    child: AppConfirmDialog(
+                      title: 'Still there?',
+                      message: 'You will be signed out due to inactivity in '
+                          '$_secondsRemaining seconds.',
+                      confirmLabel: 'Stay signed in',
+                      cancelLabel: null,
+                      onConfirm: _staySignedIn,
                     ),
                   ),
                 ),

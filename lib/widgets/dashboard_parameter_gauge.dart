@@ -1,3 +1,5 @@
+import '../utils/manila_time.dart';
+import 'sensor_offline_state.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -29,6 +31,26 @@ class DashboardParameterGauge extends StatelessWidget {
   }
 
   Widget _buildCard(BuildContext context) {
+    if (data.isOffline) {
+      final body = SensorOfflineBody(title: 'Sensor offline',
+        message: data.latestRecordedAt == null ? data.lastUpdated
+            : 'Last updated ${formatManilaDateTime(toManilaTime(data.latestRecordedAt!))}',
+        detail: 'Ideal range $_rangeText', compact: dense);
+      return Container(
+        width: compact ? (MediaQuery.sizeOf(context).width - 88).clamp(240.0, 300.0) : double.infinity,
+        padding: EdgeInsets.all(dense ? 10 : 14),
+        decoration: BoxDecoration(color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.cardBorder)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          OfflineHeader(label: 'Offline', child: Text(_shortLabel(data.label),
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: dense ? 14 : 16))),
+          const SizedBox(height: 6),
+          if (dense) Expanded(child: LayoutBuilder(builder: (context, space) =>
+            SingleChildScrollView(child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: space.maxHeight), child: body))))
+          else SizedBox(height: 235 * (MediaQuery.textScalerOf(context).scale(14) / 14), child: body),
+        ]));
+    }
     final value = _displayNumber;
     final scale = _displayScale;
     final status = _displayStatus(data.status);

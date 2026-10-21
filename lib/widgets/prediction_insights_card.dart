@@ -1,3 +1,4 @@
+import 'sensor_offline_state.dart';
 import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../screens/notifications_screen.dart';
@@ -371,4 +372,42 @@ class PredictionInsightsCard extends StatelessWidget {
       ),
     );
   }
+}
+/// Offline presentation uses the same selector callbacks as the online card.
+class PausedPredictionInsightsCard extends StatelessWidget {
+  const PausedPredictionInsightsCard({super.key, required this.showParamSelector,
+    required this.selectedParameter, required this.onParameterChanged});
+  final bool showParamSelector;
+  final String selectedParameter;
+  final ValueChanged<String> onParameterChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16), decoration: AppDecorations.card(),
+    child: LayoutBuilder(builder: (context, space) {
+      final heading = OfflineHeader(child: Wrap(spacing: 12, runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Text('Prediction Insights', style: AppTextStyles.sectionTitle),
+          if (showParamSelector) Container(padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(color: AppColors.pillBackground,
+              borderRadius: BorderRadius.circular(16)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (final parameter in ['pH', 'EC']) GestureDetector(
+                onTap: () => onParameterChanged(parameter),
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: selectedParameter == parameter ? AppColors.primaryButton : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14)),
+                  child: Text(parameter, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                    color: selectedParameter == parameter ? Colors.white : AppColors.pillText)))),
+            ])),
+        ]));
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: space.hasBoundedHeight ? MainAxisSize.max : MainAxisSize.min,
+        children: [heading, const SizedBox(height: 8),
+          if (space.hasBoundedHeight) const Expanded(child: SensorOfflineBody.insight())
+          else const SizedBox(height: 160, child: SensorOfflineBody.insight()),
+        ]);
+    }),
+  );
 }

@@ -11,6 +11,8 @@ class AppConfirmDialog extends StatelessWidget {
   final String message;
   final String confirmLabel;
   final String? cancelLabel;
+  final VoidCallback? onConfirm;
+  final Color? confirmColor;
 
   const AppConfirmDialog({
     super.key,
@@ -18,6 +20,8 @@ class AppConfirmDialog extends StatelessWidget {
     required this.message,
     this.confirmLabel = 'Yes',
     this.cancelLabel = 'No',
+    this.onConfirm,
+    this.confirmColor,
   });
 
   /// true = confirm, false = cancel button, null = dismissed by tapping outside.
@@ -27,6 +31,7 @@ class AppConfirmDialog extends StatelessWidget {
     required String message,
     String confirmLabel = 'Yes',
     String? cancelLabel = 'No',
+    Color? confirmColor,
   }) {
     return showDialog<bool>(
       context: context,
@@ -35,6 +40,7 @@ class AppConfirmDialog extends StatelessWidget {
         message: message,
         confirmLabel: confirmLabel,
         cancelLabel: cancelLabel,
+        confirmColor: confirmColor,
       ),
     );
   }
@@ -93,9 +99,9 @@ class AppConfirmDialog extends StatelessWidget {
                     ),
                   ),
                 ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: onConfirm ?? () => Navigator.of(context).pop(true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
+                    backgroundColor: confirmColor ?? AppColors.primaryButton,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),

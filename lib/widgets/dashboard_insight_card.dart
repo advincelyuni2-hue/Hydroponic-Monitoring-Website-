@@ -1,3 +1,4 @@
+import 'sensor_offline_state.dart';
 import 'card_info_tooltip.dart';
 import 'package:flutter/material.dart';
 import '../models/forecast_insight_summary.dart';
@@ -91,7 +92,8 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _header(narrow),
+              widget.isOffline && !widget.isCalibrating
+                  ? OfflineHeader(child: _header(narrow)) : _header(narrow),
               const SizedBox(height: 8),
               // Both bodies participate in layout; only the selected one paints.
               // Longer EC units and different warnings cannot resize the card.
@@ -99,7 +101,9 @@ class _DashboardInsightCardState extends State<DashboardInsightCard> {
                 index: _selected == 'pH' ? 0 : 1,
                 children: [
                   for (final isPh in [true, false])
-                    if (_modelOffline(isPh))
+                    if (widget.isOffline && !widget.isCalibrating)
+                      const SizedBox(height: 140, child: SensorOfflineBody.insight())
+                    else if (_modelOffline(isPh))
                       Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(minHeight: 140),

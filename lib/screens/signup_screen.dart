@@ -1,22 +1,22 @@
-import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
-import '../utils/email_mask.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/custom_button.dart';
-import '../controllers/signup_controller.dart';
 import '../utils/responsive.dart';
+import '../config/public_page_content.dart';
+import '../controllers/signup_controller.dart';
+import '../theme/public_page_styles.dart';
+import '../utils/email_mask.dart';
+import '../widgets/public_pages/public_auth_form.dart';
+import '../widgets/public_pages/public_auth_layout.dart';
 import 'dashboard_screen.dart';
+import 'landing_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<SignupScreen> createState() => SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class SignupScreenState extends State<SignupScreen> {
   final SignupController _controller = SignupController();
 
   @override
@@ -28,11 +28,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleCreateAccount() async {
     final success = await _controller.createAccount();
     if (!mounted) return;
-
     if (success && !_controller.isOtpStep) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+  MaterialPageRoute(builder: (context) => const DashboardScreen()),
+);
     } else if (_controller.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_controller.errorMessage!)),
@@ -43,11 +42,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleVerifyOtp() async {
     final success = await _controller.verifyOtp();
     if (!mounted) return;
-
     if (success) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+  MaterialPageRoute(builder: (context) => const DashboardScreen()),
+);
     } else if (_controller.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_controller.errorMessage!)),
@@ -58,7 +56,6 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleResendOtp() async {
     final success = await _controller.resendOtp();
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -73,7 +70,6 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleGoogleSignup() async {
     final success = await _controller.signUpWithGoogle();
     if (!mounted) return;
-
     if (!success && _controller.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_controller.errorMessage!)),
@@ -81,196 +77,196 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth >= Responsive.tabletMaxWidth;
-            final isMobile = constraints.maxWidth < Responsive.mobileMaxWidth;
-            final formSection = _buildFormSection(isMobile: isMobile);
-
-            if (isDesktop) {
-              return Row(
-                children: [
-                  Expanded(flex: 1, child: _buildImagePlaceholder()),
-                  Expanded(
-                    flex: 1,
-                    child: Center(
-                      child: AppFooterScrollView(
-                        centerContent: true,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 48, vertical: 32),
-                        child: formSection,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return AppFooterScrollView(
-              padding: EdgeInsets.all(isMobile ? 20 : 32),
-              child: Center(child: formSection),
-            );
-          },
+  void _openAbout() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (landingContext) => LandingScreen(
+          onLogin: () => Navigator.of(landingContext).pop(),
         ),
       ),
     );
   }
 
-  Widget _buildImagePlaceholder() {
-    return Container(
-      margin: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.imagePlaceholder,
-        borderRadius: BorderRadius.circular(16),
+Widget _buildNavigation() => Align(
+      alignment: Alignment.centerRight,
+      child: OutlinedButton(
+        onPressed: _openAbout,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: PublicPageStyles.green,
+          side: const BorderSide(color: PublicPageStyles.green),
+          shape: const StadiumBorder(),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 16 : 24,
+            vertical: Responsive.isMobile(context) ? 8 : 12),
+          textStyle: Responsive.isMobile(context)
+              ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
+              : null,
+        ),
+        child: const Text(PublicPageContent.aboutLink),
+      ),
+    );
+
+  @override
+  Widget build(BuildContext context) {
+    return PublicAuthLayout(
+      navigation: _buildNavigation(),
+      formBuilder: (context, compact, dense) => _buildFormSection(
+        compact: compact,
+        dense: dense,
       ),
     );
   }
 
-  Widget _buildFormSection({required bool isMobile}) {
+  Widget _buildFormSection({bool compact = false, bool dense = false}) {
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: _controller.isOtpStep
-              ? _buildOtpForm(isMobile: isMobile)
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Create your account',
-                      style: AppTextStyles.title
-                          .copyWith(fontSize: isMobile ? 26 : 32),
-                    ),
-                    SizedBox(height: isMobile ? 24 : 32),
-                    Text('Your name', style: AppTextStyles.label),
-                    const SizedBox(height: 8),
-                    CustomTextField(controller: _controller.nameController),
-                    const SizedBox(height: 24),
-                    Text('Your email', style: AppTextStyles.label),
-                    const SizedBox(height: 8),
-                    CustomTextField(
-                      controller: _controller.emailController,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 24),
-                    Text('Password', style: AppTextStyles.label),
-                    const SizedBox(height: 8),
-                    CustomTextField(
-                      controller: _controller.passwordController,
-                      obscureText: _controller.obscurePassword,
-                      onToggleObscureText: _controller.togglePasswordVisibility,
-                    ),
-                    const SizedBox(height: 24),
-                    Text('Confirm password', style: AppTextStyles.label),
-                    const SizedBox(height: 8),
-                    CustomTextField(
-                      controller: _controller.confirmPasswordController,
-                      obscureText: _controller.obscureConfirmPassword,
-                      onToggleObscureText:
-                          _controller.toggleConfirmPasswordVisibility,
-                    ),
-                    const SizedBox(height: 32),
-                    CustomButton(
-                      text: 'Create Account',
-                      backgroundColor: AppColors.primaryButton,
-                      textStyle: AppTextStyles.button,
-                      isLoading: _controller.isLoading,
-                      onPressed: _handleCreateAccount,
-                    ),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed:
-                            _controller.isLoading ? null : _handleResendOtp,
-                        child: Text(
-                          'Already started sign-up? Resend verification code',
-                          style: AppTextStyles.footerLink,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    CustomButton(
-                      text: 'Sign Up with Google',
-                      backgroundColor: AppColors.googleButton,
-                      textStyle: AppTextStyles.buttonDark,
-                      isLoading: _controller.isLoading,
-                      onPressed: _handleGoogleSignup,
-                    ),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: RichText(
-                          text: TextSpan(
-                            style: AppTextStyles.footer,
-                            children: [
-                              const TextSpan(text: 'Already have an account? '),
-                              TextSpan(
-                                  text: 'Log in',
-                                  style: AppTextStyles.footerLink),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+        if (_controller.isOtpStep) {
+          return _buildOtpForm(compact: compact, dense: dense);
+        }
+
+        return PublicAuthForm(
+          heading: 'Create your account',
+          description: 'Enter your details below to get started.',
+          compact: compact,
+          dense: dense,
+          children: [
+            PublicAuthField(
+              controller: _controller.nameController,
+              label: 'Your name',
+              hint: 'John Doe',
+              dense: dense,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.name],
+            ),
+            PublicAuthField(
+              controller: _controller.emailController,
+              label: PublicPageContent.emailLabel,
+              hint: PublicPageContent.emailHint,
+              dense: dense,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+            ),
+            PublicAuthField(
+              controller: _controller.passwordController,
+              label: PublicPageContent.passwordLabel,
+              hint: PublicPageContent.passwordHint,
+              dense: dense,
+              obscureText: _controller.obscurePassword,
+              onToggleObscureText: _controller.togglePasswordVisibility,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
+            ),
+            PublicAuthField(
+              controller: _controller.confirmPasswordController,
+              label: 'Confirm password',
+              hint: PublicPageContent.passwordHint,
+              dense: dense,
+              obscureText: _controller.obscureConfirmPassword,
+              onToggleObscureText: _controller.toggleConfirmPasswordVisibility,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!_controller.isLoading) _handleCreateAccount();
+              },
+            ),
+            PublicAuthButton(
+              text: 'Create Account',
+              onPressed: _handleCreateAccount,
+              isLoading: _controller.isLoading,
+              dense: dense,
+            ),
+            SizedBox(height: dense ? 12 : 20),
+            Row(
+              children: [
+                const Expanded(child: Divider(color: PublicPageStyles.border)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    PublicPageContent.alternativeLogin,
+                    style: PublicPageStyles.meta,
+                  ),
                 ),
+                const Expanded(child: Divider(color: PublicPageStyles.border)),
+              ],
+            ),
+            SizedBox(height: dense ? 12 : 20),
+            PublicAuthButton(
+              text: 'Sign Up with Google',
+              onPressed: _handleGoogleSignup,
+              isLoading: _controller.isLoading,
+              dense: dense,
+              secondary: true,
+            ),
+            SizedBox(height: dense ? 12 : 18),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Already have an account? ',
+                  style: PublicPageStyles.body.copyWith(fontSize: 14),
+                ),
+                PublicAuthLink(
+                  text: 'Log in',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildOtpForm({required bool isMobile}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+  Widget _buildOtpForm({bool compact = false, bool dense = false}) {
+    final maskedEmail = maskEmail(_controller.emailController.text.trim());
+
+    return PublicAuthForm(
+      heading: 'Verify your email',
+      description: 'Enter the 6-digit code sent to $maskedEmail.',
+      compact: compact,
+      dense: dense,
       children: [
-        Text(
-          'Verify your email',
-          style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
-        ),
-        SizedBox(height: isMobile ? 24 : 32),
-        Text(
-          'Enter the 6-digit code sent to ${maskEmail(_controller.emailController.text.trim())}.',
-          style: AppTextStyles.bodySmall,
-        ),
-        const SizedBox(height: 24),
-        Text('Verification code', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        CustomTextField(
+        PublicAuthField(
           controller: _controller.otpController,
+          label: 'Verification code',
+          hint: '123456',
+          dense: dense,
           keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          onSubmitted: (_) {
+            if (!_controller.isLoading) _handleVerifyOtp();
+          },
         ),
-        const SizedBox(height: 32),
-        CustomButton(
+        PublicAuthButton(
           text: 'Verify Account',
-          backgroundColor: AppColors.primaryButton,
-          textStyle: AppTextStyles.button,
-          isLoading: _controller.isLoading,
           onPressed: _handleVerifyOtp,
+          isLoading: _controller.isLoading,
+          dense: dense,
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: dense ? 10 : 14),
         Center(
           child: TextButton(
             onPressed: _controller.isLoading ? null : _handleResendOtp,
-            child: Text('Resend code', style: AppTextStyles.footerLink),
+            child: Text(
+              'Resend code',
+              style: PublicPageStyles.body.copyWith(
+                fontSize: 14,
+                color: PublicPageStyles.green,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: dense ? 6 : 10),
         Center(
-          child: TextButton(
+          child: PublicAuthLink(
+            text: 'Back to login',
             onPressed: _controller.isLoading
                 ? null
                 : () => Navigator.of(context).pop(),
-            child: Text('Back to login', style: AppTextStyles.bodySmall),
           ),
         ),
       ],

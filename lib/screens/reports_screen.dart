@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import '../widgets/app_footer.dart';
 import '../widgets/mobile_graph_card.dart';
 import 'package:flutter/material.dart';
@@ -86,7 +87,7 @@ class ReportsScreenState extends State<ReportsScreen> {
           listenable: _controller,
           builder: (context, _) {
             if (_controller.isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return const HydroLoadingScreen();
             }
 
             return AppFooterScrollView(
@@ -271,6 +272,7 @@ class ReportsScreenState extends State<ReportsScreen> {
 
   Widget _buildTrendsCard() => MobileGraphCard(
         title: 'Historical Telemetry Trends',
+              pageBackground: Colors.white,
         description: 'Shows historical sensor readings and how they change over the selected period.',
         actionLabel: 'View Historical Telemetry Trends',
         listenable: _controller,
@@ -281,6 +283,7 @@ class ReportsScreenState extends State<ReportsScreen> {
     final isPh = _controller.selectedParameter == 'pH';
     return ReportsAnalyticsCard(
       compact: false,
+      isLoading: _controller.isTrendLoading,
       selectedParameter: _controller.selectedParameter,
       selectedTimeframe: _controller.selectedTimeframe,
       points: _controller.trendPoints,
@@ -303,6 +306,7 @@ class ReportsScreenState extends State<ReportsScreen> {
 
   Widget _buildPredictionCard() => MobileGraphCard(
         title: 'Forecast Model Evaluation',
+        pageBackground: Colors.white,
         description: 'Compares actual sensor readings with model predictions to evaluate forecasting performance.',
         actionLabel: 'View Forecast Model Evaluation',
         listenable: _controller,

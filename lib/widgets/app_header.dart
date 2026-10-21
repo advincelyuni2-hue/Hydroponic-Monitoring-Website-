@@ -15,8 +15,19 @@ import 'header_search.dart';
 import '../services/app_state.dart';
 import '../services/global_search_service.dart';
 
+/// UI-only additions (no backend changes):
+///  - search bar capped at a fixed max width and anchored beside the bell,
+///    so the right-hand cluster stays put while the left side changes per page
+///  - soft green bell circle (all sizes)
+///  - avatar shows the user's initial instead of the generic person icon
+///    (all sizes)
+///  - on mobile the title scales down to fit so it is always shown in full
+const double _kSearchMaxWidth = 400;
+const Color _kBellTint = Color(0xFFE3EDD0);
+
 class AppHeader extends StatelessWidget {
   final String title;
+  final String? mobileTitle;
   final UserProfile? profile;
   final VoidCallback? onBellTap;
   final VoidCallback? onProfileTap;
@@ -32,6 +43,7 @@ class AppHeader extends StatelessWidget {
   const AppHeader({
     super.key,
     required this.title,
+    this.mobileTitle,
     this.profile,
     this.onBellTap,
     this.onProfileTap,
@@ -172,15 +184,25 @@ class AppHeader extends StatelessWidget {
         : (Responsive.isDesktop(context) ? 600 : 480);
 
     final Widget titleText = Text(
-      title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+      isMobile ? mobileTitle ?? title : title,
+      maxLines: isMobile && mobileTitle != null ? 2 : 1,
+      // On mobile the title is scaled to fit (below) rather than cut off.
+      overflow: isMobile ? TextOverflow.visible : TextOverflow.ellipsis,
       softWrap: false,
       style: AppTextStyles.pageHeading.copyWith(
         color: Theme.of(context).colorScheme.onSurface,
         fontSize: isMobile ? 18 : 24,
       ),
     );
+
+    // Mobile: shrink the title just enough to show it in full.
+    final Widget titleLabel = isMobile
+        ? FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: titleText,
+          )
+        : titleText;
 
     final Widget titleSection = Row(
       children: [
@@ -208,18 +230,18 @@ class AppHeader extends StatelessWidget {
           Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
-              child: titleText,
+              child: titleLabel,
             ),
           )
         else ...[
-          Flexible(child: titleText),
+          Flexible(child: titleLabel),
           const SizedBox(width: 16),
           action,
         ],
       ],
     );
 
-    return Row(
+    final Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         if (!isMobile)
@@ -230,18 +252,25 @@ class AppHeader extends StatelessWidget {
         else
           Expanded(child: titleSection),
 
-        if (!compactLayout) const Spacer(),
-
         // Search Control
         if (!isMobile) ...[
+          // Takes the leftover space, but the search itself is capped and
+          // right-aligned so it always sits beside the bell.
           Expanded(
-            flex: 2,
-            child: HeaderSearchField(
-              onHistoryDateSelected: onHistoryDateSelected,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _kSearchMaxWidth),
+                child: HeaderSearchField(
+                  onHistoryDateSelected: onHistoryDateSelected,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 16),
         ] else ...[
+          // No Spacer here: the title takes all the leftover width, so it
+          // only shrinks when it truly doesn't fit.
           _iconCircle(
             Icons.search,
             () => showMobileSearchSheet(
@@ -258,9 +287,10 @@ class AppHeader extends StatelessWidget {
           key: bellKey,
           child: onBellTap != null
               ? _iconCircle(Icons.notifications_none, onBellTap!,
-                  size: iconSize)
+                  size: iconSize, tinted: true)
               : AdminAlertBell(
                   size: iconSize,
+                  tinted: true,
                   fallback: () {
                     if (isMobile) {
                       Navigator.of(context).push(
@@ -280,21 +310,33 @@ class AppHeader extends StatelessWidget {
           const SizedBox(width: 12),
           GestureDetector(
             onTap: onProfileTap ?? () => _openSettings(context),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.iconCircle,
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                const SizedBox(width: 8),
-                ValueListenableBuilder<UserProfile?>(
-                  valueListenable: appProfile,
-                  builder: (context, liveProfile, _) {
-                    final shownProfile = liveProfile ?? profile;
+            child: ValueListenableBuilder<UserProfile?>(
+              valueListenable: appProfile,
+              builder: (context, liveProfile, _) {
+                final shownProfile = liveProfile ?? profile;
+                final name = (shownProfile?.name ?? '').trim();
+                final initial =
+                    name.isEmpty ? '' : name.substring(0, 1).toUpperCase();
 
-                    return Column(
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.iconCircle,
+                      child: initial.isEmpty
+                          ? const Icon(Icons.person, color: Colors.white)
+                          : Text(
+                              initial,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -314,38 +356,68 @@ class AppHeader extends StatelessWidget {
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ] else ...[
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onProfileTap ?? () => _openSettings(context),
-            child: const CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.iconCircle,
-              child: Icon(Icons.person, color: Colors.white, size: 16),
+            child: ValueListenableBuilder<UserProfile?>(
+              valueListenable: appProfile,
+              builder: (context, liveProfile, _) {
+                final name = ((liveProfile ?? profile)?.name ?? '').trim();
+                final initial =
+                    name.isEmpty ? '' : name.substring(0, 1).toUpperCase();
+
+                return CircleAvatar(
+                  radius: iconSize / 2,
+                  backgroundColor: AppColors.iconCircle,
+                  child: initial.isEmpty
+                      ? Icon(Icons.person,
+                          color: Colors.white, size: iconSize * 0.5)
+                      : Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                );
+              },
             ),
           ),
         ],
       ],
     );
+
+    return row;
   }
 
-  Widget _iconCircle(IconData icon, VoidCallback onTap, {double size = 40}) {
+  Widget _iconCircle(
+    IconData icon,
+    VoidCallback onTap, {
+    double size = 40,
+    bool tinted = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          color: AppColors.iconCircle,
+        decoration: BoxDecoration(
+          color: tinted ? _kBellTint : AppColors.iconCircle,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: size * 0.5),
+        child: Icon(
+          icon,
+          color: tinted ? AppColors.iconCircle : Colors.white,
+          size: size * 0.5,
+        ),
       ),
     );
   }
@@ -355,10 +427,14 @@ class AdminAlertBell extends StatefulWidget {
   final double size;
   final VoidCallback fallback;
 
+  /// Soft green circle with a dark green icon (desktop/tablet header).
+  final bool tinted;
+
   const AdminAlertBell({
     super.key,
     required this.size,
     required this.fallback,
+    this.tinted = false,
   });
 
   @override
@@ -407,13 +483,13 @@ class AdminAlertBellState extends State<AdminAlertBell> {
           child: Container(
             width: widget.size,
             height: widget.size,
-            decoration: const BoxDecoration(
-              color: AppColors.iconCircle,
+            decoration: BoxDecoration(
+              color: widget.tinted ? _kBellTint : AppColors.iconCircle,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.notifications_none,
-              color: Colors.white,
+              color: widget.tinted ? AppColors.iconCircle : Colors.white,
               size: widget.size * 0.5,
             ),
           ),

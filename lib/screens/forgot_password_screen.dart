@@ -1,21 +1,21 @@
-import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../utils/email_mask.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/custom_button.dart';
-import '../controllers/forgot_password_controller.dart';
 import '../utils/responsive.dart';
+import '../config/public_page_content.dart';
+import '../controllers/forgot_password_controller.dart';
+import '../theme/public_page_styles.dart';
+import '../utils/email_mask.dart';
+import '../widgets/public_pages/public_auth_form.dart';
+import '../widgets/public_pages/public_auth_layout.dart';
+import 'landing_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final ForgotPasswordController _controller = ForgotPasswordController();
 
   @override
@@ -34,7 +34,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final success = await _controller.sendCode();
     if (!mounted) return;
     if (success) {
-      _snack(_controller.successMessage!, color: Colors.green[700]);
+      _snack(_controller.successMessage!, color: PublicPageStyles.green);
     } else if (_controller.errorMessage != null) {
       _snack(_controller.errorMessage!);
     }
@@ -44,185 +44,178 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final success = await _controller.resetPassword();
     if (!mounted) return;
     if (success) {
-      _snack(_controller.successMessage!, color: Colors.green[700]);
-      Navigator.of(context).pop(); // back to the login screen
+      _snack(_controller.successMessage!, color: PublicPageStyles.green);
+      Navigator.of(context).pop(); // Back to login screen
     } else if (_controller.errorMessage != null) {
       _snack(_controller.errorMessage!);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth >= Responsive.tabletMaxWidth;
-            final isMobile = constraints.maxWidth < Responsive.mobileMaxWidth;
-            final formSection = _buildFormSection(isMobile: isMobile);
-
-            if (isDesktop) {
-              return Row(
-                children: [
-                  Expanded(flex: 1, child: _buildImagePlaceholder()),
-                  Expanded(
-                    flex: 1,
-                    child: Center(
-                      child: AppFooterScrollView(
-                        centerContent: true,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 48,
-                          vertical: 32,
-                        ),
-                        child: formSection,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return AppFooterScrollView(
-              padding: EdgeInsets.all(isMobile ? 20 : 32),
-              child: Center(child: formSection),
-            );
-          },
+  void _openAbout() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (landingContext) => LandingScreen(
+          onLogin: () => Navigator.of(landingContext).pop(),
         ),
       ),
     );
   }
 
-  Widget _buildImagePlaceholder() {
-    return Container(
-      margin: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.imagePlaceholder,
-        borderRadius: BorderRadius.circular(16),
+  Widget _buildNavigation() => Align(
+        alignment: Alignment.centerRight,
+        child: OutlinedButton(
+          onPressed: _openAbout,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: PublicPageStyles.green,
+            side: const BorderSide(color: PublicPageStyles.green),
+            shape: const StadiumBorder(),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.isMobile(context) ? 16 : 24,
+            vertical: Responsive.isMobile(context) ? 8 : 12),
+          textStyle: Responsive.isMobile(context)
+              ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)
+              : null,
+          ),
+          child: const Text(PublicPageContent.aboutLink),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return PublicAuthLayout(
+      navigation: _buildNavigation(),
+      formBuilder: (context, compact, dense) => _buildFormSection(
+        compact: compact,
+        dense: dense,
       ),
     );
   }
 
-  Widget _buildFormSection({required bool isMobile}) {
+  Widget _buildFormSection({bool compact = false, bool dense = false}) {
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: _controller.isCodeStep
-              ? _buildCodeForm(isMobile: isMobile)
-              : _buildEmailForm(isMobile: isMobile),
-        );
+        if (_controller.isCodeStep) {
+          return _buildCodeForm(compact: compact, dense: dense);
+        }
+        return _buildEmailForm(compact: compact, dense: dense);
       },
     );
   }
 
-  Widget _buildEmailForm({required bool isMobile}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Forgot Password',
-          style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
-        ),
-        const SizedBox(height: 12),
-        Text(
+  Widget _buildEmailForm({bool compact = false, bool dense = false}) {
+    return PublicAuthForm(
+      heading: PublicPageContent.forgotPassword,
+      description:
           "Enter your email address and we'll send you a verification code to reset your password.",
-          style: AppTextStyles.bodySmall.copyWith(fontSize: 14, height: 1.4),
-        ),
-        SizedBox(height: isMobile ? 24 : 32),
-        Text('Your email', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        CustomTextField(
+      compact: compact,
+      dense: dense,
+      children: [
+        PublicAuthField(
           controller: _controller.emailController,
+          label: PublicPageContent.emailLabel,
+          hint: PublicPageContent.emailHint,
+          dense: dense,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.email],
+          onSubmitted: (_) {
+            if (!_controller.isLoading) _handleSendCode();
+          },
         ),
-        SizedBox(height: isMobile ? 24 : 32),
-        CustomButton(
+        PublicAuthButton(
           text: 'Send Verification Code',
-          backgroundColor: AppColors.primaryButton,
-          textStyle: AppTextStyles.button,
-          isLoading: _controller.isLoading,
           onPressed: _handleSendCode,
+          isLoading: _controller.isLoading,
+          dense: dense,
         ),
-        const SizedBox(height: 24),
-        Center(
-          child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.footer,
-                children: [
-                  const TextSpan(text: 'Remember your password? '),
-                  TextSpan(text: 'Log in', style: AppTextStyles.footerLink),
-                ],
-              ),
+        SizedBox(height: dense ? 12 : 18),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Remember your password? ',
+              style: PublicPageStyles.body.copyWith(fontSize: 14),
             ),
-          ),
+            PublicAuthLink(
+              text: 'Log in',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildCodeForm({required bool isMobile}) {
+  Widget _buildCodeForm({bool compact = false, bool dense = false}) {
     final maskedEmail = maskEmail(_controller.emailController.text.trim());
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Reset your password',
-          style: AppTextStyles.title.copyWith(fontSize: isMobile ? 26 : 32),
-        ),
-        const SizedBox(height: 12),
-        Text(
+
+    return PublicAuthForm(
+      heading: 'Reset your password',
+      description:
           'Enter the verification code sent to $maskedEmail and choose a new password.',
-          style: AppTextStyles.bodySmall.copyWith(fontSize: 14, height: 1.4),
-        ),
-        SizedBox(height: isMobile ? 24 : 32),
-        Text('Verification code', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        CustomTextField(
+      compact: compact,
+      dense: dense,
+      children: [
+        PublicAuthField(
           controller: _controller.codeController,
+          label: 'Verification code',
+          hint: '123456',
+          dense: dense,
           keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.oneTimeCode],
         ),
-        const SizedBox(height: 24),
-        Text('New password', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        CustomTextField(
+        PublicAuthField(
           controller: _controller.newPasswordController,
+          label: 'New password',
+          hint: PublicPageContent.passwordHint,
+          dense: dense,
           obscureText: _controller.obscurePassword,
           onToggleObscureText: _controller.togglePasswordVisibility,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.newPassword],
         ),
-        const SizedBox(height: 24),
-        Text('Confirm new password', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        CustomTextField(
+        PublicAuthField(
           controller: _controller.confirmPasswordController,
+          label: 'Confirm new password',
+          hint: PublicPageContent.passwordHint,
+          dense: dense,
           obscureText: _controller.obscureConfirmPassword,
           onToggleObscureText: _controller.toggleConfirmPasswordVisibility,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            if (!_controller.isLoading) _handleResetPassword();
+          },
         ),
-        const SizedBox(height: 32),
-        CustomButton(
+        PublicAuthButton(
           text: 'Reset Password',
-          backgroundColor: AppColors.primaryButton,
-          textStyle: AppTextStyles.button,
-          isLoading: _controller.isLoading,
           onPressed: _handleResetPassword,
+          isLoading: _controller.isLoading,
+          dense: dense,
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: dense ? 10 : 14),
         Center(
           child: TextButton(
             onPressed: _controller.isLoading ? null : _handleSendCode,
-            child: Text('Resend code', style: AppTextStyles.footerLink),
+            child: Text(
+              'Resend code',
+              style: PublicPageStyles.body.copyWith(
+                fontSize: 14,
+                color: PublicPageStyles.green,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ),
+        SizedBox(height: dense ? 6 : 10),
         Center(
-          child: TextButton(
-            onPressed:
-                _controller.isLoading ? null : _controller.backToEmailStep,
-            child: Text('Use a different email', style: AppTextStyles.bodySmall),
+          child: PublicAuthLink(
+            text: 'Use a different email',
+            onPressed: _controller.isLoading
+                ? null
+                : _controller.backToEmailStep,
           ),
         ),
       ],

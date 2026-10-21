@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/responsive.dart';
 
 class ParameterConfigCard extends StatelessWidget {
   final RangeValues phRange;
@@ -23,6 +24,7 @@ class ParameterConfigCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = Responsive.isMobile(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -40,6 +42,7 @@ class ParameterConfigCard extends StatelessWidget {
           const SizedBox(height: 16),
           // pH Range Box
           _rangeBox(
+            isMobile: isMobile,
             label: 'pH Setpoint Range',
             unit: 'pH',
             rangeValues: phRange,
@@ -52,6 +55,7 @@ class ParameterConfigCard extends StatelessWidget {
           const SizedBox(height: 16),
           // EC Range Box
           _rangeBox(
+            isMobile: isMobile,
             label: 'EC Setpoint Range',
             unit: 'mS/cm',
             rangeValues: ecRange,
@@ -66,11 +70,14 @@ class ParameterConfigCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
+                flex: isMobile ? 2 : 1,
                 child: SizedBox(
-                  height: 42,
+                  height: isMobile ? null : 42,
                   child: ElevatedButton(
                     onPressed: onSave,
                     style: ElevatedButton.styleFrom(
+                      minimumSize: isMobile ? const Size(0, 44) : null,
+                      padding: isMobile ? const EdgeInsets.symmetric(horizontal: 8, vertical: 12) : null,
                       backgroundColor: AppColors.primaryButton,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -79,6 +86,7 @@ class ParameterConfigCard extends StatelessWidget {
                     ),
                     child: Text(
                       'Save configuration',
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.button.copyWith(fontSize: 13),
                     ),
                   ),
@@ -87,10 +95,12 @@ class ParameterConfigCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: SizedBox(
-                  height: 42,
+                  height: isMobile ? null : 42,
                   child: OutlinedButton(
                     onPressed: onRevert,
                     style: OutlinedButton.styleFrom(
+                      minimumSize: isMobile ? const Size(0, 44) : null,
+                      padding: isMobile ? const EdgeInsets.symmetric(horizontal: 8, vertical: 12) : null,
                       side: const BorderSide(
                         color: AppColors.primaryButton,
                         width: 1.2,
@@ -117,6 +127,7 @@ class ParameterConfigCard extends StatelessWidget {
   }
 
   Widget _rangeBox({
+    required bool isMobile,
     required String label,
     required String unit,
     required RangeValues rangeValues,
@@ -136,10 +147,13 @@ class ParameterConfigCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Flex(
+            direction: isMobile ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(label, style: AppTextStyles.bodyBold.copyWith(fontSize: 14)),
+              if (isMobile) const SizedBox(height: 4),
               Text(
                 'Ideal: ${rangeValues.start.toStringAsFixed(6)} - ${rangeValues.end.toStringAsFixed(6)} $unit',
                 style: AppTextStyles.cardMeta.copyWith(
@@ -170,7 +184,9 @@ class ParameterConfigCard extends StatelessWidget {
               onChanged: onChanged,
             ),
           ),
-          Row(
+          Flex(
+            direction: isMobile ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(

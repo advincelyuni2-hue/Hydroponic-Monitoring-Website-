@@ -122,6 +122,11 @@ class NotificationService {
     return AppNotificationItem(
       id: row['id'].toString(),
       createdAt: parsed,
+      alertCreatedAt: _formatDetailTimestamp(row['created_at']),
+      latestActivityAt: _formatDetailTimestamp(row['timestamp']),
+      hasRecordedIntervention: row['action_log_id'] != null ||
+          _nonEmpty(row['action_taken_at']) != null ||
+          row['lifecycle_state'] == 'action_taken',
       title: _displayTitle(storedTitle, parameter),
       subtitle: displayMessage.isEmpty
           ? liveDetail?.summary ?? 'Review this notification.'
@@ -415,6 +420,16 @@ class NotificationService {
       summary: '$parameter five-minute average is '
           '${direction?.toLowerCase() ?? 'stable'} at $displayValue.',
     );
+  }
+
+  String? _formatDetailTimestamp(dynamic raw) {
+    final value = _nonEmpty(raw);
+    if (value == null) return null;
+    try {
+      return formatManilaDateTime(toManilaTime(parseSupabaseTimestamp(value)));
+    } on FormatException {
+      return null;
+    }
   }
 
   String? _formatTimestamp(dynamic raw) {

@@ -73,6 +73,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ---------------------------------------------------------------------
 
   Widget _buildProfileCard(bool isMobile) {
+    final credentialButtons = [
+      OutlinedButton.icon(
+        onPressed: () => _openCredentialDialog(_CredentialMode.email),
+        style: isMobile ? OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          textStyle: const TextStyle(fontSize: 12),
+        ) : null,
+        icon: const Icon(Icons.alternate_email_rounded, size: 16),
+        label: const Text('Change email', textAlign: TextAlign.center),
+      ),
+      OutlinedButton.icon(
+        onPressed: () => _openCredentialDialog(_CredentialMode.password),
+        style: isMobile ? OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          textStyle: const TextStyle(fontSize: 12),
+        ) : null,
+        icon: const Icon(Icons.lock_outline_rounded, size: 16),
+        label: const Text('Change password', textAlign: TextAlign.center),
+      ),
+    ];
     return _SettingsCard(
       title: 'Profile Management',
       description:
@@ -88,22 +108,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _field(_emailController, enabled: false),
         const SizedBox(height: 12),
         if (AuthService().hasPasswordLogin)
-          Wrap(
+          isMobile ? Row(
+            children: [
+              Expanded(child: credentialButtons[0]),
+              const SizedBox(width: 8),
+              Expanded(child: credentialButtons[1]),
+            ],
+          ) : Wrap(
             spacing: 12,
             runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _openCredentialDialog(_CredentialMode.email),
-                icon: const Icon(Icons.alternate_email_rounded, size: 16),
-                label: const Text('Change email'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    _openCredentialDialog(_CredentialMode.password),
-                icon: const Icon(Icons.lock_outline_rounded, size: 16),
-                label: const Text('Change password'),
-              ),
-            ],
+            children: credentialButtons,
           )
         else
           Text(

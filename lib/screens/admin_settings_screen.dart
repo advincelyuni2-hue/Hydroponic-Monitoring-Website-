@@ -1,3 +1,4 @@
+import '../widgets/hydro_loading_screen.dart';
 import '../widgets/app_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -275,6 +276,7 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Scaffold(body: SafeArea(child: HydroLoadingScreen()));
     final isAdmin = appProfile.value?.isAdmin == true;
 
     return Scaffold(
@@ -328,8 +330,8 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
           for (final user in _users) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
+              child: LayoutBuilder(builder: (context, constraints) {
+                final children = <Widget>[
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: AppColors.calloutBackground,
@@ -398,8 +400,24 @@ class AdminSettingsScreenState extends State<AdminSettingsScreen> {
                         : (active) => _toggleUserActive(user, active),
                   ),
                   const SizedBox(width: 8),
-                ],
-              ),
+                ];
+                if (Responsive.isMobile(context)) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: children.take(3).toList()),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [children[4], children[6]],
+                      ),
+                    ],
+                  );
+                }
+                return Row(children: children);
+              }),
             ),
             Divider(color: AppColors.cardBorder, height: 1),
           ],

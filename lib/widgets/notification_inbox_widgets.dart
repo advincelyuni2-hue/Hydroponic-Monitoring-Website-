@@ -241,7 +241,10 @@ class _NotificationDetailsPanelState extends State<NotificationDetailsPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Created ${item.timestamp}', style: AppTextStyles.cardMeta),
+          Text('Created ${item.alertCreatedAt ?? 'Date unavailable'}',
+              style: AppTextStyles.cardMeta),
+          Text('Latest update ${item.latestActivityAt ?? 'Date unavailable'}',
+              style: AppTextStyles.cardMeta),
           const SizedBox(height: 12),
           LayoutBuilder(builder: (context, constraints) {
             final width = constraints.maxWidth < 300
@@ -273,7 +276,10 @@ class _NotificationDetailsPanelState extends State<NotificationDetailsPanel> {
                   ])),
           if (!item.isResolved && item.isSensorAlert) ...[
             const SizedBox(height: 10),
-            Text('Resolves automatically after three stable readings.',
+            Text(
+                item.isMonitoring
+                    ? 'Intervention recorded. Waiting for three consecutive stable readings before automatic resolution.'
+                    : 'Resolves automatically after three stable readings.',
                 style: AppTextStyles.cardMeta),
           ],
           const SizedBox(height: 18),
@@ -368,10 +374,14 @@ class _NotificationDetailsPanelState extends State<NotificationDetailsPanel> {
   List<Widget> _timeline(
       AppNotificationItem item, NotificationAppearance appearance) {
     final entries = <({String title, String time, Color color})>[
-      (title: 'Alert created', time: item.timestamp, color: appearance.color),
+      (
+        title: 'Alert created',
+        time: item.alertCreatedAt ?? 'Date unavailable',
+        color: appearance.color
+      ),
       if (item.actionTakenAt != null)
         (
-          title: 'Action recorded',
+          title: 'Intervention recorded',
           time: item.actionTakenAt!,
           color: AppColors.primaryButton
         ),

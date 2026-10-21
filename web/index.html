@@ -31,8 +31,59 @@
 
   <title>monitoring_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- HydroPulse splash styles -->
+  <style>
+    html, body { margin: 0; background: #FDFEEE; }
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #FDFEEE;
+      font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      transition: opacity .25s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    #splash img { width: 96px; height: 96px; border-radius: 24px; display: block; }
+    #splash svg { margin: 36px 0 22px; }
+    #splash .ecg {
+      stroke-dasharray: 420;
+      animation: splash-draw 2.2s ease-in-out infinite;
+    }
+    #splash .title { font-size: 18px; font-weight: 600; color: #1B2410; }
+    #splash .sub { margin-top: 6px; font-size: 14px; color: #5C6356; }
+    @keyframes splash-draw {
+      0%   { stroke-dashoffset: 420; }
+      60%  { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -420; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #splash .ecg { animation: none; stroke-dashoffset: 0; }
+    }
+  </style>
 </head>
 <body>
+  <!-- HydroPulse splash: shown while Flutter loads, removed on first frame -->
+  <div id="splash" role="status" aria-label="Loading">
+    <img src="splash/logo.png" alt="HydroPulse">
+    <svg width="240" height="60" viewBox="0 0 240 60" fill="none" aria-hidden="true">
+      <path d="M0 30H80" stroke="#DDDCC8" stroke-width="3" stroke-linecap="round"/>
+      <path d="M160 30H240" stroke="#DDDCC8" stroke-width="3" stroke-linecap="round"/>
+      <path class="ecg" d="M0 30H80l10-6 10 6 12-26 14 52 12-26h14l8-6 8 6H240"
+            stroke="#2E6B0E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="title">Syncing your reservoir readings</div>
+    <div class="sub">This only takes a moment</div>
+  </div>
+  <script>
+    // Flutter fires this once the first frame is on screen.
+    window.addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('splash');
+      if (!s) return;
+      s.classList.add('hide');
+      setTimeout(function () { s.remove(); }, 300);
+    });
+  </script>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

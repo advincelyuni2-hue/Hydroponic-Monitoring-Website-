@@ -4,8 +4,13 @@ class AppNotificationItem {
   final String id;
   final String title;
   final String subtitle;
+  // Activity time retained for existing list ordering, grouping and consumers.
   final String timestamp;
   final DateTime? createdAt;
+  // Actual notifications.created_at, formatted for the details panel.
+  final String? alertCreatedAt;
+  final String? latestActivityAt;
+  final bool hasRecordedIntervention;
   final NotificationType type;
   final String currentStatus;
   final String currentValue;
@@ -27,6 +32,9 @@ class AppNotificationItem {
     required this.subtitle,
     required this.timestamp,
     this.createdAt,
+    this.alertCreatedAt,
+    this.latestActivityAt,
+    this.hasRecordedIntervention = false,
     required this.type,
     required this.currentStatus,
     required this.currentValue,
@@ -50,12 +58,20 @@ class AppNotificationItem {
   bool get isCritical => type == NotificationType.critical;
   bool get isSensorAlert => source == 'sensor' || source == 'sensor_threshold';
 
+  bool get isMonitoring =>
+      !isResolved &&
+      lifecycleState != 'resolved' &&
+      (hasRecordedIntervention ||
+          actionTakenAt != null ||
+          lifecycleState == 'action_taken');
+
   String get lifecycleLabel {
     if (isResolved || lifecycleState == 'resolved') return 'Resolved';
+    if (isMonitoring) return 'Monitoring';
+    if (isSensorAlert) return 'Ongoing';
     if (lifecycleState == 'recovering') {
       return 'Recovering ($stableReadingCount/3 stable readings)';
     }
-    if (lifecycleState == 'action_taken') return 'Action recorded';
     return 'Open';
   }
 }

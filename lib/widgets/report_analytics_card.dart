@@ -9,10 +9,12 @@ import '../theme/app_decorations.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/responsive.dart';
 import 'mobile_graph_card.dart';
+import 'mobile_graph_legend.dart';
 
 class ReportsAnalyticsCard extends StatefulWidget {
   final String selectedParameter;
   final bool compact;
+  final bool isLoading;
   final String selectedTimeframe;
   final List<AnalyticsPoint> points;
   final double minThreshold;
@@ -24,6 +26,7 @@ class ReportsAnalyticsCard extends StatefulWidget {
     super.key,
     required this.selectedParameter,
     this.compact = false,
+    this.isLoading = false,
     required this.selectedTimeframe,
     required this.points,
     required this.minThreshold,
@@ -49,6 +52,18 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
+    if (widget.isLoading) {
+      return Container(
+        height: 320,
+        decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    final latest = widget.points.isEmpty ? null : widget.points.last;
+    final outOfRange = latest != null &&
+        (latest.value < widget.minThreshold || latest.value > widget.maxThreshold);
+    final outsideCount = widget.points.where((point) =>
+        point.value < widget.minThreshold || point.value > widget.maxThreshold).length;
 
     return Container(
       width: double.infinity,
@@ -56,11 +71,24 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       decoration: MobileGraphPage.isActive(context) ? null : AppDecorations.card(),
       child: MobileGraphComposition(
         chartIndex: 4,
+        subtitle: 'Historical sensor trends and parameter telemetry',
+        sheetTitle: 'Telemetry details',
+        summaries: [
+          MobileGraphSummary(title: 'Latest reading',
+            value: latest == null ? 'No readings' : latest.value.toStringAsFixed(2),
+            detail: latest == null ? null
+                : '${latest.label}\n${widget.selectedParameter} ? ${outOfRange ? "Out of range" : "In range"}',
+            valueColor: outOfRange ? AppColors.alertBorder : AppColors.accentGreen),
+          MobileGraphSummary(title: 'Ideal range',
+            value: '${widget.minThreshold.toStringAsFixed(2)} ? ${widget.maxThreshold.toStringAsFixed(2)}',
+            detail: widget.points.isEmpty ? 'No readings available'
+                : '$outsideCount of ${widget.points.length} readings out of range during ${widget.selectedTimeframe}'),
+        ],
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(isMobile),
           const SizedBox(height: 5),
-          Text(
+          if (MobileGraphPage.isActive(context)) const SizedBox.shrink() else Text(
             'Historical sensor trends and parameter telemetry',
             style: AppTextStyles.cardMeta,
           ),
@@ -71,7 +99,8 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
                 : (widget.compact ? 260 : 350),
             child: MobileGraphTimeline(
               pointCount: widget.points.length,
-              child: MobileLineChart(_buildTrendChartData(isMobile)),
+              child: MobileLineChart(_buildTrendChartData(isMobile),
+                preserveAxes: MobileGraphPage.isActive(context)),
             ),
           ),
           const SizedBox(height: 12),
@@ -112,7 +141,13 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
       ],
     );
 
-    if (MobileGraphPage.isActive(context)) return controls;
+    if (MobileGraphPage.isActive(context)) {
+      return MobileGraphControls(value: widget.selectedParameter,
+        values: const ['pH', 'EC'], onChanged: widget.onParameterChanged,
+        trailing: _selector<String>(values: const ['7d', '30d', '90d'],
+          selected: widget.selectedTimeframe, label: (value) => value,
+          onSelected: widget.onTimeframeChanged));
+    }
     if (!Responsive.isDesktop(context) || widget.compact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,6 +212,27 @@ class ReportsAnalyticsCardState extends State<ReportsAnalyticsCard> {
 
   Widget _buildLegend() {
     final currentColor = widget.selectedParameter == 'pH' ? phColor : ecColor;
+    if (MobileGraphPage.isActive(context)) {
+      Widget row(Widget mark, String label, {String? note}) => Row(children: [
+        mark,
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: AppTextStyles.cardMeta)),
+        if (note != null) ...[
+          const SizedBox(width: 8),
+          Flexible(child: Text(note, textAlign: TextAlign.right,
+            style: AppTextStyles.cardMeta.copyWith(fontSize: 11,
+              color: AppColors.textSecondary))),
+        ],
+      ]);
+      return MobileGraphLegendRows(children: [
+        row(MobileLegendMark(color: currentColor),
+          '${widget.selectedParameter} measured values'),
+        row(const MobileLegendMark(color: AppColors.alertBorder, dot: true),
+          'Out of range', note: 'shown on hover'),
+        row(const MobileLegendMark(color: AppColors.alertBorder, dashed: true),
+          'Ideal range limits'),
+      ]);
+    }
 
     return Wrap(
       spacing: 18,
